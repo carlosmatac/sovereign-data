@@ -1,0 +1,103 @@
+// ============================================
+// AssemblyAI Integration — Transcription + Diarization
+// ============================================
+
+const ASSEMBLYAI_BASE_URL = "https://api.assemblyai.com/v2";
+
+interface TranscriptionRequest {
+  audio_url: string;
+  webhook_url: string;
+  webhook_auth_header_name?: string;
+  webhook_auth_header_value?: string;
+  speaker_labels: boolean;
+  language_code?: string;
+  language_detection?: boolean;
+}
+
+interface TranscriptionResponse {
+  id: string;
+  status: "queued" | "processing" | "completed" | "error";
+  text?: string;
+  utterances?: Array<{
+    speaker: string;
+    text: string;
+    start: number; // milliseconds
+    end: number;
+    confidence: number;
+    words: Array<{
+      text: string;
+      start: number;
+      end: number;
+      confidence: number;
+      speaker: string;
+    }>;
+  }>;
+  error?: string;
+  audio_duration?: number;
+}
+
+/**
+ * Submit audio for transcription with speaker diarization.
+ * Uses Universal-2 model with webhook callback.
+ */
+export async function submitTranscription({
+  audioUrl,
+  webhookUrl,
+  webhookSecret,
+  languageCode,
+}: {
+  audioUrl: string;
+  webhookUrl: string;
+  webhookSecret: string;
+  languageCode?: string;
+}): Promise<{ transcriptId: string }> {
+  const body: TranscriptionRequest = {
+    audio_url: audioUrl,
+    webhook_url: webhookUrl,
+    webhook_auth_header_name: "x-webhook-secret",
+    webhook_auth_header_value: webhookSecret,
+    speaker_labels: true, // Critical: enables speaker diarization
+    language_detection: !languageCode,
+    ...(languageCode && { language_code: languageCode }),
+  };
+
+  const response = await fetch(`${ASSEMBLYAI_BASE_URL}/transcript`, {
+    method: "POST",
+    headers: {
+      Authorization: process.env.ASSEMBLYAI_API_KEY!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AssemblyAI submission failed: ${error}`);
+  }
+
+  const data = (await response.json()) as TranscriptionResponse;
+  return { transcriptId: data.id };
+}
+
+/**
+ * Fetch a completed transcription result.
+ */
+export async function getTranscription(
+  transcriptId: string
+): Promise<TranscriptionResponse> {
+  const response = await fetch(
+    `${ASSEMBLYAI_BASE_URL}/transcript/${transcriptId}`,
+    {
+      headers: {
+        Authorization: process.env.ASSEMBLYAI_API_KEY!,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`AssemblyAI fetch failed: ${error}`);
+  }
+
+  return response.json() as Promise<TranscriptionResponse>;
+}
