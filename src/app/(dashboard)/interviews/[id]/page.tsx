@@ -1,0 +1,349 @@
+import { createClient } from "@/lib/supabase/server";
+import { notFound } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { STATUS_LABELS } from "@/lib/constants";
+import {
+  ArrowLeft,
+  Clock,
+  Globe,
+  User,
+  Building2,
+  MapPin,
+  AlertTriangle,
+  TrendingUp,
+  FileText,
+} from "lucide-react";
+import Link from "next/link";
+import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
+import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
+
+export default async function InterviewDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  // Fetch interview with project info
+  const { data: interview, error } = await supabase
+    .from("interviews")
+    .select("*, projects(name, country, region)")
+    .eq("id", id)
+    .single();
+
+  if (error || !interview) {
+    notFound();
+  }
+
+  // Fetch entities for this interview
+  const { data: mentions } = await supabase
+    .from("entity_mentions")
+    .select("*, entities(*)")
+    .eq("interview_id", id);
+
+  const statusInfo = STATUS_LABELS[interview.status] ?? {
+    label: interview.status,
+    color: "bg-gray-100 text-gray-800",
+  };
+
+  const project = interview.projects as unknown as {
+    name: string;
+    country: string | null;
+    region: string | null;
+  } | null;
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return null;
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m ${secs}s`;
+  };
+
+  const sentiment = interview.sentiment as {
+    overall?: string;
+    score?: number;
+    highlights?: Array<{ text: string; sentiment: string }>;
+  } | null;
+
+  const entityTypeIcons: Record<string, React.ReactNode> = {
+    PERSON: <User className="h-3.5 w-3.5" />,
+    COMPANY: <Building2 className="h-3.5 w-3.5" />,
+    GOVERNMENT: <Globe className="h-3.5 w-3.5" />,
+    ORGANIZATION: <Globe className="h-3.5 w-3.5" />,
+    LOCATION: <MapPin className="h-3.5 w-3.5" />,
+    EVENT: <Clock className="h-3.5 w-3.5" />,
+  };
+
+  return (
+    <div className="p-6">
+      {/* Back navigation */}
+      <div className="mb-6">
+        <Link
+          href="/interviews"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to Interviews
+        </Link>
+      </div>
+
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {interview.title}
+            </h1>
+            <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
+              {project && <span>{project.name}</span>}
+              {project?.country && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {project.country}
+                </span>
+              )}
+              {interview.audio_duration && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatDuration(interview.audio_duration)}
+                </span>
+              )}
+            </div>
+          </div>
+          <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+        </div>
+        {interview.description && (
+          <p className="mt-3 text-muted-foreground">{interview.description}</p>
+        )}
+      </div>
+
+      {/* Pipeline Status Tracker */}
+      {interview.status !== "COMPLETED" && (
+        <InterviewStatusTracker
+          interviewId={interview.id}
+          currentStatus={interview.status}
+          errorMessage={interview.error_message}
+        />
+      )}
+
+      {/* Main Content Grid — only show when there's extracted data */}
+      {interview.status === "COMPLETED" && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column: Transcript + Summary */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Executive Summary */}
+            {interview.summary && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">
+                      Executive Summary
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed">
+                    {interview.summary}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Risks & Opportunities */}
+            {interview.topics && interview.topics.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Topics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {interview.topics.map((topic) => (
+                      <Badge key={topic} variant="secondary">
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Full Transcript */}
+            {interview.transcript_full && (
+              <TranscriptViewer
+                transcript={interview.transcript_full}
+                speakerMap={
+                  interview.speaker_map as Record<string, string>
+                }
+              />
+            )}
+          </div>
+
+          {/* Right Column: Sidebar Intelligence */}
+          <div className="space-y-6">
+            {/* Sentiment */}
+            {sentiment && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Sentiment</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-3 w-3 rounded-full ${
+                        sentiment.overall === "positive"
+                          ? "bg-green-500"
+                          : sentiment.overall === "negative"
+                            ? "bg-red-500"
+                            : sentiment.overall === "mixed"
+                              ? "bg-yellow-500"
+                              : "bg-gray-400"
+                      }`}
+                    />
+                    <span className="text-sm font-medium capitalize">
+                      {sentiment.overall}
+                    </span>
+                    {sentiment.score !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        ({sentiment.score > 0 ? "+" : ""}
+                        {sentiment.score.toFixed(2)})
+                      </span>
+                    )}
+                  </div>
+                  {sentiment.highlights &&
+                    sentiment.highlights.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {sentiment.highlights.map((h, i) => (
+                          <div
+                            key={i}
+                            className="rounded-md bg-muted p-2 text-xs"
+                          >
+                            <span
+                              className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
+                                h.sentiment === "positive"
+                                  ? "bg-green-500"
+                                  : h.sentiment === "negative"
+                                    ? "bg-red-500"
+                                    : "bg-gray-400"
+                              }`}
+                            />
+                            &ldquo;{h.text}&rdquo;
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Entities */}
+            {mentions && mentions.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    Entities Mentioned
+                  </CardTitle>
+                  <CardDescription>
+                    {mentions.length} entities identified
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {mentions.map((mention) => {
+                      const entity = mention.entities as unknown as {
+                        name: string;
+                        type: string;
+                        description: string | null;
+                      } | null;
+                      if (!entity) return null;
+
+                      return (
+                        <div
+                          key={mention.id}
+                          className="flex items-start gap-2 rounded-md p-2 hover:bg-muted"
+                        >
+                          <div className="mt-0.5 text-muted-foreground">
+                            {entityTypeIcons[entity.type] ?? (
+                              <Globe className="h-3.5 w-3.5" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">
+                              {entity.name}
+                            </p>
+                            {entity.description && (
+                              <p className="text-xs text-muted-foreground">
+                                {entity.description}
+                              </p>
+                            )}
+                            <div className="mt-0.5 flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {entity.type}
+                              </Badge>
+                              {mention.sentiment && (
+                                <span
+                                  className={`text-[10px] ${
+                                    mention.sentiment === "positive"
+                                      ? "text-green-600"
+                                      : mention.sentiment === "negative"
+                                        ? "text-red-600"
+                                        : "text-gray-500"
+                                  }`}
+                                >
+                                  {mention.sentiment}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Speaker Map */}
+            {interview.speaker_map &&
+              Object.keys(interview.speaker_map).length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Speakers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(
+                        interview.speaker_map as Record<string, string>
+                      ).map(([key, name]) => (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between text-sm"
+                        >
+                          <span className="text-muted-foreground">{key}</span>
+                          <span className="font-medium">{name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
