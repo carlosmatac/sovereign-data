@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createProject } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,57 +27,29 @@ import Link from "next/link";
 import { REGIONS } from "@/lib/constants";
 
 export default function NewProjectPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      toast.error("Project name is required");
-      return;
-    }
-
+  const handleSubmit = async (formData: FormData) => {
     setLoading(true);
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Append region from the Select component (not a native form element)
+    if (region) {
+      formData.set("region", region);
+    }
 
-    if (!user) {
-      toast.error("You must be logged in");
+    const result = await createProject(formData);
+
+    if (result?.error) {
+      toast.error("Failed to create project", {
+        description: result.error,
+      });
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from("projects")
-      .insert({
-        name: name.trim(),
-        description: description.trim() || null,
-        country: country.trim() || null,
-        region: region || null,
-        created_by: user.id,
-      })
-      .select()
-      .single();
-
-    setLoading(false);
-
-    if (error) {
-      toast.error("Failed to create project", {
-        description: error.message,
-      });
-      return;
-    }
-
     toast.success("Project created");
-    router.push(`/interviews?project=${data.id}`);
+    // redirect() in the server action handles navigation
   };
 
   return (
@@ -101,14 +73,13 @@ export default function NewProjectPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreate} className="space-y-6">
+          <form action={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Project Name *</Label>
               <Input
                 id="name"
+                name="name"
                 placeholder="e.g. Nigeria Energy Sector 2026"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
                 required
                 autoFocus
               />
@@ -118,9 +89,8 @@ export default function NewProjectPage() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
+                name="description"
                 placeholder="Brief description of the intelligence focus..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
                 rows={3}
               />
             </div>
@@ -130,9 +100,8 @@ export default function NewProjectPage() {
                 <Label htmlFor="country">Country</Label>
                 <Input
                   id="country"
+                  name="country"
                   placeholder="e.g. Nigeria"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
                 />
               </div>
 

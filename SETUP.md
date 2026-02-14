@@ -180,6 +180,27 @@ npm run dev
 
 **Solution**: Use `CREATE EXTENSION IF NOT EXISTS "vector" WITH SCHEMA "extensions";`
 
+### RLS Infinite Recursion & auth.uid() NULL in PostgREST
+
+**Problem**: `infinite recursion detected in policy for relation "project_members"` and `new row violates row-level security policy` on INSERT.
+
+**Cause**: Two issues:
+1. RLS policies on `project_members` query themselves, causing infinite recursion.
+2. `auth.uid()` returns NULL in the PostgREST context for both browser and server Supabase clients, even when `getUser()` succeeds. This is a known issue with `@supabase/ssr` cookie-based auth and PostgREST JWT propagation.
+
+**Solution**:
+1. Run `supabase/migrations/00002_fix_rls_recursion.sql` — creates `SECURITY DEFINER` helper functions (`is_project_member`, `is_project_owner`, etc.) and rewrites all policies to use them.
+2. Run `supabase/migrations/00003_fix_created_by_default.sql` — adds `DEFAULT auth.uid()` to `created_by` columns.
+3. All server-side mutations (Server Actions, API routes) verify the user via `getUser()` first, then use the admin client (service role) for DB writes. This bypasses RLS safely since auth is already verified.
+
+### AssemblyAI speech_model Parameter
+
+**Problem**: `"speech_models" must be a non-empty list containing one or more of: "universal-3-pro", "universal-2"`.
+
+**Cause**: As of 2026, AssemblyAI requires the `speech_model` parameter in transcription requests. Previously it was optional and defaulted to the latest model.
+
+**Solution**: Include `speech_model: "universal-2"` in the transcription request body.
+
 ### pg_trgm Index Error
 
 **Problem**: `operator class "gin_trgm_ops" does not exist` when creating the entities name index.

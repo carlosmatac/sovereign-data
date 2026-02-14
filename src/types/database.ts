@@ -97,7 +97,7 @@ export interface Database {
           description?: string | null;
           country?: string | null;
           region?: string | null;
-          created_by: string;
+          created_by?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -199,7 +199,7 @@ export interface Database {
           assemblyai_id?: string | null;
           language?: string;
           conducted_at?: string | null;
-          created_by: string;
+          created_by?: string;
           created_at?: string;
           updated_at?: string;
         };

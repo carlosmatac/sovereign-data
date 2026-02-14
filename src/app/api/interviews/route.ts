@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 
 /**
@@ -7,11 +8,12 @@ import { submitTranscription } from "@/lib/ai/assemblyai";
  *
  * Create a new interview record and trigger transcription.
  * Called after the client uploads audio to Supabase Storage.
+ *
+ * Uses admin client for DB writes (auth verified via getUser first).
  */
 export async function POST(request: NextRequest) {
+  // 1. Verify user identity via cookie-based client
   const supabase = await createClient();
-
-  // Verify authenticated user
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -37,8 +39,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // 2. Use admin client for DB operations (bypasses RLS, safe after auth check)
+  const admin = createAdminClient();
+
   // ── Create interview record ────────────────────────────────────
-  const { data: interview, error: insertError } = await supabase
+  const { data: interview, error: insertError } = await admin
     .from("interviews")
     .insert({
       title,
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Update with AssemblyAI ID
-    await supabase
+    await admin
       .from("interviews")
       .update({
         assemblyai_id: transcriptId,
@@ -90,7 +95,7 @@ export async function POST(request: NextRequest) {
     console.error("AssemblyAI submission failed:", error);
 
     // Mark as failed but still return the interview ID
-    await supabase
+    await admin
       .from("interviews")
       .update({
         status: "FAILED",
