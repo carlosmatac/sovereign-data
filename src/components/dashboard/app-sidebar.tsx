@@ -22,9 +22,11 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Globe,
+  LayoutDashboard,
   FolderKanban,
   Mic,
   Search,
+  MessageSquare,
   Settings,
   LogOut,
   ChevronUp,
@@ -35,6 +37,11 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 const navItems = [
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
   {
     title: "Projects",
     href: "/projects",
@@ -49,6 +56,11 @@ const navItems = [
     title: "Intelligence Search",
     href: "/search",
     icon: Search,
+  },
+  {
+    title: "Intelligence Chat",
+    href: "/chat",
+    icon: MessageSquare,
   },
 ];
 

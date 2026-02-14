@@ -11,7 +11,7 @@
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
 | 0 | Foundation | COMPLETE | 100% |
-| 1 | Auth & Core Pipeline | IN PROGRESS | ~90% |
+| 1 | Auth & Core Pipeline | COMPLETE | 100% |
 | 2 | Conversational RAG & Analytics | NOT STARTED | 0% |
 | 3 | Team Management & Reports | NOT STARTED | 0% |
 | 4 | Production Deployment | NOT STARTED | 0% |
@@ -37,7 +37,7 @@
 
 ---
 
-## Phase 1 — Auth & Core Pipeline (IN PROGRESS ~90%)
+## Phase 1 — Auth & Core Pipeline (COMPLETE)
 
 **Goal**: Working end-to-end flow: login → create project → upload audio → transcribe → extract → search.
 
@@ -68,24 +68,20 @@
 | RLS recursion fix | Done | `supabase/migrations/00002_*.sql` | SECURITY DEFINER helpers |
 | created_by default fix | Done | `supabase/migrations/00003_*.sql` | DEFAULT auth.uid() |
 
-### Remaining Tasks (to close Phase 1)
+### Resolved During Testing
 
-| Task | Status | Blocker | Notes |
-|------|--------|---------|-------|
-| Test upload → AssemblyAI submission | NEEDS TEST | `speech_models` fix just deployed | Retry audio upload |
-| Solve webhook reachability | BLOCKED | AssemblyAI can't reach localhost | Use ngrok, or deploy to Vercel, or implement polling fallback |
-| Test full ETL pipeline | BLOCKED | Depends on webhook working | Transcript → extraction → chunking → embedding → DB |
-| Verify interview detail page renders results | BLOCKED | Depends on pipeline completing | Summary, entities, transcript, sentiment |
-| Test Intelligence Search end-to-end | BLOCKED | Depends on chunks existing in DB | Query → intent → hybrid_search → results |
-| Verify Realtime status updates | BLOCKED | Depends on pipeline running | Status tracker should animate through stages |
+| Task | Resolution | Commit |
+|------|-----------|--------|
+| Webhook unreachable from AssemblyAI | Implemented polling fallback at `/api/interviews/[id]/poll` — status tracker polls every 10s | `e5b82ad` |
+| OpenAI structured output schema errors | Changed `.optional()` to `.nullable()` in extraction schema; removed `.default([])` from search intent schema | `e5b82ad`, `88210fe` |
+| Search returns 0 results | Lowered similarity threshold from 0.7 to 0.25 (text-embedding-3-small typical range); switched search to admin client for RLS bypass | `88210fe` |
 
-### Phase 1 Completion Criteria
-Phase 1 is DONE when:
-1. An audio file is uploaded and reaches status `COMPLETED`
-2. The interview detail page shows: summary, entities, sentiment, full transcript
-3. A search query on `/search` returns relevant chunks with similarity scores
+### Phase 1 Completion Criteria — ALL MET
+1. Audio file uploaded and reached status `COMPLETED`
+2. Interview detail page shows: summary, entities, sentiment, full transcript
+3. Search query on `/search` returns relevant chunks with similarity scores
 
-**Commits**: `617cf16`, `24bf37b`, `623b7bd`, `dcbb6b0`
+**Commits**: `617cf16`, `24bf37b`, `623b7bd`, `dcbb6b0`, `e5b82ad`, `88210fe`
 
 ---
 
