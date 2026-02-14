@@ -37,7 +37,7 @@ export const AI_CONFIG = {
   extractionModel: "gpt-4o-mini" as const,
   chunkSize: 500, // target tokens per chunk
   chunkOverlap: 50, // overlapping tokens between chunks
-  similarityThreshold: 0.7,
+  similarityThreshold: 0.25,
   maxSearchResults: 10,
 } as const;
 

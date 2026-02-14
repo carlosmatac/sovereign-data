@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbeddings } from "@/lib/ai/embeddings";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
@@ -7,20 +8,22 @@ import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
 
 // Schema for intent classification (pre-filter extraction)
+// NOTE: OpenAI structured outputs require ALL fields to be required (no optional/default).
 const IntentSchema = z.object({
   rewritten_query: z
     .string()
     .describe("The query rewritten for optimal semantic search"),
   filters: z.object({
-    country: z.string().nullable().describe("Country filter if mentioned"),
+    country: z
+      .string()
+      .nullable()
+      .describe("Country filter if mentioned, null otherwise"),
     topics: z
       .array(z.string())
-      .describe("Topic tags to filter by")
-      .default([]),
+      .describe("Topic tags to filter by, empty array if none"),
     project_ids: z
       .array(z.string())
-      .describe("Specific project IDs if referenced")
-      .default([]),
+      .describe("Specific project IDs if referenced, empty array if none"),
   }),
 });
 
@@ -77,13 +80,16 @@ Extract:
     ]);
 
     // ── Step 3: Hybrid search via Supabase RPC ───────────────────
+    // Use admin client for RPC call — auth.uid() is NULL in PostgREST context
+    // (user identity already verified above via getUser).
+    const admin = createAdminClient();
     const filterProjectIds = project_id
       ? [project_id]
       : intent.filters.project_ids.length > 0
         ? intent.filters.project_ids
         : null;
 
-    const { data: results, error } = await supabase.rpc("hybrid_search", {
+    const { data: results, error } = await admin.rpc("hybrid_search", {
       query_embedding: JSON.stringify(queryEmbedding),
       filter_project_ids: filterProjectIds,
       filter_country: intent.filters.country,
@@ -96,10 +102,14 @@ Extract:
     if (error) {
       console.error("Hybrid search failed:", error);
       return NextResponse.json(
-        { error: "Search failed" },
+        { error: "Search failed", details: error.message },
         { status: 500 }
       );
     }
+
+    console.log(
+      `[search] query="${intent.rewritten_query}" country=${intent.filters.country} → ${results?.length ?? 0} results`
+    );
 
     return NextResponse.json({
       query: intent.rewritten_query,
