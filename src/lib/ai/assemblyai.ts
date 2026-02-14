@@ -6,7 +6,7 @@ const ASSEMBLYAI_BASE_URL = "https://api.assemblyai.com/v2";
 
 interface TranscriptionRequest {
   audio_url: string;
-  speech_model: string;
+  speech_models: string[];
   webhook_url: string;
   webhook_auth_header_name?: string;
   webhook_auth_header_value?: string;
@@ -41,8 +41,8 @@ interface TranscriptionResponse {
  * Submit audio for transcription with speaker diarization.
  * Uses Universal-2 model with webhook callback.
  *
- * NOTE: As of 2026, AssemblyAI requires the `speech_model` parameter.
- * Valid values: "universal-2", "universal-3-pro"
+ * NOTE: As of 2026, AssemblyAI requires the `speech_models` parameter (array).
+ * Valid values: ["universal-2"], ["universal-3-pro"]
  */
 export async function submitTranscription({
   audioUrl,
@@ -57,7 +57,7 @@ export async function submitTranscription({
 }): Promise<{ transcriptId: string }> {
   const body: TranscriptionRequest = {
     audio_url: audioUrl,
-    speech_model: "universal-2",
+    speech_models: ["universal-2"],
     webhook_url: webhookUrl,
     webhook_auth_header_name: "x-webhook-secret",
     webhook_auth_header_value: webhookSecret,

@@ -199,7 +199,7 @@ npm run dev
 
 **Cause**: As of 2026, AssemblyAI requires the `speech_model` parameter in transcription requests. Previously it was optional and defaulted to the latest model.
 
-**Solution**: Include `speech_model: "universal-2"` in the transcription request body.
+**Solution**: Include `speech_models: ["universal-2"]` (plural, array) in the transcription request body. The singular `speech_model` is also deprecated.
 
 ### pg_trgm Index Error
 
