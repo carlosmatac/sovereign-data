@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Card,
@@ -49,6 +49,9 @@ const PIPELINE_STEPS: Array<{
   },
 ];
 
+/** How often to poll the status endpoint (ms) */
+const POLL_INTERVAL_MS = 10_000;
+
 interface StatusTrackerProps {
   interviewId: string;
   currentStatus: InterviewStatus;
@@ -66,9 +69,80 @@ export function InterviewStatusTracker({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ?? null
   );
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusRef = useRef<InterviewStatus>(initialStatus);
 
-  // Subscribe to real-time status updates
+  // Keep ref in sync with state
   useEffect(() => {
+    statusRef.current = currentStatus;
+  }, [currentStatus]);
+
+  // Handle status transitions
+  const handleStatusChange = useCallback(
+    (newStatus: InterviewStatus, newError?: string | null) => {
+      setCurrentStatus(newStatus);
+      if (newError) setErrorMessage(newError);
+
+      // Stop polling on terminal states
+      if (newStatus === "COMPLETED" || newStatus === "FAILED") {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      }
+
+      // Refresh the page when completed to show full content
+      if (newStatus === "COMPLETED") {
+        router.refresh();
+      }
+    },
+    [router]
+  );
+
+  // ── Polling fallback ──────────────────────────────────────────────
+  // Polls the /api/interviews/[id]/poll endpoint. This:
+  // 1. Detects when AssemblyAI transcription completes (webhook can't reach localhost)
+  // 2. Picks up status changes if Realtime WebSocket is broken
+  useEffect(() => {
+    // Don't poll for terminal states
+    if (initialStatus === "COMPLETED" || initialStatus === "FAILED") return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/interviews/${interviewId}/poll`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const newStatus = data.status as InterviewStatus;
+
+        // Only update if status actually changed
+        if (newStatus && newStatus !== statusRef.current) {
+          handleStatusChange(newStatus, data.error_message);
+        }
+      } catch {
+        // Silently ignore poll errors — Realtime may still work
+      }
+    };
+
+    // Poll immediately on mount (catches already-completed transcriptions)
+    poll();
+
+    // Then poll on interval
+    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewId, handleStatusChange]);
+
+  // ── Supabase Realtime (primary mechanism when it works) ───────────
+  useEffect(() => {
+    if (initialStatus === "COMPLETED" || initialStatus === "FAILED") return;
+
     const supabase = createClient();
 
     const channel = supabase
@@ -83,16 +157,10 @@ export function InterviewStatusTracker({
         },
         (payload) => {
           const newStatus = payload.new.status as InterviewStatus;
-          setCurrentStatus(newStatus);
-
-          if (payload.new.error_message) {
-            setErrorMessage(payload.new.error_message as string);
-          }
-
-          // Refresh the page when completed to show full content
-          if (newStatus === "COMPLETED") {
-            router.refresh();
-          }
+          handleStatusChange(
+            newStatus,
+            payload.new.error_message as string | null
+          );
         }
       )
       .subscribe();
@@ -100,7 +168,7 @@ export function InterviewStatusTracker({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [interviewId, router]);
+  }, [interviewId, initialStatus, handleStatusChange]);
 
   const currentStepIndex = PIPELINE_STEPS.findIndex(
     (s) => s.status === currentStatus

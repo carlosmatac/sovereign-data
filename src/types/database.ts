@@ -37,7 +37,7 @@ export interface SentimentData {
   highlights: Array<{
     text: string;
     sentiment: "positive" | "negative" | "neutral";
-    timestamp?: number;
+    timestamp?: number | null;
   }>;
 }
 

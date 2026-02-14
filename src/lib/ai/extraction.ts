@@ -21,7 +21,7 @@ const ExtractionSchema = z.object({
       z.object({
         text: z.string().describe("Quote or paraphrase from the interview"),
         sentiment: z.enum(["positive", "negative", "neutral"]),
-        timestamp: z.number().optional().describe("Approximate time in seconds if available"),
+        timestamp: z.number().nullable().describe("Approximate time in seconds if available, null if not"),
       })
     ).max(5),
   }),
@@ -36,12 +36,12 @@ const ExtractionSchema = z.object({
       type: z.enum(["PERSON", "COMPANY", "GOVERNMENT", "ORGANIZATION", "LOCATION", "EVENT"]),
       description: z
         .string()
-        .optional()
-        .describe("Brief context (e.g., 'Minister of Energy, Nigeria')"),
+        .nullable()
+        .describe("Brief context (e.g., 'Minister of Energy, Nigeria'), null if unknown"),
       sentiment: z
         .enum(["positive", "negative", "neutral"])
-        .optional()
-        .describe("How the interview portrays this entity"),
+        .nullable()
+        .describe("How the interview portrays this entity, null if unclear"),
     })
   ),
   risks: z
