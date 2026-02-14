@@ -41,7 +41,7 @@
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Frontend | Next.js 15, Tailwind CSS, Shadcn/ui | App Router, RSC, modern UI |
-| Auth | Supabase Auth | Magic Links, session management |
+| Auth | Supabase Auth | Magic Links (token_hash flow) |
 | Database | PostgreSQL 16 + pgvector | Relational data + vector search |
 | Storage | Supabase Storage | Audio file hosting (S3 wrapper) |
 | Transcription | AssemblyAI Universal-2 | Speaker diarization, accented speech |
@@ -51,14 +51,9 @@
 
 ## Getting Started
 
-### Prerequisites
+See [SETUP.md](./SETUP.md) for the complete setup guide, including external service configuration and known issues.
 
-- Node.js 18+
-- Supabase project (with pgvector enabled)
-- AssemblyAI API key
-- OpenAI API key
-
-### Setup
+### Quick Start
 
 ```bash
 # Install dependencies
@@ -66,28 +61,61 @@ npm install
 
 # Copy environment variables
 cp .env.local.example .env.local
-# → Fill in your API keys
+# → Fill in your Supabase, AssemblyAI, and OpenAI keys
 
-# Run the database migration
-# (via Supabase Dashboard → SQL Editor, or Supabase CLI)
+# Run database migrations (see SETUP.md for details)
+# Run storage setup (see SETUP.md for details)
 
 # Start development server
 npm run dev
 ```
 
-### Database Migration
+## Project Structure
 
-Run the SQL in `supabase/migrations/00001_initial_schema.sql` against your Supabase project. This creates:
+```
+src/
+├── app/
+│   ├── (auth)/              # Login + auth callback (no sidebar)
+│   │   ├── login/           # Magic link login page
+│   │   └── auth/
+│   │       ├── callback/    # Server route: redirects to /auth/confirm
+│   │       └── confirm/     # Client page: verifies token_hash, sets session
+│   ├── (dashboard)/         # Authenticated app shell (with sidebar)
+│   │   ├── projects/        # Project list + create
+│   │   ├── interviews/      # Interview list, upload, detail view
+│   │   ├── search/          # Hybrid RAG intelligence search
+│   │   └── settings/        # Platform configuration
+│   └── api/
+│       ├── interviews/      # POST: create interview + trigger transcription
+│       ├── search/          # POST: hybrid RAG search
+│       └── webhooks/
+│           └── transcription/ # AssemblyAI webhook callback
+├── components/
+│   ├── dashboard/           # App sidebar
+│   ├── interviews/          # Status tracker, transcript viewer
+│   └── ui/                  # Shadcn/ui components
+├── lib/
+│   ├── ai/                  # AI pipeline modules
+│   │   ├── assemblyai.ts    # Transcription submission + polling
+│   │   ├── extraction.ts    # GPT-4o-mini structured extraction
+│   │   ├── chunking.ts      # Speaker-aware semantic chunking
+│   │   ├── embeddings.ts    # OpenAI embedding generation
+│   │   └── pipeline.ts      # Full ETL orchestrator
+│   ├── supabase/            # Supabase client factories
+│   │   ├── client.ts        # Browser client (uses anon key)
+│   │   ├── server.ts        # Server Component client (cookie sessions)
+│   │   └── admin.ts         # Service role client (bypasses RLS)
+│   └── constants.ts         # App constants, AI config, status labels
+├── types/
+│   └── database.ts          # Full typed Supabase Database interface
+└── middleware.ts             # Auth gate + session refresh
 
-- `profiles` — User profiles (extends Supabase Auth)
-- `projects` — Intelligence projects (RLS root)
-- `project_members` — Access control
-- `interviews` — Audio interview assets
-- `interview_chunks` — Vector store (RAG search units)
-- `entities` — Knowledge graph (people, companies, orgs)
-- `entity_mentions` — Entity ↔ Interview relationships
-
-All tables have **Row Level Security (RLS)** enabled.
+supabase/
+├── migrations/
+│   └── 00001_initial_schema.sql  # Full schema + RLS + hybrid_search()
+├── setup-storage.sql              # Storage bucket + policies
+└── enable-realtime.sql            # Realtime publication for interviews
+```
 
 ## Security
 
@@ -95,6 +123,7 @@ All tables have **Row Level Security (RLS)** enabled.
 - **Zero Data Retention** — AI providers configured for no training data retention
 - **GDPR compliant** — EU data residency (Frankfurt)
 - **Webhook verification** — Signed webhooks for AssemblyAI callbacks
+- **Auth via token_hash** — No PKCE cookies, works cross-browser
 
 ## License
 
