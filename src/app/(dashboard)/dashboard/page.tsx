@@ -24,6 +24,9 @@ import {
   ArrowRight,
   Globe,
   MessageSquare,
+  Network,
+  Link2,
+  Hash,
 } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
@@ -48,6 +51,8 @@ export default async function DashboardPage() {
     chunksResult,
     entitiesResult,
     recentInterviewsResult,
+    relationshipsResult,
+    allInterviewsResult,
   ] = await Promise.all([
     admin.from("projects").select("id, name, country", { count: "exact" }),
     admin.from("interviews").select("id, status", { count: "exact" }),
@@ -60,6 +65,13 @@ export default async function DashboardPage() {
       .select("id, title, status, created_at, projects(name, country)")
       .order("created_at", { ascending: false })
       .limit(5),
+    admin
+      .from("entity_relationships")
+      .select("id", { count: "exact", head: true }),
+    admin
+      .from("interviews")
+      .select("id, status, topics, project_id, projects(name)")
+      .eq("status", "COMPLETED"),
   ]);
 
   const projectCount = projectsResult.count ?? 0;
@@ -68,6 +80,8 @@ export default async function DashboardPage() {
   const chunkCount = chunksResult.count ?? 0;
   const entityCount = entitiesResult.count ?? 0;
   const recentInterviews = recentInterviewsResult.data ?? [];
+  const relationshipCount = relationshipsResult.count ?? 0;
+  const completedInterviews = allInterviewsResult.data ?? [];
 
   // Compute status breakdown
   const statusCounts: Record<string, number> = {};
@@ -84,11 +98,11 @@ export default async function DashboardPage() {
   const failedCount = statusCounts["FAILED"] ?? 0;
 
   // Interviews by project
+  const projectsData = projectsResult.data ?? [];
   const projectInterviewCounts: Record<
     string,
     { name: string; country: string | null; total: number; completed: number }
   > = {};
-  const projectsData = projectsResult.data ?? [];
   projectsData.forEach((p) => {
     projectInterviewCounts[p.id] = {
       name: p.name,
@@ -97,10 +111,30 @@ export default async function DashboardPage() {
       completed: 0,
     };
   });
-  interviews.forEach((i) => {
-    // We need project_id — fetch from recent interviews or use a separate query
-    // For simplicity, skip individual project counts for now
+  completedInterviews.forEach((i) => {
+    const entry = projectInterviewCounts[i.project_id];
+    if (entry) {
+      entry.total += 1;
+      if (i.status === "COMPLETED") entry.completed += 1;
+    }
   });
+  const projectBreakdown = Object.values(projectInterviewCounts)
+    .filter((p) => p.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const maxProjectCount = Math.max(1, ...projectBreakdown.map((p) => p.total));
+
+  // Topic distribution
+  const topicCounts: Record<string, number> = {};
+  completedInterviews.forEach((i) => {
+    const topics = i.topics as string[] | null;
+    topics?.forEach((t) => {
+      topicCounts[t] = (topicCounts[t] ?? 0) + 1;
+    });
+  });
+  const topTopics = Object.entries(topicCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12);
+  const maxTopicCount = Math.max(1, ...topTopics.map(([, c]) => c));
 
   return (
     <div className="p-6">
@@ -139,7 +173,8 @@ export default async function DashboardPage() {
           title="Entities"
           value={entityCount}
           icon={Users}
-          description="People, companies, organizations"
+          description={`${relationshipCount} relationships mapped`}
+          href="/network"
         />
       </div>
 
@@ -253,6 +288,12 @@ export default async function DashboardPage() {
                 </Link>
               </Button>
               <Button variant="outline" className="justify-start" asChild>
+                <Link href="/network">
+                  <Network className="mr-2 h-4 w-4" />
+                  Network Explorer
+                </Link>
+              </Button>
+              <Button variant="outline" className="justify-start" asChild>
                 <Link href="/projects/new">
                   <FolderKanban className="mr-2 h-4 w-4" />
                   New Project
@@ -299,6 +340,94 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Analytics Row */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        {/* Interviews by Project */}
+        {projectBreakdown.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base">
+                  Interviews by Project
+                </CardTitle>
+              </div>
+              <CardDescription>
+                Completed interviews per project
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {projectBreakdown.map((project) => (
+                  <div key={project.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium truncate max-w-[200px]">
+                        {project.name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {project.country && (
+                          <span className="text-xs text-muted-foreground">
+                            {project.country}
+                          </span>
+                        )}
+                        <span className="text-xs font-medium tabular-nums">
+                          {project.total}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-primary transition-all"
+                        style={{
+                          width: `${(project.total / maxProjectCount) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Top Topics */}
+        {topTopics.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base">Topic Distribution</CardTitle>
+              </div>
+              <CardDescription>
+                Most frequent topics across all interviews
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2.5">
+                {topTopics.map(([topic, count]) => (
+                  <div key={topic} className="flex items-center gap-3">
+                    <span className="w-28 truncate text-sm">{topic}</span>
+                    <div className="flex-1">
+                      <div className="h-2 rounded-full bg-muted">
+                        <div
+                          className="h-2 rounded-full bg-emerald-500 transition-all"
+                          style={{
+                            width: `${(count / maxTopicCount) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

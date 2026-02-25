@@ -12,7 +12,7 @@
 |-------|------|--------|----------|
 | 0 | Foundation | COMPLETE | 100% |
 | 1 | Auth & Core Pipeline | COMPLETE | 100% |
-| 2 | Conversational RAG & Analytics | PARTIALLY COMPLETE | ~40% |
+| 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | NOT STARTED | 0% |
 | 4 | Production Deployment | NOT STARTED | 0% |
@@ -86,7 +86,7 @@
 
 ---
 
-## Phase 2 — Conversational RAG & Analytics (PARTIALLY COMPLETE)
+## Phase 2 — Conversational RAG & Analytics (COMPLETE)
 
 **Goal**: Transform search from single-query to conversational, add dashboard analytics.
 
@@ -97,15 +97,12 @@
 | Chat interface (streaming RAG) | Done | `chat/page.tsx`, `api/chat/route.ts` | Multi-turn with `streamText` + `useChat`, in-memory history |
 | Chat citations | Done | `api/chat/route.ts` | Citation markers [1]–[8] with speaker, timestamp, and interview links |
 | Dashboard home page | Done | `dashboard/page.tsx` | Stats cards, recent interviews, pipeline status, quick actions |
-
-### Remaining Tasks
-
-| Task | Priority | Description |
-|------|----------|-------------|
-| Entity network graph | Medium | Visualization of entity relationships across interviews. Now possible with `entity_relationships` table from Phase 2.5. |
-| Topic heatmap | Low | Matrix of topics × countries with interview density. |
-| Trending topics | Low | Time-series of topic frequency across interviews. |
-| Interview count by project | Low | Card/chart showing interviews per project with status breakdown. |
+| Dashboard: interviews by project | Done | `dashboard/page.tsx` | Horizontal bar breakdown per project with completion counts |
+| Dashboard: topic distribution | Done | `dashboard/page.tsx` | Top 12 topics across all interviews with visual bars |
+| Dashboard: relationship stats | Done | `dashboard/page.tsx` | Entity count + relationship count in stats card, links to Network |
+| Network Explorer page | Done | `network/page.tsx`, `network-explorer.tsx` | Two-panel entity explorer: search, filter by type, view connections with confidence scores and evidence |
+| Sidebar: Network Explorer link | Done | `app-sidebar.tsx` | Added to Platform nav group |
+| Interview deletion | Done | `api/interviews/[id]/route.ts`, `delete-interview-button.tsx` | DELETE API with Storage cleanup + CASCADE; confirmation dialog on detail + list pages |
 
 **Commits**: `b855ca2`
 
@@ -219,6 +216,9 @@
 | Entity relationships as graph edges | Enables GraphRAG: source→target with typed relation, confidence, and evidence provenance |
 | Async content generation post-pipeline | Runs after COMPLETED, wrapped in try/catch — failures are non-critical and don't affect interview status |
 | Content snippet lifecycle (draft→approved→published) | Supports future editorial workflow without schema changes |
+| Interview deletion via CASCADE | Deleting an interview removes all chunks, mentions, relationships, snippets; audio cleaned from Storage separately |
+| Network Explorer as list-based explorer (not force graph) | More practical for business users; zero heavy dependencies; entity search + type filters + evidence quotes |
+| Dashboard analytics without charting library | Pure CSS/Tailwind progress bars; avoids bundle bloat; sufficient for current data density |
 
 ---
 
@@ -247,9 +247,9 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phases 0, 1, and 2.5 are COMPLETE. Phase 2 is PARTIALLY COMPLETE
-(Chat and Dashboard working; entity network graph, topic heatmap, and trending
-topics are NOT done).
+Current state: Phases 0, 1, 2, and 2.5 are ALL COMPLETE. The platform has a full
+streaming RAG chat, dashboard with analytics, entity network explorer, and
+interview deletion.
 
 The database has 9 tables across 4 migrations. The ETL pipeline now extracts
 entities AND relationships (GraphRAG), and auto-generates marketing snippets

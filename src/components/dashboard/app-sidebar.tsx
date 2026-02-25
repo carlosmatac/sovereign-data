@@ -27,6 +27,7 @@ import {
   Mic,
   Search,
   MessageSquare,
+  Network,
   Settings,
   LogOut,
   ChevronUp,
@@ -61,6 +62,11 @@ const navItems = [
     title: "Intelligence Chat",
     href: "/chat",
     icon: MessageSquare,
+  },
+  {
+    title: "Network Explorer",
+    href: "/network",
+    icon: Network,
   },
 ];
 

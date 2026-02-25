@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Mic, Clock } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
+import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 
 export default async function InterviewsPage({
   searchParams,
@@ -121,6 +122,11 @@ export default async function InterviewsPage({
                       >
                         {statusInfo.label}
                       </Badge>
+                      <DeleteInterviewButton
+                        interviewId={interview.id}
+                        interviewTitle={interview.title}
+                        variant="icon"
+                      />
                     </div>
                   </CardContent>
                 </Card>

@@ -31,6 +31,7 @@ import Link from "next/link";
 import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
+import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 
 export default async function InterviewDetailPage({
   params,
@@ -162,7 +163,13 @@ export default async function InterviewDetailPage({
               )}
             </div>
           </div>
-          <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+            <DeleteInterviewButton
+              interviewId={interview.id}
+              interviewTitle={interview.title}
+            />
+          </div>
         </div>
         {interview.description && (
           <p className="mt-3 text-muted-foreground">{interview.description}</p>
