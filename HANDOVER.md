@@ -1,153 +1,120 @@
-# PROJECT STATE SNAPSHOT & HANDOVER
+# SOVEREIGN DATA — MASTER HANDOVER DOCUMENT & SYSTEM PROMPT
 
 **Date**: February 14, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
-**Latest commit**: `dcbb6b0` (6 commits on `main`)
+**Branch**: `main` — 10 commits, latest `b855ca2`
+**Runtime**: Next.js dev server on `http://localhost:3000`
 
 ---
 
-## 1. PROJECT MANIFESTO (The "Why")
+## 1. BUSINESS CONTEXT & VISION (The "Why")
 
-**Sovereign Data** is a Frontier Markets Intelligence Platform for a media/consulting firm operating in the Global South (Africa, LatAm, Asia). The firm conducts 60-90 minute exclusive interviews with Ministers, CEOs, and Diplomats. Currently, the intelligence in these audio files "dies" after the article is written.
+**Sovereign Data** is a Frontier Markets Intelligence Platform for a media/consulting firm operating in the Global South (Africa, LatAm, Asia). The firm conducts 60–90 minute exclusive interviews with Ministers, CEOs, and Diplomats. Currently, the intelligence in these audio files "dies" after the article is written.
 
-**Core Value Prop:**
-- **Audio-First BI**: Ingest audio → transcribe with speaker identification → extract structured intelligence → make it searchable.
-- **Zero Data Retention**: AssemblyAI and OpenAI configured for zero training data retention.
-- **GDPR Compliance**: Supabase hosted in EU (Frankfurt).
-- **Monetization**: Internal editor efficiency + selling high-ticket BI reports to foreign investors.
+**The platform is evolving from a passive audio archive into an Active Business Intelligence Engine** to solve three core pain points:
 
-**Hybrid Search Strategy (RAG):**
-1. **Intent Classification**: LLM extracts metadata filters from the user query (country, topics).
-2. **SQL Pre-filter**: Standard `WHERE` clauses reduce the search space to relevant chunks.
-3. **Vector Similarity**: pgvector HNSW index finds semantically similar chunks within the filtered set.
-4. **Synthesis**: Top chunks sent to LLM for answer generation with timestamped audio citations.
+### Pillar 1: Sales Intelligence (GraphRAG — Break Information Silos)
+A salesperson in Colombia needs to know if a Minister they are meeting was mentioned negatively by a CEO in a Nigeria project. We need **cross-project relationship mapping** (a "Network Explorer") so salespeople can see who is connected to whom, how, and with what sentiment. This directly increases deal closure rates.
 
----
+### Pillar 2: Editorial Strategy (Multi-modal + Trend Detection)
+Editors need to spot global trends (e.g., "Green Hydrogen") across all interviews to decide on new markets or magazine covers. We're moving from intuition-based editorial decisions to **data-driven trend detection**. The architecture must also prepare for **multi-modal ingestion** (PDFs, prep documents) beyond just audio.
 
-## 2. THE TECH STACK (Strict Constraints)
-
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| **Frontend** | Next.js 15 (App Router), TypeScript | Turbopack, `src/` directory |
-| **UI** | Tailwind CSS v4, `shadcn/ui`, `lucide-react` | 20 Shadcn components installed |
-| **Auth** | Supabase Auth | Magic Links via token_hash flow (NOT PKCE) |
-| **Database** | Supabase PostgreSQL 16 + `pgvector` | HNSW index, 1536 dimensions |
-| **Storage** | Supabase Storage | `interview-audio` bucket, public read |
-| **Transcription** | AssemblyAI | `speech_models: ["universal-2"]`, speaker diarization |
-| **Extraction** | OpenAI GPT-4o-mini | Via Vercel AI SDK `generateObject` with Zod schemas |
-| **Embeddings** | OpenAI text-embedding-3-small | 1536 dimensions, $0.02/1M tokens |
-| **Orchestration** | Vercel AI SDK (`ai`, `@ai-sdk/openai`) | `generateObject` for structured outputs |
-
-**Package versions (key):**
-- `next@16.1.6`, `@supabase/supabase-js@2.95.3`, `@supabase/ssr@0.8.0`
-- `ai` (Vercel AI SDK), `@ai-sdk/openai`, `zod`
+### Pillar 3: Push Marketing (TBY Marketing Automation)
+The team wastes hours manually clipping interviews for social media. The system must **automatically generate ready-to-publish content** — LinkedIn posts, Twitter threads, newsletter snippets — the moment an interview finishes processing. Zero manual effort.
 
 ---
 
-## 3. ARCHITECTURE & DATA FLOW
+## 2. CURRENT STATE & TECH STACK (What We Have)
 
-### Async 3-Step Pipeline
+### Stack (Strict Constraints)
+
+| Layer | Technology | Version / Notes |
+|-------|-----------|-----------------|
+| Frontend | Next.js 15 (App Router), TypeScript | Turbopack, `src/` directory, `next@16.1.6` |
+| UI | Tailwind CSS v4, shadcn/ui, lucide-react | 20 Shadcn components installed |
+| Auth | Supabase Auth | **Magic Links via token_hash flow (NOT PKCE)** — do not change this |
+| Database | Supabase PostgreSQL 16 + pgvector | HNSW index, 1536 dimensions, EU (Frankfurt) |
+| Storage | Supabase Storage | `interview-audio` bucket, public read |
+| Transcription | AssemblyAI | `speech_models: ["universal-2"]` (plural, array — API changed in 2026) |
+| Extraction | OpenAI GPT-4o-mini | Via Vercel AI SDK `generateObject` with Zod schemas |
+| Embeddings | OpenAI text-embedding-3-small | 1536 dimensions |
+| Orchestration | Vercel AI SDK v6 (`ai@^6.0.82`, `@ai-sdk/openai@^3.0.27`, `@ai-sdk/react`) | `streamText`, `generateObject`, `useChat` |
+| Markdown | `react-markdown` | For chat response rendering |
+
+### Phase Status
+
+| Phase | Status | What's Done |
+|-------|--------|-------------|
+| **Phase 0** | COMPLETE | Scaffold, schema, typed clients, app shell |
+| **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction, chunking, embeddings, search — full end-to-end pipeline verified working |
+| **Phase 2** | PARTIALLY COMPLETE | Dashboard home page + Intelligence Chat (streaming RAG) working. Entity graph + topic heatmap NOT done |
+| **Phase 2.5** | NOT STARTED | **Your immediate mission** — see Section 3 |
+| **Phase 3** | NOT STARTED | Team management, reports |
+| **Phase 4** | NOT STARTED | Production deployment |
+
+### Database — 7 Tables, 3 Migrations Applied
+
+| Table | Purpose |
+|-------|---------|
+| `profiles` | Extends auth.users (auto-created via trigger) |
+| `projects` | RLS root, contains country/region |
+| `project_members` | Many-to-many with roles (owner/editor/viewer) |
+| `interviews` | Audio assets with status, transcript, summary, sentiment, topics |
+| `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware |
+| `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) |
+| `entity_mentions` | Entity ↔ interview links with sentiment |
+
+Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in `extensions` schema.
+
+### File Structure (57 source files)
 
 ```
-Step 1: INGESTION (Upload & Forget)
-  User uploads MP3 → Supabase Storage (browser client direct upload)
-  → POST /api/interviews creates record (status: PROCESSING)
-  → Submits audio URL to AssemblyAI with webhook callback
-  → User sees real-time status tracker (Supabase Realtime)
-
-Step 2: PROCESSING (Webhook-Driven ETL)
-  AssemblyAI completes → POST /api/webhooks/transcription
-  → Fetches full transcript with speaker diarization
-  → GPT-4o-mini extracts: summary, sentiment, entities, topics, risks, opportunities
-  → Speaker-aware chunking (~500 tokens, respects speaker turns)
-  → OpenAI generates embeddings for each chunk
-
-Step 3: PERSISTENCE
-  → Chunks + embeddings → interview_chunks table (HNSW indexed)
-  → Entities → entities + entity_mentions tables
-  → Interview status → COMPLETED (Realtime pushes update to UI)
+src/
+├── app/
+│   ├── (auth)/login, auth/callback, auth/confirm
+│   ├── (dashboard)/
+│   │   ├── dashboard/page.tsx         # NEW: Stats, recent interviews, quick actions
+│   │   ├── chat/page.tsx              # NEW: Streaming RAG conversation
+│   │   ├── projects/, interviews/, search/, settings/
+│   │   └── layout.tsx                 # Auth guard + sidebar
+│   ├── api/
+│   │   ├── chat/route.ts             # NEW: streamText + hybrid_search RAG
+│   │   ├── interviews/route.ts       # Create + submit to AssemblyAI
+│   │   ├── interviews/[id]/poll/route.ts  # Polling fallback (webhook can't reach localhost)
+│   │   ├── search/route.ts           # Intent classification + hybrid_search
+│   │   └── webhooks/transcription/route.ts
+│   ├── layout.tsx, page.tsx (redirects to /dashboard)
+├── components/
+│   ├── dashboard/app-sidebar.tsx      # 6 nav items: Dashboard, Projects, Interviews, Search, Chat, Settings
+│   ├── interviews/status-tracker.tsx  # Realtime + polling fallback
+│   ├── interviews/transcript-viewer.tsx
+│   └── ui/ (20 shadcn components)
+├── lib/
+│   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts
+│   ├── supabase/client.ts, server.ts, admin.ts
+│   └── constants.ts
+├── types/database.ts                  # Full typed Database interface
+└── middleware.ts
 ```
 
-### Security Layer
-- **RLS on all 7 tables** — project-scoped access via `SECURITY DEFINER` helper functions.
-- **Admin client pattern**: Server-side mutations verify user with `getUser()`, then use service role client for DB writes (bypasses RLS safely).
-- **Webhook verification**: `x-webhook-secret` header on AssemblyAI callbacks.
+### CRITICAL Gotchas (Do NOT Violate)
 
----
+1. **auth.uid() is NULL in PostgREST context** — ALL mutations use the "admin client pattern": verify user with `getUser()`, then use service role client for DB writes. This is not a bug, it's the established architecture.
 
-## 4. CURRENT INFRASTRUCTURE STATE
+2. **OpenAI structured outputs require ALL fields to be required** — No `.optional()` or `.default()` in Zod schemas passed to `generateObject`. Use `.nullable()` instead.
 
-### Database — All Migrations Applied
+3. **AssemblyAI webhooks cannot reach localhost** — A polling fallback exists at `/api/interviews/[id]/poll` that checks AssemblyAI directly and triggers the pipeline. The status tracker polls every 10s.
 
-Three migrations have been run on Supabase:
+4. **Similarity threshold is 0.25** (not 0.7) — `text-embedding-3-small` returns cosine similarities in the 0.3–0.6 range for related content. Set in `AI_CONFIG` in `constants.ts`.
 
-| Migration | What it does |
-|-----------|-------------|
-| `00001_initial_schema.sql` | 7 tables, all indexes, RLS policies, triggers, `hybrid_search()` function |
-| `00002_fix_rls_recursion.sql` | `SECURITY DEFINER` helper functions, rewrites all policies |
-| `00003_fix_created_by_default.sql` | `DEFAULT auth.uid()` on `created_by` columns |
+5. **AI SDK v6 breaking changes** — `useChat` returns `{ messages, sendMessage, status, error }`, NOT `{ input, handleSubmit, isLoading }`. Messages use `.parts` array (not `.content`). Server uses `toUIMessageStreamResponse()`.
 
-**7 Tables:**
-1. `profiles` — extends auth.users (auto-created on signup via trigger)
-2. `projects` — RLS root, contains country/region
-3. `project_members` — many-to-many with roles (owner/editor/viewer)
-4. `interviews` — audio assets with status, transcript, summary, sentiment
-5. `interview_chunks` — vector store, HNSW indexed (`vector(1536)`)
-6. `entities` — knowledge graph (PERSON, COMPANY, GOVERNMENT, etc.)
-7. `entity_mentions` — entity ↔ interview links with sentiment
+6. **Token_hash auth flow** — Email templates in Supabase Dashboard use `{{ .TokenHash }}`, the client page `/auth/confirm` calls `verifyOtp({ token_hash, type })`. Do NOT switch to PKCE.
 
-**Key indexes:**
-- `idx_chunks_embedding` — HNSW (m=16, ef_construction=64) on `vector_cosine_ops`
-- `idx_chunks_metadata` — GIN on JSONB for pre-filter queries
-- `idx_entities_name` — GIN trigram for fuzzy name search
+7. **SECURITY DEFINER helpers** — RLS policies use `is_project_member()`, `is_project_owner()`, etc. functions to avoid infinite recursion. See migration `00002`.
 
-**Storage:**
-- Bucket `interview-audio` created (public read, auth upload, 500MB limit, audio MIME types only)
+### Environment Variables (`.env.local` — populated, gitignored)
 
-**Realtime:**
-- `interviews` table added to `supabase_realtime` publication
-
-### SQL Extension Fix (CRITICAL)
-The original migration had `CREATE EXTENSION "pgvector"` which fails on Supabase. Fixed to:
-```sql
-CREATE EXTENSION IF NOT EXISTS "vector" WITH SCHEMA "extensions";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA "extensions"; -- MUST be before gin_trgm_ops index
-```
-
----
-
-## 5. ENVIRONMENT & CONFIGURATION (The "Gotchas")
-
-### Port Issue
-Port 3000 was occupied by another process during initial dev. The app started on port 3001 which broke auth callbacks. **Resolution**: Kill the process on 3000, always run on port 3000. Auth callback URLs are origin-dependent.
-
-### Auth Flow — token_hash (NOT PKCE)
-Default Supabase magic links use PKCE flow which stores a code verifier cookie. This fails when the user clicks the link in a different browser (email client).
-
-**Our fix:**
-- Supabase email templates customized to use `{{ .TokenHash }}` directly:
-  ```
-  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink">Sign In</a>
-  ```
-- Client page `/auth/confirm` calls `supabase.auth.verifyOtp({ token_hash, type })` — no PKCE cookie needed.
-- Works in any browser/device.
-
-### auth.uid() NULL in PostgREST
-Both browser client and server client's PostgREST calls have `auth.uid() = NULL` even when `getUser()` succeeds. This is a `@supabase/ssr` cookie-JWT propagation issue.
-
-**Our pattern for ALL mutations:**
-```typescript
-// 1. Verify identity via cookie-based client
-const supabase = await createClient(); // server client
-const { data: { user } } = await supabase.auth.getUser();
-if (!user) return { error: "Not authenticated" };
-
-// 2. Use admin client for the actual DB write
-const admin = createAdminClient(); // service_role, bypasses RLS
-await admin.from("table").insert({ ..., created_by: user.id });
-```
-
-### API Keys (`.env.local` — populated, gitignored)
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://pirgarfjqbymzqpgqjgh.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<set>
@@ -158,130 +125,86 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 WEBHOOK_SECRET=<set>
 ```
 
-### Supabase Dashboard Config
-- **Site URL**: `http://localhost:3000`
-- **Redirect URLs**: `http://localhost:3000/**`
-- **Email Templates**: Magic Link and Confirm Signup customized with `token_hash` (see SETUP.md Section 3.5)
+---
+
+## 3. IMMEDIATE MISSION: PHASE 2.5 (The "What")
+
+### The Paradigm Shift
+
+We are moving from a **Linear Ingestion Architecture** to a **Graph & Event-Driven Architecture**:
+
+- **From Entities to Relationships (GraphRAG)**: It's not enough to know "Elon Musk" was mentioned. We need a Knowledge Graph showing WHO mentioned him, how they are connected (`relation_type`: "business_partner", "critic", "regulator", etc.), and the confidence score.
+- **From Audio to Multi-modal**: The system architecture should prepare for `source_type` flexibility (audio today, PDFs/docs tomorrow).
+- **From Search to "Push"**: The pipeline must proactively generate derivative content (marketing snippets) asynchronously without waiting for user prompts.
+
+### CRITICAL CONSTRAINT
+You must NOT break the existing Chat (`/chat`) or Dashboard (`/dashboard`) features. All new architecture must be additive or gracefully refactored. The existing 7 tables must remain intact — add new tables, add columns with defaults, but do not drop or rename existing columns.
+
+### Objective 1: Database Evolution (Graph & Assets)
+
+Update the Supabase schema to support:
+
+- **Multi-modal ingestion prep**: Add `source_type` column to `interviews` (default `'audio'`, future values: `'document'`, `'video'`). This is additive — existing audio interviews continue working.
+- **Explicit Entity Relationships**: New `entity_relationships` table mapping source entity → target entity with `relation_type` (enum: 'business_partner', 'competitor', 'regulator', 'critic', 'ally', 'subsidiary', 'investor', etc.), `confidence` score (0–1), `evidence_text` (the quote that establishes the relationship), and `interview_id` (provenance).
+- **Marketing Content Snippets**: New `content_snippets` table storing auto-generated marketing assets per interview — `platform` (enum: 'linkedin', 'twitter', 'newsletter', 'summary'), `content` (the generated text), `tone` ('professional', 'casual', 'provocative'), `status` ('draft', 'approved', 'published').
+
+**Provide the SQL migration and the conceptual approach first. Wait for approval before writing application code.**
+
+### Objective 2: AI Pipeline Evolution
+
+Modify the existing ETL pipeline (`src/lib/ai/pipeline.ts`) to:
+
+1. **Extract relationships** during the entity extraction phase — update the Zod schema in `extraction.ts` to also return a `relationships` array (source_name, target_name, relation_type, confidence, evidence_text). Remember: all fields must be required (use `.nullable()` not `.optional()`).
+2. **Post-processing step**: After the main pipeline reaches COMPLETED, trigger an async "content generation" step that uses GPT-4o-mini to generate marketing snippets (LinkedIn post, Twitter thread, newsletter blurb) from the interview summary + key quotes.
+3. **Persist everything** to the new tables using the admin client pattern.
+
+### Objective 3: UI Surfacing
+
+- Update the **Interview Detail page** (`src/app/(dashboard)/interviews/[id]/page.tsx`) to display:
+  - Marketing Assets section: generated snippets with copy-to-clipboard buttons, organized by platform
+  - Entity Relationships: a visual or list representation showing who is connected to whom and how
+- This should be additive — the existing summary, entities, sentiment, and transcript sections remain untouched.
 
 ---
 
-## 6. CURRENT APP STATUS & WHAT WORKS
+## 4. FUTURE ROADMAP (What Comes Later)
 
-### Working (Tested)
-- Login via magic link (token_hash flow)
-- Dashboard navigation (sidebar, all pages render)
-- Project creation (Server Action + admin client)
-- Audio upload to Supabase Storage (works, file lands in bucket)
+Once Phase 2.5 is fully working and verified:
 
-### Last Bug — JUST FIXED (Not Yet Tested by User)
-**AssemblyAI transcription submission** was failing because:
-1. First attempt: missing `speech_model` param (API changed in 2026)
-2. Second attempt: used `speech_model` (singular) but API wants `speech_models` (plural, array)
-3. **Fix applied in commit `dcbb6b0`**: `speech_models: ["universal-2"]`
+### Phase 3: Team Management & Investor-Grade Reports
+- Email invite flow → `project_members` with roles (owner/editor/viewer)
+- Role-based UI (viewers: read-only, editors: upload + edit, owners: full control)
+- Report generator: select interviews/topics → GPT-4o generates structured BI report
+- PDF export via `@react-pdf/renderer` or Puppeteer
+- Report sharing with optional password protection
 
-The interview record IS created in the DB (status: FAILED) but AssemblyAI never starts transcription. Once the user retries the upload, the full pipeline should work.
-
-### Not Yet Tested
-- Full ETL pipeline (AssemblyAI webhook → extraction → chunking → embedding)
-- Interview detail page with completed data
-- Intelligence Search (RAG)
-- Real-time status updates via Supabase Realtime
+### Phase 4: Production Deployment & Security
+- Deploy to Vercel, configure production env vars
+- Custom domain + update Supabase URLs
+- Update webhook URL to production (AssemblyAI can reach Vercel)
+- Rate limiting, Sentry error monitoring
+- Zero data retention audit (AssemblyAI + OpenAI)
+- Supabase daily backups
 
 ---
 
-## 7. IMMEDIATE ROADMAP (Next Steps)
+## 5. HOW TO START A NEW SESSION
 
-### Priority 1: Verify Upload Pipeline Works End-to-End
-The AssemblyAI `speech_models` fix is deployed. User needs to:
-1. Upload an audio file again
-2. Verify AssemblyAI accepts it and starts transcription
-3. Verify the webhook hits `/api/webhooks/transcription`
-4. Watch the full ETL pipeline complete
-
-**Potential blocker**: The webhook URL is `http://localhost:3000/api/webhooks/transcription`. AssemblyAI cannot reach localhost. For production this needs a public URL (Vercel deployment or ngrok tunnel for dev). This hasn't been tested yet and will likely be the next issue.
-
-### Priority 2: Fix Webhook Reachability
-Options:
-- Deploy to Vercel (production path)
-- Use `ngrok` or Vercel CLI `vercel dev` for local development
-- Poll AssemblyAI instead of using webhooks (fallback)
-
-### Priority 3: Test & Debug Full Pipeline
-Once transcription completes, verify:
-- Transcript extraction and structured intelligence (GPT-4o-mini)
-- Chunk generation and embedding
-- Data persistence in all tables
-- Interview detail page rendering the results
-- Search functionality
-
----
-
-## 8. FILE STRUCTURE (53 Source Files)
+Copy-paste this to bootstrap the new agent:
 
 ```
-src/
-├── app/
-│   ├── (auth)/
-│   │   ├── login/page.tsx              # Magic link login
-│   │   └── auth/
-│   │       ├── callback/route.ts       # Server: forwards params to confirm
-│   │       └── confirm/page.tsx        # Client: verifyOtp with token_hash
-│   ├── (dashboard)/
-│   │   ├── layout.tsx                  # Auth guard + sidebar shell
-│   │   ├── projects/
-│   │   │   ├── page.tsx                # Project list grid
-│   │   │   ├── new/page.tsx            # Create project form
-│   │   │   └── actions.ts             # Server Action: createProject (admin client)
-│   │   ├── interviews/
-│   │   │   ├── page.tsx                # Interview list with status badges
-│   │   │   ├── upload/page.tsx         # Upload form: drag-drop, Storage upload, triggers API
-│   │   │   └── [id]/page.tsx           # Detail: summary, entities, transcript, sentiment
-│   │   ├── search/page.tsx             # RAG search UI with results
-│   │   └── settings/page.tsx           # Platform config display
-│   ├── api/
-│   │   ├── interviews/route.ts         # POST: create + submit to AssemblyAI (admin client)
-│   │   ├── search/route.ts             # POST: intent classify → hybrid_search → results
-│   │   └── webhooks/transcription/route.ts  # AssemblyAI webhook → ETL pipeline
-│   ├── layout.tsx                      # Root: fonts, Toaster, TooltipProvider
-│   └── page.tsx                        # Redirect to /projects
-├── components/
-│   ├── dashboard/app-sidebar.tsx       # Sidebar nav + user dropdown
-│   ├── interviews/
-│   │   ├── status-tracker.tsx          # Real-time pipeline progress (Supabase Realtime)
-│   │   └── transcript-viewer.tsx       # Speaker-colored, searchable transcript
-│   └── ui/                             # 20 Shadcn components
-├── lib/
-│   ├── ai/
-│   │   ├── assemblyai.ts              # Submit + fetch transcription
-│   │   ├── extraction.ts              # GPT-4o-mini structured extraction (Zod schema)
-│   │   ├── chunking.ts                # Speaker-aware semantic chunking
-│   │   ├── embeddings.ts              # OpenAI batch embedding generation
-│   │   └── pipeline.ts                # Full ETL orchestrator
-│   ├── supabase/
-│   │   ├── client.ts                  # Browser client (anon key)
-│   │   ├── server.ts                  # Server client (cookie sessions)
-│   │   └── admin.ts                   # Service role client (bypasses RLS)
-│   └── constants.ts                   # Status labels, regions, AI config
-├── types/database.ts                  # Full Supabase Database type (Row/Insert/Update)
-└── middleware.ts                      # Auth gate, session refresh
+Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is the
+primary document — it contains the full business context, tech stack, architectural
+constraints, known gotchas, and your immediate mission.
+
+Current state: Phase 1 is COMPLETE (full audio ingestion pipeline working). Phase 2
+is PARTIALLY COMPLETE (Dashboard and Intelligence Chat with streaming RAG are working).
+
+Your immediate task is Phase 2.5: Evolve the architecture from linear ingestion to
+Graph + Event-Driven. Start with Objective 1 (Database Evolution) — propose the SQL
+migration and conceptual approach. Wait for approval before writing application code.
+
+CRITICAL: Do NOT break the existing Chat (/chat) or Dashboard (/dashboard). All
+changes must be additive. The admin client pattern, token_hash auth, and SECURITY
+DEFINER RLS helpers are sacred — use them, don't replace them.
 ```
-
----
-
-## 9. INSTRUCTIONS FOR THE NEW AI AGENT
-
-You are the senior developer inheriting this project. The foundation is solid — 53 TypeScript files, full database schema with RLS, complete AI pipeline code, and a working auth flow. Do not reinvent the wheel. Trust the schema, trust the types, trust the architecture.
-
-**Key principles established:**
-- All DB mutations go through admin client after `getUser()` verification
-- Auth uses `token_hash` flow (NOT PKCE) — do not change this
-- AssemblyAI requires `speech_models: ["universal-2"]` (plural, array)
-- The `SECURITY DEFINER` helper functions (`is_project_member`, `is_project_owner`, etc.) are the foundation of all RLS policies — use them
-
-**Your immediate task**: Help the user test the upload pipeline end-to-end. The `speech_models` fix was just deployed but not yet tested. The biggest likely blocker is that **AssemblyAI webhooks cannot reach localhost** — you'll need to solve this with ngrok, Vercel deploy, or a polling fallback.
-
-**Read these files first:**
-1. `SETUP.md` — complete setup guide with all known issues
-2. `src/lib/ai/pipeline.ts` — the ETL orchestrator
-3. `src/app/api/webhooks/transcription/route.ts` — webhook handler
-4. `src/types/database.ts` — the typed Database interface
