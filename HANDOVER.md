@@ -1,8 +1,8 @@
 # SOVEREIGN DATA — MASTER HANDOVER DOCUMENT & SYSTEM PROMPT
 
-**Date**: February 14, 2026
+**Date**: February 25, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
-**Branch**: `main` — 10 commits, latest `b855ca2`
+**Branch**: `main` — latest `6177b3b`
 **Runtime**: Next.js dev server on `http://localhost:3000`
 
 ---
@@ -46,54 +46,61 @@ The team wastes hours manually clipping interviews for social media. The system 
 | Phase | Status | What's Done |
 |-------|--------|-------------|
 | **Phase 0** | COMPLETE | Scaffold, schema, typed clients, app shell |
-| **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction, chunking, embeddings, search — full end-to-end pipeline verified working |
-| **Phase 2** | PARTIALLY COMPLETE | Dashboard home page + Intelligence Chat (streaming RAG) working. Entity graph + topic heatmap NOT done |
-| **Phase 2.5** | NOT STARTED | **Your immediate mission** — see Section 3 |
-| **Phase 3** | NOT STARTED | Team management, reports |
+| **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction (entities + relationships), chunking, embeddings, search — full end-to-end pipeline |
+| **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
+| **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
+| **Phase 3** | NOT STARTED | **Your immediate mission** — see Section 3 |
 | **Phase 4** | NOT STARTED | Production deployment |
 
-### Database — 7 Tables, 3 Migrations Applied
+### Database — 9 Tables, 4 Migrations Applied
 
 | Table | Purpose |
 |-------|---------|
 | `profiles` | Extends auth.users (auto-created via trigger) |
 | `projects` | RLS root, contains country/region |
 | `project_members` | Many-to-many with roles (owner/editor/viewer) |
-| `interviews` | Audio assets with status, transcript, summary, sentiment, topics |
+| `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` |
 | `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware |
 | `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) |
 | `entity_mentions` | Entity ↔ interview links with sentiment |
+| `entity_relationships` | Graph edges: source→target with `relation_type`, `confidence`, `evidence_text`, interview provenance |
+| `content_snippets` | Auto-generated marketing assets: `platform`, `content`, `tone`, `status` lifecycle |
 
 Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in `extensions` schema.
 
-### File Structure (57 source files)
+### File Structure (~70 source files)
 
 ```
 src/
 ├── app/
 │   ├── (auth)/login, auth/callback, auth/confirm
 │   ├── (dashboard)/
-│   │   ├── dashboard/page.tsx         # NEW: Stats, recent interviews, quick actions
-│   │   ├── chat/page.tsx              # NEW: Streaming RAG conversation
+│   │   ├── dashboard/page.tsx         # Stats, project breakdown, topic distribution, quick actions
+│   │   ├── chat/page.tsx              # Streaming RAG conversation
+│   │   ├── network/page.tsx           # Entity relationship explorer (two-panel)
 │   │   ├── projects/, interviews/, search/, settings/
 │   │   └── layout.tsx                 # Auth guard + sidebar
 │   ├── api/
-│   │   ├── chat/route.ts             # NEW: streamText + hybrid_search RAG
+│   │   ├── chat/route.ts             # streamText + hybrid_search RAG
 │   │   ├── interviews/route.ts       # Create + submit to AssemblyAI
-│   │   ├── interviews/[id]/poll/route.ts  # Polling fallback (webhook can't reach localhost)
+│   │   ├── interviews/[id]/route.ts  # DELETE interview (Storage + CASCADE)
+│   │   ├── interviews/[id]/poll/route.ts  # Polling fallback
 │   │   ├── search/route.ts           # Intent classification + hybrid_search
 │   │   └── webhooks/transcription/route.ts
 │   ├── layout.tsx, page.tsx (redirects to /dashboard)
 ├── components/
-│   ├── dashboard/app-sidebar.tsx      # 6 nav items: Dashboard, Projects, Interviews, Search, Chat, Settings
-│   ├── interviews/status-tracker.tsx  # Realtime + polling fallback
+│   ├── dashboard/app-sidebar.tsx      # 7 nav items: Dashboard, Projects, Interviews, Search, Chat, Network, Settings
+│   ├── interviews/status-tracker.tsx
 │   ├── interviews/transcript-viewer.tsx
+│   ├── interviews/copy-button.tsx     # Copy-to-clipboard (client component)
+│   ├── interviews/delete-interview-button.tsx  # Delete with confirmation dialog
+│   ├── network/network-explorer.tsx   # Interactive entity explorer (client component)
 │   └── ui/ (20 shadcn components)
 ├── lib/
-│   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts
+│   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts
 │   ├── supabase/client.ts, server.ts, admin.ts
 │   └── constants.ts
-├── types/database.ts                  # Full typed Database interface
+├── types/database.ts                  # Full typed Database interface (9 tables, 8 enums)
 └── middleware.ts
 ```
 
@@ -113,6 +120,8 @@ src/
 
 7. **SECURITY DEFINER helpers** — RLS policies use `is_project_member()`, `is_project_owner()`, etc. functions to avoid infinite recursion. See migration `00002`.
 
+8. **Interview deletion uses CASCADE** — Deleting from `interviews` automatically removes all `interview_chunks`, `entity_mentions`, `entity_relationships`, and `content_snippets`. Audio is deleted from Storage separately in the DELETE API handler.
+
 ### Environment Variables (`.env.local` — populated, gitignored)
 
 ```
@@ -127,56 +136,41 @@ WEBHOOK_SECRET=<set>
 
 ---
 
-## 3. IMMEDIATE MISSION: PHASE 2.5 (The "What")
+## 3. IMMEDIATE MISSION: PHASE 3 — Team Management & Reports
 
-### The Paradigm Shift
+### Objective 1: Team Member Invitation & Management
 
-We are moving from a **Linear Ingestion Architecture** to a **Graph & Event-Driven Architecture**:
+Build the multi-user collaboration layer using the existing `project_members` table:
 
-- **From Entities to Relationships (GraphRAG)**: It's not enough to know "Elon Musk" was mentioned. We need a Knowledge Graph showing WHO mentioned him, how they are connected (`relation_type`: "business_partner", "critic", "regulator", etc.), and the confidence score.
-- **From Audio to Multi-modal**: The system architecture should prepare for `source_type` flexibility (audio today, PDFs/docs tomorrow).
-- **From Search to "Push"**: The pipeline must proactively generate derivative content (marketing snippets) asynchronously without waiting for user prompts.
+- **Invite flow**: Project owner enters an email → a `project_members` row is created with role `'editor'` or `'viewer'` → an invite email is sent (use Supabase Auth invite or a custom email).
+- **Member management page** (`/projects/[id]/members`): List current members, change roles, remove members. Only owners can manage members.
+- **Role-based UI**: Viewers see read-only views (no upload, no edit). Editors can upload interviews and edit. Owners have full control including member management.
+- Use the existing `is_project_member()`, `is_project_editor()`, `is_project_owner()` SECURITY DEFINER helpers.
+
+### Objective 2: Report Generator
+
+- **Report creation page**: User selects interviews and/or topics → GPT-4o (not mini — higher reasoning quality) generates a structured BI report.
+- **Report templates**: Pre-built formats like "Country Risk Assessment", "Sector Analysis", "Entity Profile".
+- **Report display page**: Rendered report with sections, sourced from interview data.
+- Consider using `streamText` for streaming the report generation (reports can be long).
+
+### Objective 3: PDF Export
+
+- Generate downloadable PDF from report data.
+- Options: `@react-pdf/renderer` (React components → PDF) or server-side Puppeteer (HTML → PDF).
+- PDF should include report title, date, sections, citations, and a professional layout.
+
+### Objective 4: Report Sharing (Optional/Low Priority)
+
+- Shareable link with optional password protection.
+- This requires a new `reports` table and a public route.
 
 ### CRITICAL CONSTRAINT
-You must NOT break the existing Chat (`/chat`) or Dashboard (`/dashboard`) features. All new architecture must be additive or gracefully refactored. The existing 7 tables must remain intact — add new tables, add columns with defaults, but do not drop or rename existing columns.
-
-### Objective 1: Database Evolution (Graph & Assets)
-
-Update the Supabase schema to support:
-
-- **Multi-modal ingestion prep**: Add `source_type` column to `interviews` (default `'audio'`, future values: `'document'`, `'video'`). This is additive — existing audio interviews continue working.
-- **Explicit Entity Relationships**: New `entity_relationships` table mapping source entity → target entity with `relation_type` (enum: 'business_partner', 'competitor', 'regulator', 'critic', 'ally', 'subsidiary', 'investor', etc.), `confidence` score (0–1), `evidence_text` (the quote that establishes the relationship), and `interview_id` (provenance).
-- **Marketing Content Snippets**: New `content_snippets` table storing auto-generated marketing assets per interview — `platform` (enum: 'linkedin', 'twitter', 'newsletter', 'summary'), `content` (the generated text), `tone` ('professional', 'casual', 'provocative'), `status` ('draft', 'approved', 'published').
-
-**Provide the SQL migration and the conceptual approach first. Wait for approval before writing application code.**
-
-### Objective 2: AI Pipeline Evolution
-
-Modify the existing ETL pipeline (`src/lib/ai/pipeline.ts`) to:
-
-1. **Extract relationships** during the entity extraction phase — update the Zod schema in `extraction.ts` to also return a `relationships` array (source_name, target_name, relation_type, confidence, evidence_text). Remember: all fields must be required (use `.nullable()` not `.optional()`).
-2. **Post-processing step**: After the main pipeline reaches COMPLETED, trigger an async "content generation" step that uses GPT-4o-mini to generate marketing snippets (LinkedIn post, Twitter thread, newsletter blurb) from the interview summary + key quotes.
-3. **Persist everything** to the new tables using the admin client pattern.
-
-### Objective 3: UI Surfacing
-
-- Update the **Interview Detail page** (`src/app/(dashboard)/interviews/[id]/page.tsx`) to display:
-  - Marketing Assets section: generated snippets with copy-to-clipboard buttons, organized by platform
-  - Entity Relationships: a visual or list representation showing who is connected to whom and how
-- This should be additive — the existing summary, entities, sentiment, and transcript sections remain untouched.
+You must NOT break the existing Chat (`/chat`), Dashboard (`/dashboard`), Network Explorer (`/network`), or Interview Detail pages. All new features must be additive. The admin client pattern, token_hash auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.
 
 ---
 
-## 4. FUTURE ROADMAP (What Comes Later)
-
-Once Phase 2.5 is fully working and verified:
-
-### Phase 3: Team Management & Investor-Grade Reports
-- Email invite flow → `project_members` with roles (owner/editor/viewer)
-- Role-based UI (viewers: read-only, editors: upload + edit, owners: full control)
-- Report generator: select interviews/topics → GPT-4o generates structured BI report
-- PDF export via `@react-pdf/renderer` or Puppeteer
-- Report sharing with optional password protection
+## 4. FUTURE ROADMAP (What Comes After Phase 3)
 
 ### Phase 4: Production Deployment & Security
 - Deploy to Vercel, configure production env vars
@@ -197,14 +191,21 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phase 1 is COMPLETE (full audio ingestion pipeline working). Phase 2
-is PARTIALLY COMPLETE (Dashboard and Intelligence Chat with streaming RAG are working).
+Current state: Phases 0, 1, 2, and 2.5 are ALL COMPLETE. The platform has:
+- Full audio ingestion pipeline (upload → transcribe → extract entities &
+  relationships → chunk → embed → generate marketing snippets)
+- Streaming RAG chat with citations
+- Dashboard with analytics (project breakdown, topic distribution)
+- Network Explorer for entity relationships
+- Interview deletion with CASCADE cleanup
 
-Your immediate task is Phase 2.5: Evolve the architecture from linear ingestion to
-Graph + Event-Driven. Start with Objective 1 (Database Evolution) — propose the SQL
-migration and conceptual approach. Wait for approval before writing application code.
+The database has 9 tables across 4 migrations. See ROADMAP.md for full task
+history and architecture decisions.
 
-CRITICAL: Do NOT break the existing Chat (/chat) or Dashboard (/dashboard). All
-changes must be additive. The admin client pattern, token_hash auth, and SECURITY
-DEFINER RLS helpers are sacred — use them, don't replace them.
+Your immediate task is Phase 3: Team Management & Reports. Start with Objective 1
+(team member invitation and role-based UI) — propose the approach first, wait for
+approval before writing code.
+
+CRITICAL: Do NOT break existing features. The admin client pattern, token_hash
+auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.
 ```
