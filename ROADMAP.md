@@ -14,7 +14,7 @@
 | 1 | Auth & Core Pipeline | COMPLETE | 100% |
 | 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
-| 3 | Team Management & Reports | NOT STARTED | 0% |
+| 3 | Team Management & Reports | IN PROGRESS | 40% (Obj 1 complete) |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -144,24 +144,54 @@
 
 ---
 
-## Phase 3 — Team Management & Reports (NOT STARTED)
+## Phase 3 — Team Management & Reports (IN PROGRESS)
 
 **Goal**: Multi-user collaboration and investor-grade report generation.
 
-### Planned Tasks
+### Objective 1: Team Member Invitation & Role-Based UI (COMPLETE)
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Database migration for invitations | Done | `supabase/migrations/00005_team_invitation_support.sql` | `invited_email` column on `project_members`, claim trigger |
+| TypeScript types update | Done | `src/types/database.ts` | `invited_email` + nullable `user_id` on project_members |
+| Project role utility | Done | `src/lib/auth/project-role.ts` | `getUserProjectRole()`, `getAuthUser()` helpers |
+| Invite flow (Server Actions) | Done | `src/app/(dashboard)/projects/[id]/members/actions.ts` | `inviteTeamMember`, `updateMemberRole`, `removeMember` |
+| Member management page | Done | `src/app/(dashboard)/projects/[id]/members/page.tsx` | Owner-only access, pending invites section |
+| Member list component | Done | `src/components/projects/member-list.tsx` | Invite form, role selector, remove dialog |
+| Project detail page | Done | `src/app/(dashboard)/projects/[id]/page.tsx` | Stats cards, quick actions, role-aware UI |
+| Projects list → detail link | Done | `src/app/(dashboard)/projects/page.tsx` | Cards now link to `/projects/[id]` |
+| Role-based interview list | Done | `src/app/(dashboard)/interviews/page.tsx` | Upload + delete buttons gated by editor/owner role |
+| Role-based interview detail | Done | `src/app/(dashboard)/interviews/[id]/page.tsx` | Delete button gated by project role |
+| Upload page project filter | Done | `src/app/(dashboard)/interviews/upload/page.tsx` | Dropdown only shows editable projects; supports `?project=` param |
+
+### Schema Changes (Migration 00005)
+
+| Change | Details |
+|--------|---------|
+| `project_members.invited_email` | New nullable TEXT column for pending invites |
+| `project_members.user_id` | Changed to nullable (NULL while invite is pending) |
+| `check_member_or_invite` constraint | At least one of `user_id` or `invited_email` must be set |
+| `idx_unique_pending_invite` index | One pending invite per email per project |
+| `claim_pending_invites()` trigger | Auto-fills `user_id` and clears `invited_email` when invitee's profile is created |
+
+### Objective 1 Completion Criteria — ALL MET
+1. Owner can invite team members by email (existing users added directly, new users receive Supabase Auth invite)
+2. Owner can change member roles (editor ↔ viewer) and remove members
+3. Viewers see read-only UI (no upload button, no delete buttons)
+4. Editors/owners see upload + delete controls
+5. Upload page only shows projects the user can edit
+6. Project detail page shows role-appropriate actions
+
+### Remaining Tasks (Objectives 2–4)
 
 | Task | Priority | Description |
 |------|----------|-------------|
-| Invite team members | High | Email invite flow → creates project_member with role |
-| Role-based UI | High | Viewers: read-only. Editors: upload + edit. Owners: full control. |
-| Member management page | High | List members, change roles, remove members |
 | Report generator | High | Select interviews/topics → GPT generates structured BI report |
 | Report templates | Medium | Pre-built templates: "Country Risk Assessment", "Sector Analysis", "Entity Profile" |
 | PDF export | Medium | Generate downloadable PDF from report data |
 | Report sharing | Low | Shareable link with optional password protection |
 
 ### Technical Notes
-- Invite flow: owner enters email → creates `project_members` row → sends invite email
 - Reports generated via GPT-4o (not mini) for higher reasoning quality — user pays per report
 - PDF generation via a library like `@react-pdf/renderer` or server-side with Puppeteer
 
@@ -222,13 +252,13 @@
 
 ---
 
-## Database Schema Summary (9 Tables, 4 Migrations)
+## Database Schema Summary (9 Tables, 5 Migrations)
 
 | Table | Purpose | Migration |
 |-------|---------|-----------|
 | `profiles` | Extends auth.users (auto-created via trigger) | 00001 |
 | `projects` | RLS root, contains country/region | 00001 |
-| `project_members` | Many-to-many with roles (owner/editor/viewer) | 00001 |
+| `project_members` | Many-to-many with roles (owner/editor/viewer), invitation support | 00001, 00005 |
 | `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` | 00001, 00004 |
 | `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware | 00001 |
 | `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) | 00001 |

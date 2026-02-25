@@ -143,22 +143,25 @@ export interface Database {
         Row: {
           id: string;
           project_id: string;
-          user_id: string;
+          user_id: string | null;
           role: UserRole;
+          invited_email: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           project_id: string;
-          user_id: string;
+          user_id?: string | null;
           role?: UserRole;
+          invited_email?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           project_id?: string;
-          user_id?: string;
+          user_id?: string | null;
           role?: UserRole;
+          invited_email?: string | null;
           created_at?: string;
         };
         Relationships: [

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getUserProjectRole } from "@/lib/auth/project-role";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -51,6 +52,9 @@ export default async function InterviewDetailPage({
   if (error || !interview) {
     notFound();
   }
+
+  const userRole = await getUserProjectRole(interview.project_id);
+  const canEdit = userRole === "owner" || userRole === "editor";
 
   // Fetch entities for this interview
   const { data: mentions } = await supabase
@@ -165,10 +169,12 @@ export default async function InterviewDetailPage({
           </div>
           <div className="flex items-center gap-2">
             <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
-            <DeleteInterviewButton
-              interviewId={interview.id}
-              interviewTitle={interview.title}
-            />
+            {canEdit && (
+              <DeleteInterviewButton
+                interviewId={interview.id}
+                interviewTitle={interview.title}
+              />
+            )}
           </div>
         </div>
         {interview.description && (

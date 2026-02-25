@@ -49,16 +49,16 @@ The team wastes hours manually clipping interviews for social media. The system 
 | **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction (entities + relationships), chunking, embeddings, search — full end-to-end pipeline |
 | **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
 | **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
-| **Phase 3** | NOT STARTED | **Your immediate mission** — see Section 3 |
+| **Phase 3** | IN PROGRESS | Objective 1 (Team invitation + role-based UI) COMPLETE. Objectives 2–4 (Reports, PDF, Sharing) pending — see Section 3 |
 | **Phase 4** | NOT STARTED | Production deployment |
 
-### Database — 9 Tables, 4 Migrations Applied
+### Database — 9 Tables, 5 Migrations Applied
 
 | Table | Purpose |
 |-------|---------|
 | `profiles` | Extends auth.users (auto-created via trigger) |
 | `projects` | RLS root, contains country/region |
-| `project_members` | Many-to-many with roles (owner/editor/viewer) |
+| `project_members` | Many-to-many with roles (owner/editor/viewer), `invited_email` for pending invites |
 | `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` |
 | `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware |
 | `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) |
@@ -68,7 +68,7 @@ The team wastes hours manually clipping interviews for social media. The system 
 
 Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in `extensions` schema.
 
-### File Structure (~70 source files)
+### File Structure (~75 source files)
 
 ```
 src/
@@ -78,7 +78,8 @@ src/
 │   │   ├── dashboard/page.tsx         # Stats, project breakdown, topic distribution, quick actions
 │   │   ├── chat/page.tsx              # Streaming RAG conversation
 │   │   ├── network/page.tsx           # Entity relationship explorer (two-panel)
-│   │   ├── projects/, interviews/, search/, settings/
+│   │   ├── projects/page.tsx, [id]/page.tsx, [id]/members/
+│   │   ├── interviews/, search/, settings/
 │   │   └── layout.tsx                 # Auth guard + sidebar
 │   ├── api/
 │   │   ├── chat/route.ts             # streamText + hybrid_search RAG
@@ -95,9 +96,11 @@ src/
 │   ├── interviews/copy-button.tsx     # Copy-to-clipboard (client component)
 │   ├── interviews/delete-interview-button.tsx  # Delete with confirmation dialog
 │   ├── network/network-explorer.tsx   # Interactive entity explorer (client component)
+│   ├── projects/member-list.tsx       # Team member management (client component)
 │   └── ui/ (20 shadcn components)
 ├── lib/
 │   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts
+│   ├── auth/project-role.ts            # getUserProjectRole(), getAuthUser()
 │   ├── supabase/client.ts, server.ts, admin.ts
 │   └── constants.ts
 ├── types/database.ts                  # Full typed Database interface (9 tables, 8 enums)
@@ -138,14 +141,16 @@ WEBHOOK_SECRET=<set>
 
 ## 3. IMMEDIATE MISSION: PHASE 3 — Team Management & Reports
 
-### Objective 1: Team Member Invitation & Management
+### Objective 1: Team Member Invitation & Management — COMPLETE
 
-Build the multi-user collaboration layer using the existing `project_members` table:
+Multi-user collaboration layer built on `project_members` table:
 
-- **Invite flow**: Project owner enters an email → a `project_members` row is created with role `'editor'` or `'viewer'` → an invite email is sent (use Supabase Auth invite or a custom email).
-- **Member management page** (`/projects/[id]/members`): List current members, change roles, remove members. Only owners can manage members.
-- **Role-based UI**: Viewers see read-only views (no upload, no edit). Editors can upload interviews and edit. Owners have full control including member management.
-- Use the existing `is_project_member()`, `is_project_editor()`, `is_project_owner()` SECURITY DEFINER helpers.
+- **Invite flow**: Owner enters email → existing users added directly, new users get Supabase Auth invite email → pending invites auto-claimed on signup via `claim_pending_invites()` trigger.
+- **Member management page** (`/projects/[id]/members`): List members, change roles, remove members, revoke pending invites. Owner-only access.
+- **Project detail page** (`/projects/[id]`): Stats (interview count, member count), role badge, quick actions gated by role.
+- **Role-based UI**: Viewers see read-only views (no upload, no delete). Editors can upload and delete. Owners have full control including member management.
+- Upload page project dropdown filtered to editable projects only.
+- Uses existing SECURITY DEFINER helpers + admin client pattern for all mutations.
 
 ### Objective 2: Report Generator
 

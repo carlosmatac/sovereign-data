@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthUser } from "@/lib/auth/project-role";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,6 +31,22 @@ export default async function InterviewsPage({
 
   const { data: interviews, error } = await query;
 
+  // Fetch user's editable project IDs for role-based UI
+  const user = await getAuthUser();
+  const admin = createAdminClient();
+  const { data: editableMemberships } = user
+    ? await admin
+        .from("project_members")
+        .select("project_id")
+        .eq("user_id", user.id)
+        .in("role", ["owner", "editor"])
+    : { data: [] };
+
+  const editableProjectIds = new Set(
+    (editableMemberships ?? []).map((m) => m.project_id)
+  );
+  const canUpload = editableProjectIds.size > 0;
+
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return "—";
     const mins = Math.floor(seconds / 60);
@@ -46,12 +64,14 @@ export default async function InterviewsPage({
             Audio interviews being processed through the intelligence pipeline.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/interviews/upload">
-            <Plus className="mr-2 h-4 w-4" />
-            Upload Interview
-          </Link>
-        </Button>
+        {canUpload && (
+          <Button asChild>
+            <Link href="/interviews/upload">
+              <Plus className="mr-2 h-4 w-4" />
+              Upload Interview
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Interview List */}
@@ -71,12 +91,14 @@ export default async function InterviewsPage({
             <p className="mt-1 text-sm text-muted-foreground">
               Upload your first audio interview to start extracting intelligence.
             </p>
-            <Button className="mt-4" asChild>
-              <Link href="/interviews/upload">
-                <Plus className="mr-2 h-4 w-4" />
-                Upload Interview
-              </Link>
-            </Button>
+            {canUpload && (
+              <Button className="mt-4" asChild>
+                <Link href="/interviews/upload">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Upload Interview
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -122,11 +144,13 @@ export default async function InterviewsPage({
                       >
                         {statusInfo.label}
                       </Badge>
-                      <DeleteInterviewButton
-                        interviewId={interview.id}
-                        interviewTitle={interview.title}
-                        variant="icon"
-                      />
+                      {editableProjectIds.has(interview.project_id) && (
+                        <DeleteInterviewButton
+                          interviewId={interview.id}
+                          interviewTitle={interview.title}
+                          variant="icon"
+                        />
+                      )}
                     </div>
                   </CardContent>
                 </Card>

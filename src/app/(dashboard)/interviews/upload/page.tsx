@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import type { Project } from "@/types/database";
 
 export default function UploadInterviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -41,22 +42,28 @@ export default function UploadInterviewPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [step, setStep] = useState<"form" | "uploading" | "processing">("form");
 
-  // Form state
+  // Form state — pre-select project from URL if provided
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(searchParams.get("project") ?? "");
   const [language, setLanguage] = useState("en");
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Load projects on mount
+  // Load only projects where user has upload permission (editor/owner)
   useEffect(() => {
     async function loadProjects() {
-      const { data } = await supabase
-        .from("projects")
-        .select("*")
-        .order("name");
-      if (data) setProjects(data);
+      const { data: memberships } = await supabase
+        .from("project_members")
+        .select("project_id, role, projects(*)")
+        .in("role", ["owner", "editor"]);
+
+      if (memberships) {
+        const editable = memberships
+          .map((m) => m.projects as unknown as Project | null)
+          .filter((p): p is Project => p !== null);
+        setProjects(editable);
+      }
     }
     loadProjects();
   }, [supabase]);
