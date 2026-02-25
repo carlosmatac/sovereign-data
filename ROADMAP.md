@@ -1,8 +1,8 @@
 # Sovereign Data — Development Roadmap
 
-**Last updated**: February 14, 2026
+**Last updated**: February 25, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
-**Latest commit**: `e5b82ad` (7 commits on `main`)
+**Branch**: `main`
 
 ---
 
@@ -12,7 +12,8 @@
 |-------|------|--------|----------|
 | 0 | Foundation | COMPLETE | 100% |
 | 1 | Auth & Core Pipeline | COMPLETE | 100% |
-| 2 | Conversational RAG & Analytics | NOT STARTED | 0% |
+| 2 | Conversational RAG & Analytics | PARTIALLY COMPLETE | ~40% |
+| 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | NOT STARTED | 0% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
@@ -85,27 +86,64 @@
 
 ---
 
-## Phase 2 — Conversational RAG & Analytics (NOT STARTED)
+## Phase 2 — Conversational RAG & Analytics (PARTIALLY COMPLETE)
 
 **Goal**: Transform search from single-query to conversational, add dashboard analytics.
 
-### Planned Tasks
+### Completed Tasks
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Chat interface (streaming RAG) | Done | `chat/page.tsx`, `api/chat/route.ts` | Multi-turn with `streamText` + `useChat`, in-memory history |
+| Chat citations | Done | `api/chat/route.ts` | Citation markers [1]–[8] with speaker, timestamp, and interview links |
+| Dashboard home page | Done | `dashboard/page.tsx` | Stats cards, recent interviews, pipeline status, quick actions |
+
+### Remaining Tasks
 
 | Task | Priority | Description |
 |------|----------|-------------|
-| Chat interface | High | Multi-turn conversation with the knowledge base. Use Vercel AI SDK `streamText` with chat history. Context window = top RAG chunks + conversation history. |
-| Chat citations | High | Each answer links to specific chunks with audio timestamps. Clicking a citation plays the audio from that timestamp. |
-| Dashboard home page | Medium | Replace `/projects` as landing page. Show: total interviews, processing queue, recent activity. |
-| Interview count by project | Medium | Card/chart showing interviews per project with status breakdown. |
-| Entity network graph | Medium | Visualization of entity relationships across interviews (who mentions whom). |
+| Entity network graph | Medium | Visualization of entity relationships across interviews. Now possible with `entity_relationships` table from Phase 2.5. |
 | Topic heatmap | Low | Matrix of topics × countries with interview density. |
 | Trending topics | Low | Time-series of topic frequency across interviews. |
+| Interview count by project | Low | Card/chart showing interviews per project with status breakdown. |
 
-### Technical Notes
-- Chat should use `streamText` from Vercel AI SDK for streaming responses
-- Chat history stored in-memory (no DB persistence for MVP)
-- Dashboard analytics via Supabase aggregate queries (COUNT, GROUP BY)
-- Entity graph can use a simple force-directed layout (e.g., D3 or a React lib)
+**Commits**: `b855ca2`
+
+---
+
+## Phase 2.5 — Graph & Event-Driven Architecture (COMPLETE)
+
+**Goal**: Evolve from linear ingestion to Knowledge Graph + automated content generation.
+
+### Completed Tasks
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Database evolution (migration 00004) | Done | `supabase/migrations/00004_graph_and_content.sql` | `entity_relationships`, `content_snippets` tables; `source_type` on interviews; 5 new enums |
+| TypeScript types for new schema | Done | `src/types/database.ts` | Full Row/Insert/Update + Relationships for 2 new tables; 5 new enum types |
+| Relationship extraction in AI pipeline | Done | `src/lib/ai/extraction.ts` | Added `relationships[]` to Zod schema (source, target, type, confidence, evidence) |
+| Relationship persistence in ETL | Done | `src/lib/ai/pipeline.ts` | Step 7: entity name→ID map, upsert to `entity_relationships` |
+| Marketing content generation module | Done | `src/lib/ai/content-generation.ts` | GPT-4o-mini generates LinkedIn, Twitter, Newsletter, Executive Summary per interview |
+| Content generation in ETL pipeline | Done | `src/lib/ai/pipeline.ts` | Step 8: runs after COMPLETED, non-critical (failures don't affect pipeline status) |
+| Interview detail: Marketing Assets section | Done | `src/app/(dashboard)/interviews/[id]/page.tsx` | Platform icons, status badges, copy-to-clipboard per snippet |
+| Interview detail: Relationships section | Done | `src/app/(dashboard)/interviews/[id]/page.tsx` | Source→Target with relation type, confidence %, evidence quotes |
+| Copy-to-clipboard component | Done | `src/components/interviews/copy-button.tsx` | Client component with visual feedback |
+| RLS for new tables | Done | `supabase/migrations/00004_graph_and_content.sql` | Reuses `is_project_member` + `get_interview_project` SECURITY DEFINER helpers |
+
+### Schema Changes (Additive Only)
+
+| Change | Details |
+|--------|---------|
+| `interviews.source_type` | New column, `source_type` enum, DEFAULT `'audio'` — zero impact on existing rows |
+| `entity_relationships` table | Graph edges: source→target with relation_type, confidence, evidence_text, interview provenance |
+| `content_snippets` table | Marketing assets: platform, content, tone, status lifecycle (draft→approved→published) |
+| 5 new enums | `relation_type`, `source_type`, `snippet_platform`, `snippet_tone`, `snippet_status` |
+
+### Phase 2.5 Completion Criteria — ALL MET
+1. New interview processed with relationships extracted and persisted
+2. Marketing snippets auto-generated after pipeline completion
+3. Interview detail page displays both new sections
+4. Existing Chat (`/chat`) and Dashboard (`/dashboard`) unaffected
 
 ---
 
@@ -177,6 +215,26 @@
 | HNSW index (not IVFFlat) | Better recall at our scale; no need for periodic reindexing |
 | GPT-4o-mini for extraction | $0.15/1M tokens — 10x cheaper than GPT-4o, sufficient for structured extraction |
 | Hybrid search (SQL + vector) | Pre-filtering by country/topic reduces hallucination risk by narrowing search space |
+| Additive schema evolution (Phase 2.5) | New tables + columns with defaults — zero breaking changes to existing pipeline or UI |
+| Entity relationships as graph edges | Enables GraphRAG: source→target with typed relation, confidence, and evidence provenance |
+| Async content generation post-pipeline | Runs after COMPLETED, wrapped in try/catch — failures are non-critical and don't affect interview status |
+| Content snippet lifecycle (draft→approved→published) | Supports future editorial workflow without schema changes |
+
+---
+
+## Database Schema Summary (9 Tables, 4 Migrations)
+
+| Table | Purpose | Migration |
+|-------|---------|-----------|
+| `profiles` | Extends auth.users (auto-created via trigger) | 00001 |
+| `projects` | RLS root, contains country/region | 00001 |
+| `project_members` | Many-to-many with roles (owner/editor/viewer) | 00001 |
+| `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` | 00001, 00004 |
+| `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware | 00001 |
+| `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) | 00001 |
+| `entity_mentions` | Entity ↔ interview links with sentiment | 00001 |
+| `entity_relationships` | Knowledge graph edges with typed relations, confidence, evidence | 00004 |
+| `content_snippets` | Auto-generated marketing assets per interview | 00004 |
 
 ---
 
@@ -185,16 +243,19 @@
 Copy-paste this to start a new session:
 
 ```
-Read the file ROADMAP.md in the project root. It contains the complete
-development roadmap with phase status, completed tasks, remaining work,
-known issues, and architectural decisions.
+Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is the
+primary document — it contains the full business context, tech stack, architectural
+constraints, known gotchas, and your immediate mission.
 
-Current status: Phase 1 is at ~90%. All code exists but the end-to-end
-pipeline (upload → AssemblyAI transcription → webhook → GPT extraction →
-embeddings → search) has not been verified working yet. The main blocker
-is likely that AssemblyAI webhooks cannot reach localhost.
+Current state: Phases 0, 1, and 2.5 are COMPLETE. Phase 2 is PARTIALLY COMPLETE
+(Chat and Dashboard working; entity network graph, topic heatmap, and trending
+topics are NOT done).
 
-Your task: Close Phase 1 by making the pipeline work end-to-end. Once an
-interview reaches COMPLETED status and is searchable from /search, Phase 1
-is done and we move to Phase 2 (conversational RAG chat + dashboard analytics).
+The database has 9 tables across 4 migrations. The ETL pipeline now extracts
+entities AND relationships (GraphRAG), and auto-generates marketing snippets
+(LinkedIn, Twitter, Newsletter, Summary) after each interview completes.
+
+CRITICAL: Do NOT break the existing Chat (/chat), Dashboard (/dashboard), or
+Interview Detail page. The admin client pattern, token_hash auth, and SECURITY
+DEFINER RLS helpers are sacred — use them, don't replace them.
 ```

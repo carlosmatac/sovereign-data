@@ -23,6 +23,24 @@ export type EntityType =
 
 export type UserRole = "owner" | "editor" | "viewer";
 
+export type RelationType =
+  | "business_partner"
+  | "competitor"
+  | "regulator"
+  | "critic"
+  | "ally"
+  | "subsidiary"
+  | "investor"
+  | "advisor"
+  | "supplier"
+  | "acquirer";
+
+export type SourceType = "audio" | "document" | "video";
+
+export type SnippetPlatform = "linkedin" | "twitter" | "newsletter" | "summary";
+export type SnippetTone = "professional" | "casual" | "provocative";
+export type SnippetStatus = "draft" | "approved" | "published";
+
 // ============================================
 // JSON Column Types
 // ============================================
@@ -177,6 +195,7 @@ export interface Database {
           topics: string[] | null;
           assemblyai_id: string | null;
           language: string;
+          source_type: SourceType;
           conducted_at: string | null;
           created_by: string;
           created_at: string;
@@ -198,6 +217,7 @@ export interface Database {
           topics?: string[] | null;
           assemblyai_id?: string | null;
           language?: string;
+          source_type?: SourceType;
           conducted_at?: string | null;
           created_by?: string;
           created_at?: string;
@@ -219,6 +239,7 @@ export interface Database {
           topics?: string[] | null;
           assemblyai_id?: string | null;
           language?: string;
+          source_type?: SourceType;
           conducted_at?: string | null;
           created_by?: string;
           created_at?: string;
@@ -370,6 +391,105 @@ export interface Database {
           },
         ];
       };
+      entity_relationships: {
+        Row: {
+          id: string;
+          source_entity_id: string;
+          target_entity_id: string;
+          relation_type: RelationType;
+          confidence: number;
+          evidence_text: string | null;
+          interview_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_entity_id: string;
+          target_entity_id: string;
+          relation_type: RelationType;
+          confidence?: number;
+          evidence_text?: string | null;
+          interview_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_entity_id?: string;
+          target_entity_id?: string;
+          relation_type?: RelationType;
+          confidence?: number;
+          evidence_text?: string | null;
+          interview_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "entity_relationships_source_entity_id_fkey";
+            columns: ["source_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "entity_relationships_target_entity_id_fkey";
+            columns: ["target_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "entity_relationships_interview_id_fkey";
+            columns: ["interview_id"];
+            isOneToOne: false;
+            referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      content_snippets: {
+        Row: {
+          id: string;
+          interview_id: string;
+          platform: SnippetPlatform;
+          content: string;
+          tone: SnippetTone;
+          status: SnippetStatus;
+          metadata: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          interview_id: string;
+          platform: SnippetPlatform;
+          content: string;
+          tone?: SnippetTone;
+          status?: SnippetStatus;
+          metadata?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          interview_id?: string;
+          platform?: SnippetPlatform;
+          content?: string;
+          tone?: SnippetTone;
+          status?: SnippetStatus;
+          metadata?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "content_snippets_interview_id_fkey";
+            columns: ["interview_id"];
+            isOneToOne: false;
+            referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -398,6 +518,11 @@ export interface Database {
       interview_status: InterviewStatus;
       entity_type: EntityType;
       user_role: UserRole;
+      relation_type: RelationType;
+      source_type: SourceType;
+      snippet_platform: SnippetPlatform;
+      snippet_tone: SnippetTone;
+      snippet_status: SnippetStatus;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -419,3 +544,5 @@ export type Interview = Tables<"interviews">;
 export type InterviewChunk = Tables<"interview_chunks">;
 export type Entity = Tables<"entities">;
 export type EntityMention = Tables<"entity_mentions">;
+export type EntityRelationship = Tables<"entity_relationships">;
+export type ContentSnippet = Tables<"content_snippets">;

@@ -8,6 +8,7 @@ import { getTranscription } from "./assemblyai";
 import { extractIntelligence } from "./extraction";
 import { chunkTranscript, chunkPlainText } from "./chunking";
 import { generateEmbeddings } from "./embeddings";
+import { generateContentSnippets } from "./content-generation";
 import type { InterviewStatus } from "@/types/database";
 
 /**
@@ -153,8 +154,9 @@ export async function processTranscription(
     }
 
     // ── Step 6: Persist entities ─────────────────────────────────
+    const entityIdMap = new Map<string, string>();
+
     for (const entity of extraction.entities) {
-      // Upsert entity (idempotent by name + type)
       const { data: entityRow } = await supabase
         .from("entities")
         .upsert(
@@ -169,7 +171,7 @@ export async function processTranscription(
         .single();
 
       if (entityRow) {
-        // Create mention link
+        entityIdMap.set(entity.name, entityRow.id);
         await supabase.from("entity_mentions").insert({
           entity_id: entityRow.id,
           interview_id: interviewId,
@@ -178,12 +180,59 @@ export async function processTranscription(
       }
     }
 
+    // ── Step 7: Persist relationships ────────────────────────────
+    for (const rel of extraction.relationships) {
+      const sourceId = entityIdMap.get(rel.source_name);
+      const targetId = entityIdMap.get(rel.target_name);
+
+      if (sourceId && targetId) {
+        const { error: relError } = await supabase
+          .from("entity_relationships")
+          .upsert(
+            {
+              source_entity_id: sourceId,
+              target_entity_id: targetId,
+              relation_type: rel.relation_type,
+              confidence: rel.confidence,
+              evidence_text: rel.evidence_text ?? null,
+              interview_id: interviewId,
+            },
+            {
+              onConflict:
+                "source_entity_id,target_entity_id,relation_type,interview_id",
+            }
+          );
+
+        if (relError) {
+          console.error("Failed to upsert relationship:", relError);
+        }
+      }
+    }
+
     // ── Done ─────────────────────────────────────────────────────
     await updateInterviewStatus(interviewId, "COMPLETED");
 
     console.log(
-      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${extraction.entities.length} entities`
+      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${extraction.entities.length} entities, ${extraction.relationships.length} relationships`
     );
+
+    // ── Step 8: Content generation (non-critical) ────────────────
+    try {
+      const keyQuotes = extraction.sentiment.highlights.map((h) => h.text);
+      await generateContentSnippets({
+        interviewId,
+        title: interview?.title ?? "Unknown Interview",
+        summary: extraction.summary,
+        topics: extraction.topics,
+        country,
+        keyQuotes,
+      });
+    } catch (contentErr) {
+      console.error(
+        `Content generation failed for ${interviewId} (non-critical):`,
+        contentErr
+      );
+    }
   } catch (error) {
     console.error(`Pipeline failed for interview ${interviewId}:`, error);
     await updateInterviewStatus(interviewId, "FAILED", {

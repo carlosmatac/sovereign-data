@@ -12,18 +12,25 @@ import { Separator } from "@/components/ui/separator";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
   ArrowLeft,
+  ArrowRight,
+  Briefcase,
   Clock,
   Globe,
+  Hash,
+  Link2,
+  Mail,
   User,
   Building2,
   MapPin,
   AlertTriangle,
   TrendingUp,
   FileText,
+  Newspaper,
 } from "lucide-react";
 import Link from "next/link";
 import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
+import { CopyButton } from "@/components/interviews/copy-button";
 
 export default async function InterviewDetailPage({
   params,
@@ -49,6 +56,40 @@ export default async function InterviewDetailPage({
     .from("entity_mentions")
     .select("*, entities(*)")
     .eq("interview_id", id);
+
+  // Fetch entity relationships for this interview
+  const { data: relationships } = await supabase
+    .from("entity_relationships")
+    .select("*")
+    .eq("interview_id", id);
+
+  // Fetch content snippets for this interview
+  const { data: snippets } = await supabase
+    .from("content_snippets")
+    .select("*")
+    .eq("interview_id", id)
+    .order("platform");
+
+  // Build entity name lookup from mentions for relationship display
+  const entityNameMap: Record<string, { name: string; type: string }> = {};
+  if (mentions) {
+    for (const m of mentions) {
+      const entity = m.entities as unknown as {
+        name: string;
+        type: string;
+      } | null;
+      if (entity) {
+        entityNameMap[m.entity_id] = entity;
+      }
+    }
+  }
+
+  const platformIcons: Record<string, React.ReactNode> = {
+    linkedin: <Briefcase className="h-3.5 w-3.5" />,
+    twitter: <Hash className="h-3.5 w-3.5" />,
+    newsletter: <Mail className="h-3.5 w-3.5" />,
+    summary: <FileText className="h-3.5 w-3.5" />,
+  };
 
   const statusInfo = STATUS_LABELS[interview.status] ?? {
     label: interview.status,
@@ -173,6 +214,53 @@ export default async function InterviewDetailPage({
                       <Badge key={topic} variant="secondary">
                         {topic}
                       </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Marketing Assets */}
+            {snippets && snippets.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Newspaper className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">
+                      Marketing Assets
+                    </CardTitle>
+                  </div>
+                  <CardDescription>
+                    Auto-generated content ready for distribution
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {snippets.map((snippet) => (
+                      <div key={snippet.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {platformIcons[snippet.platform] ?? (
+                              <FileText className="h-3.5 w-3.5" />
+                            )}
+                            <span className="text-sm font-medium capitalize">
+                              {snippet.platform}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] capitalize"
+                            >
+                              {snippet.status}
+                            </Badge>
+                            <CopyButton text={snippet.content} />
+                          </div>
+                        </div>
+                        <div className="rounded-md bg-muted p-3 text-sm whitespace-pre-wrap leading-relaxed">
+                          {snippet.content}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </CardContent>
@@ -309,6 +397,63 @@ export default async function InterviewDetailPage({
                               )}
                             </div>
                           </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Entity Relationships */}
+            {relationships && relationships.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">
+                      Relationships
+                    </CardTitle>
+                  </div>
+                  <CardDescription>
+                    {relationships.length} connection{relationships.length !== 1 ? "s" : ""} identified
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {relationships.map((rel) => {
+                      const source =
+                        entityNameMap[rel.source_entity_id];
+                      const target =
+                        entityNameMap[rel.target_entity_id];
+                      if (!source || !target) return null;
+
+                      return (
+                        <div
+                          key={rel.id}
+                          className="rounded-md border p-2.5"
+                        >
+                          <div className="flex items-center gap-1.5 text-sm font-medium">
+                            <span>{source.name}</span>
+                            <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span>{target.name}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px]"
+                            >
+                              {rel.relation_type.replace(/_/g, " ")}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {Math.round(rel.confidence * 100)}%
+                            </span>
+                          </div>
+                          {rel.evidence_text && (
+                            <p className="mt-1.5 text-xs italic text-muted-foreground">
+                              &ldquo;{rel.evidence_text}&rdquo;
+                            </p>
+                          )}
                         </div>
                       );
                     })}

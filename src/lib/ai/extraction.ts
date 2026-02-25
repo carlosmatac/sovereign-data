@@ -44,6 +44,39 @@ const ExtractionSchema = z.object({
         .describe("How the interview portrays this entity, null if unclear"),
     })
   ),
+  relationships: z.array(
+    z.object({
+      source_name: z
+        .string()
+        .describe("Name of the source entity (must match an entity in the entities array)"),
+      target_name: z
+        .string()
+        .describe("Name of the target entity (must match an entity in the entities array)"),
+      relation_type: z
+        .enum([
+          "business_partner",
+          "competitor",
+          "regulator",
+          "critic",
+          "ally",
+          "subsidiary",
+          "investor",
+          "advisor",
+          "supplier",
+          "acquirer",
+        ])
+        .describe("Type of relationship between source and target"),
+      confidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe("Confidence score 0-1 for how clearly the transcript establishes this relationship"),
+      evidence_text: z
+        .string()
+        .nullable()
+        .describe("Direct quote or paraphrase from the transcript that establishes this relationship, null if inferred"),
+    })
+  ),
   risks: z
     .array(z.string())
     .describe("Key risks or threats mentioned in the interview"),
@@ -91,7 +124,8 @@ INSTRUCTIONS:
 - Extract EVERY named entity (people, companies, government bodies, locations).
 - Be precise with sentiment — distinguish between the interviewee's opinion and factual statements.
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
-- Risks and opportunities should be actionable intelligence, not generic statements.`,
+- Risks and opportunities should be actionable intelligence, not generic statements.
+- RELATIONSHIPS: Identify how entities are connected to each other. For every pair of entities with a discernible relationship, output a relationship edge. Use the exact entity names from the entities array. Include the direct quote that establishes the relationship when possible.`,
   });
 
   return object;
