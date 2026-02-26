@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createProject } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,29 +13,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { REGIONS } from "@/lib/constants";
+import { CountrySelect } from "@/components/projects/country-select";
 
 export default function NewProjectPage() {
   const [loading, setLoading] = useState(false);
+  const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
 
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
 
-    // Append region from the Select component (not a native form element)
-    if (region) {
-      formData.set("region", region);
-    }
+    if (country) formData.set("country", country);
+    if (region) formData.set("region", region);
 
     const result = await createProject(formData);
 
@@ -49,7 +40,6 @@ export default function NewProjectPage() {
     }
 
     toast.success("Project created");
-    // redirect() in the server action handles navigation
   };
 
   return (
@@ -97,28 +87,22 @@ export default function NewProjectPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  name="country"
-                  placeholder="e.g. Nigeria"
+                <Label>Country</Label>
+                <CountrySelect
+                  value={country}
+                  onSelect={(c, r) => { setCountry(c); setRegion(r); }}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="region">Region</Label>
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REGIONS.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Region</Label>
+                <Input
+                  value={region}
+                  readOnly
+                  tabIndex={-1}
+                  placeholder="Auto-assigned from country"
+                  className="bg-muted cursor-default"
+                />
               </div>
             </div>
 

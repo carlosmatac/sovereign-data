@@ -2,10 +2,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getUserProjectRole } from "@/lib/auth/project-role";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 export async function createProject(formData: FormData) {
-  // 1. Verify user identity via cookie-based client
   const supabase = await createClient();
   const {
     data: { user },
@@ -15,7 +16,6 @@ export async function createProject(formData: FormData) {
     return { error: "Not authenticated" };
   }
 
-  // 2. Parse form data
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
   const country = formData.get("country") as string;
@@ -25,8 +25,6 @@ export async function createProject(formData: FormData) {
     return { error: "Project name is required" };
   }
 
-  // 3. Use admin client for the INSERT (bypasses RLS).
-  //    Safe because we've already verified the user above.
   const admin = createAdminClient();
 
   const { data, error } = await admin
@@ -47,4 +45,51 @@ export async function createProject(formData: FormData) {
   }
 
   redirect(`/interviews?project=${data.id}`);
+}
+
+export async function updateProject(projectId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const role = await getUserProjectRole(projectId);
+  if (role !== "owner") {
+    return { error: "Only the project owner can edit project details" };
+  }
+
+  const name = formData.get("name") as string;
+  const description = formData.get("description") as string;
+  const country = formData.get("country") as string;
+  const region = formData.get("region") as string;
+
+  if (!name?.trim()) {
+    return { error: "Project name is required" };
+  }
+
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("projects")
+    .update({
+      name: name.trim(),
+      description: description?.trim() || null,
+      country: country?.trim() || null,
+      region: region || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId);
+
+  if (error) {
+    console.error("Update project error:", error);
+    return { error: error.message };
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+  return { success: true };
 }

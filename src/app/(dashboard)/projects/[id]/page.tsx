@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -104,6 +105,9 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
 
         <div className="flex gap-2">
+          {role === "owner" && (
+            <EditProjectDialog project={project} />
+          )}
           {canEdit && (
             <Button asChild>
               <Link href={`/interviews/upload?project=${projectId}`}>

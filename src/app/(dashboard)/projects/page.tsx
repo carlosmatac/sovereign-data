@@ -66,8 +66,8 @@ export default async function ProjectsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`}>
-              <Card className="transition-colors hover:border-primary/50 hover:shadow-sm">
-                <CardHeader className="pb-3">
+              <Card className="flex h-full flex-col transition-colors hover:border-primary/50 hover:shadow-sm">
+                <CardHeader className="flex-1 pb-3">
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     {project.region && (
@@ -76,11 +76,9 @@ export default async function ProjectsPage() {
                       </Badge>
                     )}
                   </div>
-                  {project.description && (
-                    <CardDescription className="line-clamp-2">
-                      {project.description}
-                    </CardDescription>
-                  )}
+                  <CardDescription className="line-clamp-2">
+                    {project.description || "No description"}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
