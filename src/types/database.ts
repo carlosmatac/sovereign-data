@@ -41,6 +41,14 @@ export type SnippetPlatform = "linkedin" | "twitter" | "newsletter" | "summary";
 export type SnippetTone = "professional" | "casual" | "provocative";
 export type SnippetStatus = "draft" | "approved" | "published";
 
+export type ReportStatus = "generating" | "completed" | "failed";
+export type ReportTemplate =
+  | "country_risk"
+  | "sector_analysis"
+  | "entity_profile"
+  | "executive_briefing"
+  | "custom";
+
 // ============================================
 // JSON Column Types
 // ============================================
@@ -493,6 +501,69 @@ export interface Database {
           },
         ];
       };
+      reports: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          template: ReportTemplate;
+          status: ReportStatus;
+          content: string | null;
+          summary: string | null;
+          interview_ids: string[];
+          parameters: Record<string, unknown>;
+          error_message: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          template: ReportTemplate;
+          status?: ReportStatus;
+          content?: string | null;
+          summary?: string | null;
+          interview_ids: string[];
+          parameters?: Record<string, unknown>;
+          error_message?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          title?: string;
+          template?: ReportTemplate;
+          status?: ReportStatus;
+          content?: string | null;
+          summary?: string | null;
+          interview_ids?: string[];
+          parameters?: Record<string, unknown>;
+          error_message?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reports_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reports_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -526,6 +597,8 @@ export interface Database {
       snippet_platform: SnippetPlatform;
       snippet_tone: SnippetTone;
       snippet_status: SnippetStatus;
+      report_status: ReportStatus;
+      report_template: ReportTemplate;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -549,3 +622,4 @@ export type Entity = Tables<"entities">;
 export type EntityMention = Tables<"entity_mentions">;
 export type EntityRelationship = Tables<"entity_relationships">;
 export type ContentSnippet = Tables<"content_snippets">;
+export type Report = Tables<"reports">;

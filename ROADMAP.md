@@ -14,7 +14,7 @@
 | 1 | Auth & Core Pipeline | COMPLETE | 100% |
 | 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
-| 3 | Team Management & Reports | IN PROGRESS | 40% (Obj 1 complete) |
+| 3 | Team Management & Reports | IN PROGRESS | 90% (Obj 1–3 complete) |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -182,18 +182,42 @@
 5. Upload page only shows projects the user can edit
 6. Project detail page shows role-appropriate actions
 
-### Remaining Tasks (Objectives 2–4)
+### Objective 2: Report Generator (COMPLETE)
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Database migration for reports | Done | `supabase/migrations/00006_reports.sql` | `reports` table with status, template, content fields |
+| TypeScript types | Done | `src/types/database.ts` | `Report`, `ReportStatus`, `ReportTemplate` types |
+| Report templates & constants | Done | `src/lib/constants.ts` | 5 templates: Country Risk, Sector Analysis, Entity Profile, Executive Briefing, Custom |
+| Report generation AI module | Done | `src/lib/ai/report-generation.ts` | GPT-4o (not mini), `streamText`, context from interviews + entities + relationships |
+| Reports API route | Done | `src/app/api/reports/route.ts` | POST creates report row + streams generation; persists on finish |
+| Report creation page | Done | `src/app/(dashboard)/reports/new/page.tsx` | 4-step wizard: project → template → interviews → generate with live streaming |
+| Report detail page | Done | `src/app/(dashboard)/reports/[id]/page.tsx` | Rendered Markdown, source interview badges, status handling |
+| Reports list page | Done | `src/app/(dashboard)/reports/page.tsx` | List with template labels, status badges, role-gated create button |
+| Sidebar nav item | Done | `src/components/dashboard/app-sidebar.tsx` | "Reports" added to Platform nav group |
+
+### Objective 3: PDF Export (COMPLETE)
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| React PDF renderer | Done | `src/lib/pdf/report-pdf.tsx` | Professional layout: header, sources, Markdown→PDF parsing, footer |
+| PDF API endpoint | Done | `src/app/api/reports/[id]/pdf/route.ts` | GET returns downloadable PDF, auth + membership verified |
+| Export button | Done | `src/app/(dashboard)/reports/[id]/page.tsx` | "Export PDF" button on completed reports |
+
+### Schema Changes (Migration 00006)
+
+| Change | Details |
+|--------|---------|
+| `reports` table | New table: `id`, `project_id`, `title`, `template`, `status`, `content`, `summary`, `interview_ids[]`, `parameters`, `error_message`, `created_by`, timestamps |
+| `report_status` enum | `generating`, `completed`, `failed` |
+| `report_template` enum | `country_risk`, `sector_analysis`, `entity_profile`, `executive_briefing`, `custom` |
+| RLS policies | Members can view, editors can create/update, owners can delete |
+
+### Remaining Tasks (Objective 4)
 
 | Task | Priority | Description |
 |------|----------|-------------|
-| Report generator | High | Select interviews/topics → GPT generates structured BI report |
-| Report templates | Medium | Pre-built templates: "Country Risk Assessment", "Sector Analysis", "Entity Profile" |
-| PDF export | Medium | Generate downloadable PDF from report data |
-| Report sharing | Low | Shareable link with optional password protection |
-
-### Technical Notes
-- Reports generated via GPT-4o (not mini) for higher reasoning quality — user pays per report
-- PDF generation via a library like `@react-pdf/renderer` or server-side with Puppeteer
+| Report sharing | Low | Shareable link with optional password protection (requires public route) |
 
 ---
 
@@ -252,7 +276,7 @@
 
 ---
 
-## Database Schema Summary (9 Tables, 5 Migrations)
+## Database Schema Summary (10 Tables, 6 Migrations)
 
 | Table | Purpose | Migration |
 |-------|---------|-----------|
@@ -265,6 +289,7 @@
 | `entity_mentions` | Entity ↔ interview links with sentiment | 00001 |
 | `entity_relationships` | Knowledge graph edges with typed relations, confidence, evidence | 00004 |
 | `content_snippets` | Auto-generated marketing assets per interview | 00004 |
+| `reports` | AI-generated BI reports with template, status, content | 00006 |
 
 ---
 

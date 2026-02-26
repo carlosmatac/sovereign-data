@@ -28,6 +28,7 @@ import {
   Search,
   MessageSquare,
   Network,
+  FileText,
   Settings,
   LogOut,
   ChevronUp,
@@ -67,6 +68,11 @@ const navItems = [
     title: "Network Explorer",
     href: "/network",
     icon: Network,
+  },
+  {
+    title: "Reports",
+    href: "/reports",
+    icon: FileText,
   },
 ];
 

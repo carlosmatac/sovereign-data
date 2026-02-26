@@ -49,10 +49,10 @@ The team wastes hours manually clipping interviews for social media. The system 
 | **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction (entities + relationships), chunking, embeddings, search — full end-to-end pipeline |
 | **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
 | **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
-| **Phase 3** | IN PROGRESS | Objective 1 (Team invitation + role-based UI) COMPLETE. Objectives 2–4 (Reports, PDF, Sharing) pending — see Section 3 |
+| **Phase 3** | IN PROGRESS | Objectives 1–3 COMPLETE (Team management, Reports, PDF export). Objective 4 (Report sharing) optional — see Section 3 |
 | **Phase 4** | NOT STARTED | Production deployment |
 
-### Database — 9 Tables, 5 Migrations Applied
+### Database — 10 Tables, 6 Migrations Applied
 
 | Table | Purpose |
 |-------|---------|
@@ -65,10 +65,13 @@ The team wastes hours manually clipping interviews for social media. The system 
 | `entity_mentions` | Entity ↔ interview links with sentiment |
 | `entity_relationships` | Graph edges: source→target with `relation_type`, `confidence`, `evidence_text`, interview provenance |
 | `content_snippets` | Auto-generated marketing assets: `platform`, `content`, `tone`, `status` lifecycle |
+| `reports` | AI-generated BI reports: template, status, Markdown content, source interview_ids |
 
 Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in `extensions` schema.
 
-### File Structure (~75 source files)
+Key enums (12 total): `interview_status`, `entity_type`, `user_role`, `relation_type`, `source_type`, `snippet_platform`, `snippet_tone`, `snippet_status`, `report_status`, `report_template`.
+
+### File Structure (~85 source files)
 
 ```
 src/
@@ -79,6 +82,7 @@ src/
 │   │   ├── chat/page.tsx              # Streaming RAG conversation
 │   │   ├── network/page.tsx           # Entity relationship explorer (two-panel)
 │   │   ├── projects/page.tsx, [id]/page.tsx, [id]/members/
+│   │   ├── reports/page.tsx, new/page.tsx, [id]/page.tsx
 │   │   ├── interviews/, search/, settings/
 │   │   └── layout.tsx                 # Auth guard + sidebar
 │   ├── api/
@@ -86,6 +90,8 @@ src/
 │   │   ├── interviews/route.ts       # Create + submit to AssemblyAI
 │   │   ├── interviews/[id]/route.ts  # DELETE interview (Storage + CASCADE)
 │   │   ├── interviews/[id]/poll/route.ts  # Polling fallback
+│   │   ├── reports/route.ts          # POST create + stream report generation
+│   │   ├── reports/[id]/pdf/route.ts # GET downloadable PDF
 │   │   ├── search/route.ts           # Intent classification + hybrid_search
 │   │   └── webhooks/transcription/route.ts
 │   ├── layout.tsx, page.tsx (redirects to /dashboard)
@@ -99,7 +105,8 @@ src/
 │   ├── projects/member-list.tsx       # Team member management (client component)
 │   └── ui/ (20 shadcn components)
 ├── lib/
-│   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts
+│   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts, report-generation.ts
+│   ├── pdf/report-pdf.tsx             # @react-pdf/renderer PDF document
 │   ├── auth/project-role.ts            # getUserProjectRole(), getAuthUser()
 │   ├── supabase/client.ts, server.ts, admin.ts
 │   └── constants.ts
@@ -152,23 +159,25 @@ Multi-user collaboration layer built on `project_members` table:
 - Upload page project dropdown filtered to editable projects only.
 - Uses existing SECURITY DEFINER helpers + admin client pattern for all mutations.
 
-### Objective 2: Report Generator
+### Objective 2: Report Generator — COMPLETE
 
-- **Report creation page**: User selects interviews and/or topics → GPT-4o (not mini — higher reasoning quality) generates a structured BI report.
-- **Report templates**: Pre-built formats like "Country Risk Assessment", "Sector Analysis", "Entity Profile".
-- **Report display page**: Rendered report with sections, sourced from interview data.
-- Consider using `streamText` for streaming the report generation (reports can be long).
+- **Report creation page** (`/reports/new`): 4-step wizard — select project → choose template → pick interviews → generate. Live streaming of GPT-4o output.
+- **5 report templates**: Country Risk Assessment, Sector Analysis, Entity Profile, Executive Briefing, Custom — each with predefined section structure.
+- **Report detail page** (`/reports/[id]`): Rendered Markdown, source interview badges, generation status.
+- **Reports list page** (`/reports`): All reports with status badges, role-gated create button.
+- Uses `streamText` with GPT-4o (not mini) for streaming; report saved to DB on `onFinish`.
+- Context includes interview summaries, entity mentions, and entity relationships.
 
-### Objective 3: PDF Export
+### Objective 3: PDF Export — COMPLETE
 
-- Generate downloadable PDF from report data.
-- Options: `@react-pdf/renderer` (React components → PDF) or server-side Puppeteer (HTML → PDF).
-- PDF should include report title, date, sections, citations, and a professional layout.
+- **`@react-pdf/renderer`** (React components → PDF) at `/api/reports/[id]/pdf`.
+- Professional layout: branded header, source interviews box, Markdown→PDF parsing (headings, bullets, paragraphs), fixed footer with confidentiality notice and page numbers.
+- Auth + project membership verified before generating PDF.
 
 ### Objective 4: Report Sharing (Optional/Low Priority)
 
 - Shareable link with optional password protection.
-- This requires a new `reports` table and a public route.
+- Would require a public route bypassing auth middleware.
 
 ### CRITICAL CONSTRAINT
 You must NOT break the existing Chat (`/chat`), Dashboard (`/dashboard`), Network Explorer (`/network`), or Interview Detail pages. All new features must be additive. The admin client pattern, token_hash auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.

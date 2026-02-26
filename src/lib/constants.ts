@@ -53,3 +53,70 @@ export const SUPPORTED_AUDIO_FORMATS = [
 
 export const MAX_AUDIO_SIZE_MB = 500;
 export const MAX_AUDIO_SIZE_BYTES = MAX_AUDIO_SIZE_MB * 1024 * 1024;
+
+// Report templates
+export const REPORT_TEMPLATES = {
+  country_risk: {
+    label: "Country Risk Assessment",
+    description:
+      "Political, economic, and operational risk analysis for a specific country based on interview intelligence.",
+    icon: "Shield",
+    sections: [
+      "Executive Summary",
+      "Political Risk",
+      "Economic Risk",
+      "Operational Risk",
+      "Key Actors & Relationships",
+      "Outlook & Recommendations",
+    ],
+  },
+  sector_analysis: {
+    label: "Sector Analysis",
+    description:
+      "Deep-dive into a specific industry sector with competitive landscape, trends, and opportunities.",
+    icon: "TrendingUp",
+    sections: [
+      "Executive Summary",
+      "Market Overview",
+      "Key Players",
+      "Trends & Drivers",
+      "Competitive Landscape",
+      "Opportunities & Risks",
+      "Strategic Recommendations",
+    ],
+  },
+  entity_profile: {
+    label: "Entity Profile",
+    description:
+      "Comprehensive dossier on a person, company, or organization based on interview mentions.",
+    icon: "User",
+    sections: [
+      "Profile Overview",
+      "Key Relationships",
+      "Sentiment Analysis",
+      "Notable Quotes & Context",
+      "Risk Flags",
+      "Assessment",
+    ],
+  },
+  executive_briefing: {
+    label: "Executive Briefing",
+    description:
+      "High-level synthesis across multiple interviews for leadership decision-making.",
+    icon: "FileText",
+    sections: [
+      "Key Findings",
+      "Strategic Implications",
+      "Market Intelligence",
+      "Relationship Map",
+      "Recommended Actions",
+    ],
+  },
+  custom: {
+    label: "Custom Report",
+    description:
+      "Free-form intelligence report with a custom focus area you define.",
+    icon: "Pencil",
+    sections: [],
+  },
+} as const;
