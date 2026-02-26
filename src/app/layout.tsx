@@ -18,6 +18,14 @@ export const metadata: Metadata = {
   title: "Sovereign Data — Frontier Markets Intelligence",
   description:
     "Transform exclusive interviews into actionable business intelligence for emerging markets.",
+  icons: {
+    icon: [
+      { url: "/logo-white.jpg", type: "image/jpeg" },
+    ],
+    apple: [
+      { url: "/logo-white.jpg", type: "image/jpeg" },
+    ],
+  },
 };
 
 export default function RootLayout({

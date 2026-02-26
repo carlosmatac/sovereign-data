@@ -14,7 +14,6 @@ import {
   Mic,
   FolderKanban,
   Users,
-  Search,
   TrendingUp,
   Clock,
   CheckCircle2,
@@ -165,9 +164,9 @@ export default async function DashboardPage() {
         <StatsCard
           title="Knowledge Chunks"
           value={chunkCount}
-          icon={Search}
+          icon={MessageSquare}
           description="Searchable transcript segments"
-          href="/search"
+          href="/chat"
         />
         <StatsCard
           title="Entities"
@@ -279,12 +278,6 @@ export default async function DashboardPage() {
                 <Link href="/chat">
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Intelligence Chat
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start" asChild>
-                <Link href="/search">
-                  <Search className="mr-2 h-4 w-4" />
-                  Search Knowledge Base
                 </Link>
               </Button>
               <Button variant="outline" className="justify-start" asChild>

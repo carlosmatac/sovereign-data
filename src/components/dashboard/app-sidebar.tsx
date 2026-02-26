@@ -20,12 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import Image from "next/image";
 import {
-  Globe,
   LayoutDashboard,
   FolderKanban,
   Mic,
-  Search,
   MessageSquare,
   Network,
   FileText,
@@ -53,11 +52,6 @@ const navItems = [
     title: "Interviews",
     href: "/interviews",
     icon: Mic,
-  },
-  {
-    title: "Intelligence Search",
-    href: "/search",
-    icon: Search,
   },
   {
     title: "Intelligence Chat",
@@ -116,19 +110,16 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/projects">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Globe className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Sovereign Data</span>
-                  <span className="text-xs text-muted-foreground">
-                    Intelligence Platform
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
+            <Link href="/projects" className="flex items-center px-2 py-3">
+              <Image
+                src="/logo-long-transparent.png"
+                alt="Sovereign Data — Intelligence Platform"
+                width={900}
+                height={200}
+                className="w-full max-w-[200px] object-contain dark:brightness-110"
+                priority
+              />
+            </Link>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

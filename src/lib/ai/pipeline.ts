@@ -66,18 +66,24 @@ export async function processTranscription(
       return;
     }
 
-    // Build speaker map from utterances
+    // Build speaker map and speaker-labeled transcript from utterances
     const speakerMap: Record<string, string> = {};
-    if (transcription.utterances) {
+    let formattedTranscript = transcription.text;
+
+    if (transcription.utterances && transcription.utterances.length > 0) {
       const speakers = new Set(transcription.utterances.map((u) => u.speaker));
       speakers.forEach((s) => {
-        speakerMap[s] = s; // Default: "A" -> "Speaker A", user can rename later
+        speakerMap[s] = `Speaker ${s}`;
       });
+
+      formattedTranscript = transcription.utterances
+        .map((u) => `[${speakerMap[u.speaker]}]: ${u.text}`)
+        .join("\n\n");
     }
 
-    // Save raw transcript
+    // Save speaker-formatted transcript
     await updateInterviewStatus(interviewId, "EXTRACTING", {
-      transcript_full: transcription.text,
+      transcript_full: formattedTranscript,
       speaker_map: speakerMap,
       audio_duration: transcription.audio_duration
         ? Math.round(transcription.audio_duration / 1000)

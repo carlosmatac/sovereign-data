@@ -16,14 +16,13 @@ interface TranscriptViewerProps {
   speakerMap?: Record<string, string>;
 }
 
-// Assign consistent colors to speakers
-const SPEAKER_COLORS = [
-  "text-blue-700 bg-blue-50 border-blue-200",
-  "text-emerald-700 bg-emerald-50 border-emerald-200",
-  "text-purple-700 bg-purple-50 border-purple-200",
-  "text-orange-700 bg-orange-50 border-orange-200",
-  "text-pink-700 bg-pink-50 border-pink-200",
-  "text-cyan-700 bg-cyan-50 border-cyan-200",
+const SPEAKER_STYLES = [
+  { badge: "text-blue-700 bg-blue-50 border-blue-200", bar: "bg-blue-400" },
+  { badge: "text-emerald-700 bg-emerald-50 border-emerald-200", bar: "bg-emerald-400" },
+  { badge: "text-purple-700 bg-purple-50 border-purple-200", bar: "bg-purple-400" },
+  { badge: "text-orange-700 bg-orange-50 border-orange-200", bar: "bg-orange-400" },
+  { badge: "text-pink-700 bg-pink-50 border-pink-200", bar: "bg-pink-400" },
+  { badge: "text-cyan-700 bg-cyan-50 border-cyan-200", bar: "bg-cyan-400" },
 ];
 
 export function TranscriptViewer({
@@ -34,59 +33,50 @@ export function TranscriptViewer({
 
   // Parse transcript into speaker segments
   const segments = useMemo(() => {
-    // Try to parse speaker-labeled transcript: "[Speaker A]: text"
     const speakerRegex = /\[([^\]]+)\]:\s*/g;
     const parts: Array<{ speaker: string | null; text: string }> = [];
 
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
+    // Collect all label positions in one pass
+    const labels: Array<{ speaker: string; start: number; contentStart: number }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = speakerRegex.exec(transcript)) !== null) {
+      labels.push({
+        speaker: m[1],
+        start: m.index,
+        contentStart: m.index + m[0].length,
+      });
+    }
 
-    while ((match = speakerRegex.exec(transcript)) !== null) {
-      // Text before this speaker label (if any)
-      if (match.index > lastIndex && parts.length === 0) {
-        const beforeText = transcript.slice(lastIndex, match.index).trim();
-        if (beforeText) {
-          parts.push({ speaker: null, text: beforeText });
-        }
-      }
+    if (labels.length === 0) {
+      return [{ speaker: null, text: transcript }];
+    }
 
-      // Find the end: either the next speaker label or end of string
-      const nextMatch = speakerRegex.exec(transcript);
-      const endIndex = nextMatch ? nextMatch.index : transcript.length;
+    // Text before first label
+    if (labels[0].start > 0) {
+      const before = transcript.slice(0, labels[0].start).trim();
+      if (before) parts.push({ speaker: null, text: before });
+    }
 
-      // Reset regex position to where we found nextMatch
-      if (nextMatch) {
-        speakerRegex.lastIndex = nextMatch.index;
-      }
-
-      const speakerLabel = match[1];
-      const speakerName = speakerMap?.[speakerLabel] ?? speakerLabel;
-      const text = transcript
-        .slice(match.index + match[0].length, endIndex)
-        .trim();
-
+    // Build segments from label positions
+    for (let i = 0; i < labels.length; i++) {
+      const endIndex = i + 1 < labels.length ? labels[i + 1].start : transcript.length;
+      const speakerName = speakerMap?.[labels[i].speaker] ?? labels[i].speaker;
+      const text = transcript.slice(labels[i].contentStart, endIndex).trim();
       if (text) {
         parts.push({ speaker: speakerName, text });
       }
-
-      lastIndex = endIndex;
-    }
-
-    // If no speaker labels found, return as single block
-    if (parts.length === 0) {
-      return [{ speaker: null, text: transcript }];
     }
 
     return parts;
   }, [transcript, speakerMap]);
 
-  // Build speaker -> color map
-  const speakerColors = useMemo(() => {
-    const map = new Map<string, string>();
+  // Build speaker -> style map
+  const speakerStyles = useMemo(() => {
+    const map = new Map<string, (typeof SPEAKER_STYLES)[0]>();
     let colorIndex = 0;
     for (const seg of segments) {
       if (seg.speaker && !map.has(seg.speaker)) {
-        map.set(seg.speaker, SPEAKER_COLORS[colorIndex % SPEAKER_COLORS.length]);
+        map.set(seg.speaker, SPEAKER_STYLES[colorIndex % SPEAKER_STYLES.length]);
         colorIndex++;
       }
     }
@@ -125,17 +115,22 @@ export function TranscriptViewer({
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[500px] rounded-md border p-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredSegments.map((seg, i) => {
-              const colorClasses = seg.speaker
-                ? speakerColors.get(seg.speaker) ?? ""
-                : "";
+              const style = seg.speaker
+                ? speakerStyles.get(seg.speaker)
+                : undefined;
 
               return (
-                <div key={i} className="group">
-                  {seg.speaker && (
+                <div
+                  key={i}
+                  className={`group rounded-md ${
+                    style ? `border-l-[3px] ${style.bar} pl-3 py-1` : ""
+                  }`}
+                >
+                  {seg.speaker && style && (
                     <span
-                      className={`mb-1 inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${colorClasses}`}
+                      className={`mb-1.5 inline-block rounded-md border px-2 py-0.5 text-xs font-semibold ${style.badge}`}
                     >
                       {seg.speaker}
                     </span>
