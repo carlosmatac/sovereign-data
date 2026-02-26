@@ -110,12 +110,12 @@ export default async function InterviewsPage({
             };
 
             return (
-              <Link
-                key={interview.id}
-                href={`/interviews/${interview.id}`}
-              >
-                <Card className="transition-colors hover:border-primary/50 hover:shadow-sm">
-                  <CardContent className="flex items-center gap-4 py-4">
+              <Card key={interview.id} className="transition-colors hover:border-primary/50 hover:shadow-sm">
+                <CardContent className="flex items-center gap-4 py-4">
+                  <Link
+                    href={`/interviews/${interview.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-4"
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <Mic className="h-5 w-5 text-muted-foreground" />
                     </div>
@@ -144,17 +144,17 @@ export default async function InterviewsPage({
                       >
                         {statusInfo.label}
                       </Badge>
-                      {editableProjectIds.has(interview.project_id) && (
-                        <DeleteInterviewButton
-                          interviewId={interview.id}
-                          interviewTitle={interview.title}
-                          variant="icon"
-                        />
-                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </Link>
+                  {editableProjectIds.has(interview.project_id) && (
+                    <DeleteInterviewButton
+                      interviewId={interview.id}
+                      interviewTitle={interview.title}
+                      variant="icon"
+                    />
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
         </div>

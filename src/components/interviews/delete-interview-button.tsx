@@ -65,7 +65,7 @@ export function DeleteInterviewButton({
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => e.stopPropagation()}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

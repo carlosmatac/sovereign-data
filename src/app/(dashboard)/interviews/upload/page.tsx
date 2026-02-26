@@ -59,9 +59,14 @@ export default function UploadInterviewPage() {
         .in("role", ["owner", "editor"]);
 
       if (memberships) {
+        const seen = new Set<string>();
         const editable = memberships
           .map((m) => m.projects as unknown as Project | null)
-          .filter((p): p is Project => p !== null);
+          .filter((p): p is Project => {
+            if (!p || seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          });
         setProjects(editable);
       }
     }
