@@ -16,6 +16,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { REPORT_TEMPLATES } from "@/lib/constants";
+import { ShareReportButton } from "@/components/reports/share-report-button";
+import { getUserProjectRole } from "@/lib/auth/project-role";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -35,6 +37,9 @@ export default async function ReportDetailPage({ params }: Props) {
     .single();
 
   if (!report) notFound();
+
+  const role = await getUserProjectRole(report.project_id);
+  const canShare = role === "owner" || role === "editor";
 
   const project = report.projects as unknown as {
     name: string;
@@ -92,12 +97,21 @@ export default async function ReportDetailPage({ params }: Props) {
           </div>
         </div>
         {report.status === "completed" && (
-          <Button variant="outline" asChild>
-            <Link href={`/api/reports/${report.id}/pdf`}>
-              <Download className="mr-2 h-4 w-4" />
-              Export PDF
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            {canShare && (
+              <ShareReportButton
+                reportId={report.id}
+                currentToken={report.share_token}
+                hasPassword={!!report.share_password}
+              />
+            )}
+            <Button variant="outline" asChild>
+              <Link href={`/api/reports/${report.id}/pdf`}>
+                <Download className="mr-2 h-4 w-4" />
+                Export PDF
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

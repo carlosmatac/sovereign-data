@@ -1,6 +1,6 @@
 # Sovereign Data — Development Roadmap
 
-**Last updated**: February 25, 2026
+**Last updated**: February 26, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
 **Branch**: `main`
 
@@ -14,7 +14,7 @@
 | 1 | Auth & Core Pipeline | COMPLETE | 100% |
 | 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
-| 3 | Team Management & Reports | IN PROGRESS | 90% (Obj 1–3 complete) |
+| 3 | Team Management & Reports | COMPLETE | 100% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -144,7 +144,7 @@
 
 ---
 
-## Phase 3 — Team Management & Reports (IN PROGRESS)
+## Phase 3 — Team Management & Reports (COMPLETE)
 
 **Goal**: Multi-user collaboration and investor-grade report generation.
 
@@ -213,11 +213,33 @@
 | `report_template` enum | `country_risk`, `sector_analysis`, `entity_profile`, `executive_briefing`, `custom` |
 | RLS policies | Members can view, editors can create/update, owners can delete |
 
-### Remaining Tasks (Objective 4)
+### Objective 4: Report Sharing (COMPLETE)
 
-| Task | Priority | Description |
-|------|----------|-------------|
-| Report sharing | Low | Shareable link with optional password protection (requires public route) |
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Database migration for sharing | Done | `supabase/migrations/00007_report_sharing.sql` | `share_token` + `share_password` columns on `reports` |
+| TypeScript types update | Done | `src/types/database.ts` | `share_token`, `share_password` nullable fields |
+| Share/unshare Server Actions | Done | `src/app/(dashboard)/reports/[id]/actions.ts` | `shareReport()`, `unshareReport()` — editor/owner only |
+| Share button & dialog | Done | `src/components/reports/share-report-button.tsx` | Copy link, optional password, revoke — appears on completed reports |
+| Public shared report API | Done | `src/app/api/shared/[token]/route.ts` | GET validates token + password hash, returns report JSON |
+| Public shared report page | Done | `src/app/shared/[token]/page.tsx` | Password prompt, rendered Markdown, branding, no auth required |
+| Middleware update | Done | `src/middleware.ts` | `/shared` and `/api/shared` routes bypass auth redirect |
+
+### Schema Changes (Migration 00007)
+
+| Change | Details |
+|--------|---------|
+| `reports.share_token` | Nullable, UNIQUE TEXT column — random base64url token |
+| `reports.share_password` | Nullable TEXT column — SHA-256 hashed password (NULL = no password) |
+| `idx_reports_share_token` | Partial index for fast token lookups |
+
+### Phase 3 Completion Criteria — ALL MET
+1. Owner can invite team members; roles enforce read-only vs read-write UI
+2. Report generator produces 5 template types via GPT-4o streaming
+3. PDF export downloads professional branded documents
+4. Shared links allow unauthenticated viewing (with optional password)
+
+**Commits**: `66d2bb1`, `6177b3b`, + Phase 3 Obj 4 commit
 
 ---
 
@@ -273,10 +295,12 @@
 | Interview deletion via CASCADE | Deleting an interview removes all chunks, mentions, relationships, snippets; audio cleaned from Storage separately |
 | Network Explorer as list-based explorer (not force graph) | More practical for business users; zero heavy dependencies; entity search + type filters + evidence quotes |
 | Dashboard analytics without charting library | Pure CSS/Tailwind progress bars; avoids bundle bloat; sufficient for current data density |
+| Report sharing via token (not separate table) | Two columns on `reports` (`share_token`, `share_password`) — simpler than a join table; one link per report; password hashed with SHA-256 |
+| Public shared pages bypass middleware | `/shared/*` and `/api/shared/*` added to middleware exclusion list; admin client fetches report by token (no RLS needed) |
 
 ---
 
-## Database Schema Summary (10 Tables, 6 Migrations)
+## Database Schema Summary (10 Tables, 7 Migrations)
 
 | Table | Purpose | Migration |
 |-------|---------|-----------|
@@ -289,7 +313,7 @@
 | `entity_mentions` | Entity ↔ interview links with sentiment | 00001 |
 | `entity_relationships` | Knowledge graph edges with typed relations, confidence, evidence | 00004 |
 | `content_snippets` | Auto-generated marketing assets per interview | 00004 |
-| `reports` | AI-generated BI reports with template, status, content | 00006 |
+| `reports` | AI-generated BI reports with template, status, content, sharing | 00006, 00007 |
 
 ---
 
@@ -302,15 +326,24 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phases 0, 1, 2, and 2.5 are ALL COMPLETE. The platform has a full
-streaming RAG chat, dashboard with analytics, entity network explorer, and
-interview deletion.
+Current state: Phases 0–3 are ALL COMPLETE. The platform has:
+- Full audio ingestion pipeline (upload → transcribe → extract entities &
+  relationships → chunk → embed → generate marketing snippets)
+- Streaming RAG chat with citations
+- Dashboard with analytics (project breakdown, topic distribution)
+- Network Explorer for entity relationships
+- Team management with role-based access (owner/editor/viewer)
+- AI report generator with 5 templates (GPT-4o streaming)
+- PDF export via @react-pdf/renderer
+- Report sharing via public links with optional password protection
+- Interview deletion with CASCADE cleanup
 
-The database has 9 tables across 4 migrations. The ETL pipeline now extracts
-entities AND relationships (GraphRAG), and auto-generates marketing snippets
-(LinkedIn, Twitter, Newsletter, Summary) after each interview completes.
+The database has 10 tables across 7 migrations. See ROADMAP.md for full task
+history and architecture decisions.
 
-CRITICAL: Do NOT break the existing Chat (/chat), Dashboard (/dashboard), or
-Interview Detail page. The admin client pattern, token_hash auth, and SECURITY
-DEFINER RLS helpers are sacred — use them, don't replace them.
+Your immediate task is Phase 4: Production Deployment. Propose the approach first,
+wait for approval before making changes.
+
+CRITICAL: Do NOT break existing features. The admin client pattern, token_hash
+auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.
 ```

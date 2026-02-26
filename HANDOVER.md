@@ -1,8 +1,8 @@
 # SOVEREIGN DATA — MASTER HANDOVER DOCUMENT & SYSTEM PROMPT
 
-**Date**: February 25, 2026
+**Date**: February 26, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
-**Branch**: `main` — latest `6177b3b`
+**Branch**: `main`
 **Runtime**: Next.js dev server on `http://localhost:3000`
 
 ---
@@ -49,10 +49,10 @@ The team wastes hours manually clipping interviews for social media. The system 
 | **Phase 1** | COMPLETE | Auth, upload, AssemblyAI transcription, GPT extraction (entities + relationships), chunking, embeddings, search — full end-to-end pipeline |
 | **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
 | **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
-| **Phase 3** | IN PROGRESS | Objectives 1–3 COMPLETE (Team management, Reports, PDF export). Objective 4 (Report sharing) optional — see Section 3 |
+| **Phase 3** | COMPLETE | Team management (invite, roles, RBAC), AI report generator (5 templates), PDF export, report sharing (public links + password) |
 | **Phase 4** | NOT STARTED | Production deployment |
 
-### Database — 10 Tables, 6 Migrations Applied
+### Database — 10 Tables, 7 Migrations Applied
 
 | Table | Purpose |
 |-------|---------|
@@ -65,13 +65,15 @@ The team wastes hours manually clipping interviews for social media. The system 
 | `entity_mentions` | Entity ↔ interview links with sentiment |
 | `entity_relationships` | Graph edges: source→target with `relation_type`, `confidence`, `evidence_text`, interview provenance |
 | `content_snippets` | Auto-generated marketing assets: `platform`, `content`, `tone`, `status` lifecycle |
-| `reports` | AI-generated BI reports: template, status, Markdown content, source interview_ids |
+| `reports` | AI-generated BI reports: template, status, Markdown content, source interview_ids, sharing (token + password) |
 
 Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in `extensions` schema.
 
 Key enums (12 total): `interview_status`, `entity_type`, `user_role`, `relation_type`, `source_type`, `snippet_platform`, `snippet_tone`, `snippet_status`, `report_status`, `report_template`.
 
-### File Structure (~85 source files)
+Migrations: `00001` (initial), `00002` (RLS SECURITY DEFINER), `00003` (created_by default), `00004` (graph + content), `00005` (team invitations), `00006` (reports), `00007` (report sharing).
+
+### File Structure (~90 source files)
 
 ```
 src/
@@ -82,9 +84,10 @@ src/
 │   │   ├── chat/page.tsx              # Streaming RAG conversation
 │   │   ├── network/page.tsx           # Entity relationship explorer (two-panel)
 │   │   ├── projects/page.tsx, [id]/page.tsx, [id]/members/
-│   │   ├── reports/page.tsx, new/page.tsx, [id]/page.tsx
+│   │   ├── reports/page.tsx, new/page.tsx, [id]/page.tsx, [id]/actions.ts
 │   │   ├── interviews/, search/, settings/
 │   │   └── layout.tsx                 # Auth guard + sidebar
+│   ├── shared/[token]/page.tsx        # Public shared report page (no auth)
 │   ├── api/
 │   │   ├── chat/route.ts             # streamText + hybrid_search RAG
 │   │   ├── interviews/route.ts       # Create + submit to AssemblyAI
@@ -92,17 +95,19 @@ src/
 │   │   ├── interviews/[id]/poll/route.ts  # Polling fallback
 │   │   ├── reports/route.ts          # POST create + stream report generation
 │   │   ├── reports/[id]/pdf/route.ts # GET downloadable PDF
+│   │   ├── shared/[token]/route.ts   # GET shared report (public, password check)
 │   │   ├── search/route.ts           # Intent classification + hybrid_search
 │   │   └── webhooks/transcription/route.ts
 │   ├── layout.tsx, page.tsx (redirects to /dashboard)
 ├── components/
-│   ├── dashboard/app-sidebar.tsx      # 7 nav items: Dashboard, Projects, Interviews, Search, Chat, Network, Settings
+│   ├── dashboard/app-sidebar.tsx      # 8 nav items: Dashboard, Projects, Interviews, Reports, Search, Chat, Network, Settings
 │   ├── interviews/status-tracker.tsx
 │   ├── interviews/transcript-viewer.tsx
 │   ├── interviews/copy-button.tsx     # Copy-to-clipboard (client component)
 │   ├── interviews/delete-interview-button.tsx  # Delete with confirmation dialog
 │   ├── network/network-explorer.tsx   # Interactive entity explorer (client component)
 │   ├── projects/member-list.tsx       # Team member management (client component)
+│   ├── reports/share-report-button.tsx # Share dialog with link + password (client component)
 │   └── ui/ (20 shadcn components)
 ├── lib/
 │   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts, report-generation.ts
@@ -110,8 +115,8 @@ src/
 │   ├── auth/project-role.ts            # getUserProjectRole(), getAuthUser()
 │   ├── supabase/client.ts, server.ts, admin.ts
 │   └── constants.ts
-├── types/database.ts                  # Full typed Database interface (9 tables, 8 enums)
-└── middleware.ts
+├── types/database.ts                  # Full typed Database interface (10 tables, 12 enums)
+└── middleware.ts                       # Auth guard; /shared, /api/shared bypass
 ```
 
 ### CRITICAL Gotchas (Do NOT Violate)
@@ -146,7 +151,7 @@ WEBHOOK_SECRET=<set>
 
 ---
 
-## 3. IMMEDIATE MISSION: PHASE 3 — Team Management & Reports
+## 3. PHASE 3 — Team Management & Reports (COMPLETE)
 
 ### Objective 1: Team Member Invitation & Management — COMPLETE
 
@@ -174,25 +179,35 @@ Multi-user collaboration layer built on `project_members` table:
 - Professional layout: branded header, source interviews box, Markdown→PDF parsing (headings, bullets, paragraphs), fixed footer with confidentiality notice and page numbers.
 - Auth + project membership verified before generating PDF.
 
-### Objective 4: Report Sharing (Optional/Low Priority)
+### Objective 4: Report Sharing — COMPLETE
 
-- Shareable link with optional password protection.
-- Would require a public route bypassing auth middleware.
+- **Share dialog** on report detail page: Editors/owners can generate a shareable link with optional password protection.
+- **Server Actions** (`shareReport`, `unshareReport`): Generate/revoke `share_token`, hash password with SHA-256, stored on `reports` table.
+- **Public route** (`/shared/[token]`): Unauthenticated page that fetches report via `/api/shared/[token]`. Shows password prompt if report is protected, then renders full Markdown content with branding.
+- **Middleware bypass**: `/shared` and `/api/shared` paths skip the auth redirect.
+- Migration `00007_report_sharing.sql` adds `share_token` (UNIQUE) and `share_password` columns.
 
 ### CRITICAL CONSTRAINT
 You must NOT break the existing Chat (`/chat`), Dashboard (`/dashboard`), Network Explorer (`/network`), or Interview Detail pages. All new features must be additive. The admin client pattern, token_hash auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.
 
 ---
 
-## 4. FUTURE ROADMAP (What Comes After Phase 3)
+## 4. IMMEDIATE MISSION: PHASE 4 — Production Deployment
 
-### Phase 4: Production Deployment & Security
-- Deploy to Vercel, configure production env vars
-- Custom domain + update Supabase URLs
-- Update webhook URL to production (AssemblyAI can reach Vercel)
-- Rate limiting, Sentry error monitoring
-- Zero data retention audit (AssemblyAI + OpenAI)
-- Supabase daily backups
+### Planned Tasks
+
+| Task | Priority | Description |
+|------|----------|-------------|
+| Deploy to Vercel | High | Connect repo, configure build settings, `next build` already passes |
+| Production env vars | High | All API keys (Supabase, OpenAI, AssemblyAI) in Vercel Dashboard |
+| Custom domain | High | Point domain to Vercel deployment |
+| Update Supabase URLs | High | Site URL + Redirect URLs for production domain in Supabase Dashboard |
+| Update webhook URL | High | `NEXT_PUBLIC_APP_URL` → production URL so AssemblyAI can reach webhook |
+| Rate limiting | Medium | Protect API routes (`/api/chat`, `/api/reports`, `/api/search`) from abuse |
+| Error monitoring | Medium | Sentry or similar for production error tracking |
+| Zero retention audit | Medium | Verify AssemblyAI + OpenAI data handling policies |
+| Backup strategy | Low | Supabase daily backups + point-in-time recovery |
+| Performance optimization | Low | Edge caching, image optimization, bundle analysis |
 
 ---
 
@@ -205,20 +220,23 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phases 0, 1, 2, and 2.5 are ALL COMPLETE. The platform has:
+Current state: Phases 0–3 are ALL COMPLETE. The platform has:
 - Full audio ingestion pipeline (upload → transcribe → extract entities &
   relationships → chunk → embed → generate marketing snippets)
 - Streaming RAG chat with citations
 - Dashboard with analytics (project breakdown, topic distribution)
 - Network Explorer for entity relationships
+- Team management with role-based access (owner/editor/viewer)
+- AI report generator with 5 templates (GPT-4o streaming)
+- PDF export via @react-pdf/renderer
+- Report sharing via public links with optional password protection
 - Interview deletion with CASCADE cleanup
 
-The database has 9 tables across 4 migrations. See ROADMAP.md for full task
+The database has 10 tables across 7 migrations. See ROADMAP.md for full task
 history and architecture decisions.
 
-Your immediate task is Phase 3: Team Management & Reports. Start with Objective 1
-(team member invitation and role-based UI) — propose the approach first, wait for
-approval before writing code.
+Your immediate task is Phase 4: Production Deployment. Propose the approach first,
+wait for approval before making changes.
 
 CRITICAL: Do NOT break existing features. The admin client pattern, token_hash
 auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.

@@ -513,6 +513,8 @@ export interface Database {
           interview_ids: string[];
           parameters: Record<string, unknown>;
           error_message: string | null;
+          share_token: string | null;
+          share_password: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -528,6 +530,8 @@ export interface Database {
           interview_ids: string[];
           parameters?: Record<string, unknown>;
           error_message?: string | null;
+          share_token?: string | null;
+          share_password?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -543,6 +547,8 @@ export interface Database {
           interview_ids?: string[];
           parameters?: Record<string, unknown>;
           error_message?: string | null;
+          share_token?: string | null;
+          share_password?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
