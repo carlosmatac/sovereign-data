@@ -51,6 +51,7 @@ The team wastes hours manually clipping interviews for social media. The system 
 | **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
 | **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
 | **Phase 3** | COMPLETE | Team management (invite, roles, RBAC), AI report generator (5 templates), PDF export, report sharing (public links + password) |
+| **Phase 3.5** | COMPLETE | Intelligence Chat upgrades (TBY persona, Second-Order Thinking, Agentic RAG), Sales War Room on project dashboard (mock CRM data) |
 | **Phase 4** | NOT STARTED | Production deployment |
 
 ### Database — 10 Tables, 7 Migrations Applied
@@ -84,7 +85,7 @@ src/
 │   │   ├── dashboard/page.tsx         # Stats, project breakdown, topic distribution, quick actions
 │   │   ├── chat/page.tsx              # Streaming RAG conversation
 │   │   ├── network/page.tsx           # Entity relationship explorer (two-panel)
-│   │   ├── projects/page.tsx, [id]/page.tsx, [id]/members/
+│   │   ├── projects/page.tsx, [id]/page.tsx, [id]/war-room.tsx, [id]/members/
 │   │   ├── reports/page.tsx, new/page.tsx, [id]/page.tsx, [id]/actions.ts
 │   │   ├── interviews/, search/, settings/
 │   │   └── layout.tsx                 # Auth guard + sidebar
@@ -112,6 +113,7 @@ src/
 │   └── ui/ (20 shadcn components)
 ├── lib/
 │   ├── ai/assemblyai.ts, extraction.ts, chunking.ts, embeddings.ts, pipeline.ts, content-generation.ts, report-generation.ts
+│   ├── mockHubspot.ts                # Mock CRM service: HubSpot-like deal data, adapter, KPI/pipeline selectors
 │   ├── pdf/report-pdf.tsx             # @react-pdf/renderer PDF document
 │   ├── auth/project-role.ts            # getUserProjectRole(), getAuthUser()
 │   ├── supabase/client.ts, server.ts, admin.ts
@@ -163,7 +165,7 @@ Multi-user collaboration layer built on `project_members` table:
 
 - **Invite flow**: Owner enters email → existing users added directly, new users get Supabase Auth invite email → pending invites auto-claimed on signup via `claim_pending_invites()` trigger.
 - **Member management page** (`/projects/[id]/members`): List members, change roles, remove members, revoke pending invites. Owner-only access.
-- **Project detail page** (`/projects/[id]`): Stats (interview count, member count), role badge, quick actions gated by role.
+- **Project detail page** (`/projects/[id]`): Sales War Room (revenue target, financial KPIs, pipeline health, deal preview with filters) + Project Ops sidebar (interview/member/role cards, quick actions). Two-column layout on desktop, stacked on mobile.
 - **Role-based UI**: Viewers see read-only views (no upload, no delete). Editors can upload and delete. Owners have full control including member management.
 - Upload page project dropdown filtered to editable projects only.
 - Uses existing SECURITY DEFINER helpers + admin client pattern for all mutations.
@@ -224,10 +226,10 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phases 0–3 are ALL COMPLETE. The platform has:
+Current state: Phases 0–3.5 are ALL COMPLETE. The platform has:
 - Full audio ingestion pipeline (upload → transcribe → extract entities &
   relationships → chunk → embed → generate marketing snippets)
-- Streaming RAG chat with citations
+- Agentic RAG chat with TBY persona, Second-Order Thinking, and Tavily web search
 - Dashboard with analytics (project breakdown, topic distribution)
 - Network Explorer for entity relationships
 - Team management with role-based access (owner/editor/viewer)
@@ -235,6 +237,7 @@ Current state: Phases 0–3 are ALL COMPLETE. The platform has:
 - PDF export via @react-pdf/renderer
 - Report sharing via public links with optional password protection
 - Interview deletion with CASCADE cleanup
+- Sales War Room on project dashboard (mock CRM data, ready for HubSpot integration)
 
 The database has 10 tables across 7 migrations. See ROADMAP.md for full task
 history and architecture decisions.

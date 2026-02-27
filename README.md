@@ -85,7 +85,7 @@ src/
 │   │       ├── callback/    # Server route: redirects to /auth/confirm
 │   │       └── confirm/     # Client page: verifies token_hash, sets session
 │   ├── (dashboard)/         # Authenticated app shell (with sidebar)
-│   │   ├── projects/        # Project list + create
+│   │   ├── projects/        # Project list, detail (Sales War Room), create
 │   │   ├── interviews/      # Interview list, upload, detail view
 │   │   ├── search/          # Hybrid RAG intelligence search
 │   │   └── settings/        # Platform configuration
@@ -109,6 +109,7 @@ src/
 │   │   ├── client.ts        # Browser client (uses anon key)
 │   │   ├── server.ts        # Server Component client (cookie sessions)
 │   │   └── admin.ts         # Service role client (bypasses RLS)
+│   ├── mockHubspot.ts       # Mock CRM service (HubSpot-like deal data)
 │   └── constants.ts         # App constants, AI config, status labels
 ├── types/
 │   └── database.ts          # Full typed Supabase Database interface

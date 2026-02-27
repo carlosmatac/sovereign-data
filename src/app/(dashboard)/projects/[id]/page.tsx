@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
+import { SalesWarRoom } from "./war-room";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -119,106 +120,131 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <Link href={`/interviews?project=${projectId}`}>
-          <Card className="transition-colors hover:border-primary/50">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Interviews</CardTitle>
-              <Mic className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{interviewCount}</div>
-              <p className="text-xs text-muted-foreground">
-                View all interviews
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
+      {/* Two-column layout: War Room (left) + Project Ops (right) */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        {/* ── Sales War Room ─────────────────────────────────────── */}
+        <section>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">
+            Sales War Room
+          </h2>
+          <SalesWarRoom projectId={projectId} />
+        </section>
 
-        {role === "owner" ? (
-          <Link href={`/projects/${projectId}/members`}>
-            <Card className="transition-colors hover:border-primary/50">
+        {/* ── Project Ops (sidebar) ──────────────────────────────── */}
+        <section>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">
+            Project Ops
+          </h2>
+          <div className="space-y-4">
+            {/* Stats Cards */}
+            <Link href={`/interviews?project=${projectId}`}>
+              <Card className="transition-colors hover:border-primary/50">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Interviews
+                  </CardTitle>
+                  <Mic className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{interviewCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    View all interviews
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {role === "owner" ? (
+              <Link href={`/projects/${projectId}/members`}>
+                <Card className="transition-colors hover:border-primary/50">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Team Members
+                    </CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{memberCount}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Manage team access
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ) : (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Team Members
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{memberCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active members
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Team Members
+                  Your Role
                 </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <Globe className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{memberCount}</div>
+                <div className="text-2xl font-bold capitalize">{role}</div>
                 <p className="text-xs text-muted-foreground">
-                  Manage team access
+                  {role === "owner"
+                    ? "Full project control"
+                    : role === "editor"
+                      ? "Can upload & edit interviews"
+                      : "Read-only access"}
                 </p>
               </CardContent>
             </Card>
-          </Link>
-        ) : (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Team Members
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{memberCount}</div>
-              <p className="text-xs text-muted-foreground">Active members</p>
-            </CardContent>
-          </Card>
-        )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Your Role</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{role}</div>
-            <p className="text-xs text-muted-foreground">
-              {role === "owner"
-                ? "Full project control"
-                : role === "editor"
-                  ? "Can upload & edit interviews"
-                  : "Read-only access"}
-            </p>
-          </CardContent>
-        </Card>
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>
+                  Common tasks for this project.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" asChild className="justify-start">
+                  <Link href={`/interviews?project=${projectId}`}>
+                    <Mic className="mr-2 h-4 w-4" />
+                    View Interviews
+                  </Link>
+                </Button>
+                {canEdit && (
+                  <Button variant="outline" size="sm" asChild className="justify-start">
+                    <Link href={`/interviews/upload?project=${projectId}`}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Interview
+                    </Link>
+                  </Button>
+                )}
+                {role === "owner" && (
+                  <Button variant="outline" size="sm" asChild className="justify-start">
+                    <Link href={`/projects/${projectId}/members`}>
+                      <Users className="mr-2 h-4 w-4" />
+                      Manage Team
+                    </Link>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common tasks for this project.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button variant="outline" asChild>
-            <Link href={`/interviews?project=${projectId}`}>
-              <Mic className="mr-2 h-4 w-4" />
-              View Interviews
-            </Link>
-          </Button>
-          {canEdit && (
-            <Button variant="outline" asChild>
-              <Link href={`/interviews/upload?project=${projectId}`}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Interview
-              </Link>
-            </Button>
-          )}
-          {role === "owner" && (
-            <Button variant="outline" asChild>
-              <Link href={`/projects/${projectId}/members`}>
-                <Users className="mr-2 h-4 w-4" />
-                Manage Team
-              </Link>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

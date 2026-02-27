@@ -244,11 +244,11 @@
 
 ---
 
-## Intelligence Chat Upgrades (Post-Phase 3)
+## Phase 3.5 — Intelligence Chat Upgrades & Sales War Room (COMPLETE)
 
-**Goal**: Transform the Intelligence Chat from a closed RAG into an Agentic RAG with TBY-specific persona and real-time web intelligence.
+**Goal**: Transform the Intelligence Chat from a closed RAG into an Agentic RAG with TBY-specific persona and real-time web intelligence. Add a Sales War Room to the project dashboard.
 
-### Completed Tasks
+### Objective 1: Intelligence Chat Upgrades (COMPLETE)
 
 | Task | Status | Files | Notes |
 |------|--------|-------|-------|
@@ -258,7 +258,18 @@
 | Web search citation format | Done | `api/chat/route.ts` | Internal citations `[1]`–`[8]` preserved; web results cited as inline markdown links + "Web Sources" section |
 | Graceful degradation | Done | `api/chat/route.ts`, `.env.local.example` | `TAVILY_API_KEY` is optional; if missing, tool returns "unavailable" message instead of throwing |
 
-### Architecture Decisions
+### Objective 2: Sales War Room (COMPLETE)
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| Mock HubSpot service | Done | `src/lib/mockHubspot.ts` | `HubspotDealRaw` type (mirrors real HubSpot payload), 13 mock deals across all stages, 800ms artificial delay, `SIMULATE_ERROR` toggle |
+| UI domain model + adapter | Done | `src/lib/mockHubspot.ts` | `Deal` type, `mapHubspotDealsToUiDeals()` adapter, computes outstanding amounts, normalizes barter |
+| KPI + Pipeline selectors | Done | `src/lib/mockHubspot.ts` | `selectKpis()` → closedCash/pending/barter/progressPct, `selectPipelineHealth()` → counts by active stage. Pure functions, no JSX |
+| War Room client component | Done | `projects/[id]/war-room.tsx` | Revenue target progress bar, 3 financial metric cards, pipeline health grid, filterable deals preview (top 5 by amount) |
+| Loading/Empty/Error states | Done | `projects/[id]/war-room.tsx` | Skeleton placeholders, friendly empty CTA, error card with retry button |
+| Project page redesign | Done | `projects/[id]/page.tsx` | Two-column layout: War Room (primary) + Project Ops sidebar (stats cards, quick actions). Responsive stacking on mobile |
+
+### Architecture Decisions (Phase 3.5)
 
 | Decision | Rationale |
 |----------|-----------|
@@ -268,6 +279,10 @@
 | Tavily via raw `fetch` (no SDK) | Single POST endpoint; avoids adding a dependency for a 10-line function |
 | `topic: "general" \| "news"` parameter | Lets the model target news-specific results when user asks about recent developments vs. general company/sector research |
 | Graceful API key handling | Missing `TAVILY_API_KEY` returns a structured "unavailable" result — tool never throws, model falls back to internal-only context |
+| Mock HubSpot service with real payload shape | `HubspotDealRaw` mirrors actual HubSpot API response structure; when real integration comes, only `getDeals()` needs to change — adapter and selectors stay identical |
+| Selectors as pure functions (not inline JSX) | `selectKpis()` and `selectPipelineHealth()` are testable, reusable, and decoupled from rendering |
+| War Room as client component (not RSC) | Needs client-side state for loading/error/retry + filter state; mock data has no server dependencies |
+| Two-column layout (War Room + Project Ops) | Revenue data is the primary concern for CMs; interview/team stats demoted to sidebar but still one click away |
 
 ---
 
@@ -328,6 +343,8 @@
 | Agentic RAG (hybrid internal + web search) | Pre-injected `hybrid_search` context + Tavily web search as AI SDK tool; model autonomously decides when to search the web; `stopWhen: stepCountIs(3)` |
 | TBY Master Persona in system prompt | Full business context (team roles, sales products, jargon) injected into every chat; enables domain-native reasoning without user explanation |
 | Second-Order Thinking for lead gen | 3-step cascade (Orbit → Market Gap → Ideal Target Profile) prevents recommending already-interviewed companies; anti-hallucination fallback |
+| Mock HubSpot with real payload shape | `HubspotDealRaw` mirrors HubSpot API; adapter + selectors won't change when real API is connected |
+| Sales War Room as client component | Needs loading/error/retry + filter state; pure selectors keep business logic out of JSX |
 
 ---
 
@@ -357,10 +374,10 @@ Read the files HANDOVER.md and ROADMAP.md in the project root. HANDOVER.md is th
 primary document — it contains the full business context, tech stack, architectural
 constraints, known gotchas, and your immediate mission.
 
-Current state: Phases 0–3 are ALL COMPLETE. The platform has:
+Current state: Phases 0–3.5 are ALL COMPLETE. The platform has:
 - Full audio ingestion pipeline (upload → transcribe → extract entities &
   relationships → chunk → embed → generate marketing snippets)
-- Streaming RAG chat with citations
+- Agentic RAG chat with TBY persona, Second-Order Thinking, and Tavily web search
 - Dashboard with analytics (project breakdown, topic distribution)
 - Network Explorer for entity relationships
 - Team management with role-based access (owner/editor/viewer)
@@ -368,6 +385,7 @@ Current state: Phases 0–3 are ALL COMPLETE. The platform has:
 - PDF export via @react-pdf/renderer
 - Report sharing via public links with optional password protection
 - Interview deletion with CASCADE cleanup
+- Sales War Room on project dashboard (mock CRM data, ready for HubSpot integration)
 
 The database has 10 tables across 7 migrations. See ROADMAP.md for full task
 history and architecture decisions.
