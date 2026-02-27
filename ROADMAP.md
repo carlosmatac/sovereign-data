@@ -15,6 +15,7 @@
 | 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | COMPLETE | 100% |
+| 3.5 | Intelligence Chat Upgrades | COMPLETE | 100% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -243,6 +244,33 @@
 
 ---
 
+## Intelligence Chat Upgrades (Post-Phase 3)
+
+**Goal**: Transform the Intelligence Chat from a closed RAG into an Agentic RAG with TBY-specific persona and real-time web intelligence.
+
+### Completed Tasks
+
+| Task | Status | Files | Notes |
+|------|--------|-------|-------|
+| TBY Master Persona injection | Done | `api/chat/route.ts` | Full TBY identity: team structure, products, jargon (pitch, drop-off, all-in-one, barter), 4 strategic directives |
+| Second-Order Thinking directive | Done | `api/chat/route.ts` | 3-step cascade for lead generation: Orbit (entity extraction) → Market Gap (sector deduction) → Ideal Target Profile (anti-hallucination fallback) |
+| Agentic RAG with web search tool | Done | `api/chat/route.ts` | Tavily Search API via `tool()` + `stopWhen: stepCountIs(3)`; model autonomously decides when to search the web |
+| Web search citation format | Done | `api/chat/route.ts` | Internal citations `[1]`–`[8]` preserved; web results cited as inline markdown links + "Web Sources" section |
+| Graceful degradation | Done | `api/chat/route.ts`, `.env.local.example` | `TAVILY_API_KEY` is optional; if missing, tool returns "unavailable" message instead of throwing |
+
+### Architecture Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Pre-injected internal RAG + on-demand web search | Internal `hybrid_search` always runs (zero-latency path for most queries); web search is additive via tool calling — model decides when it's needed |
+| `stopWhen: stepCountIs(3)` not `maxSteps` | AI SDK v6 replaced `maxSteps` with `stopWhen`; 3 steps allows: internal context → web search → final answer |
+| `inputSchema` not `parameters` on `tool()` | AI SDK v6 renamed the property; using Zod v4 schema directly |
+| Tavily via raw `fetch` (no SDK) | Single POST endpoint; avoids adding a dependency for a 10-line function |
+| `topic: "general" \| "news"` parameter | Lets the model target news-specific results when user asks about recent developments vs. general company/sector research |
+| Graceful API key handling | Missing `TAVILY_API_KEY` returns a structured "unavailable" result — tool never throws, model falls back to internal-only context |
+
+---
+
 ## Phase 4 — Production Deployment (NOT STARTED)
 
 **Goal**: Live on Vercel with production environment, monitoring, and security hardening.
@@ -297,6 +325,9 @@
 | Dashboard analytics without charting library | Pure CSS/Tailwind progress bars; avoids bundle bloat; sufficient for current data density |
 | Report sharing via token (not separate table) | Two columns on `reports` (`share_token`, `share_password`) — simpler than a join table; one link per report; password hashed with SHA-256 |
 | Public shared pages bypass middleware | `/shared/*` and `/api/shared/*` added to middleware exclusion list; admin client fetches report by token (no RLS needed) |
+| Agentic RAG (hybrid internal + web search) | Pre-injected `hybrid_search` context + Tavily web search as AI SDK tool; model autonomously decides when to search the web; `stopWhen: stepCountIs(3)` |
+| TBY Master Persona in system prompt | Full business context (team roles, sales products, jargon) injected into every chat; enables domain-native reasoning without user explanation |
+| Second-Order Thinking for lead gen | 3-step cascade (Orbit → Market Gap → Ideal Target Profile) prevents recommending already-interviewed companies; anti-hallucination fallback |
 
 ---
 

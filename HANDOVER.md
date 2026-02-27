@@ -38,7 +38,8 @@ The team wastes hours manually clipping interviews for social media. The system 
 | Transcription | AssemblyAI | `speech_models: ["universal-2"]` (plural, array — API changed in 2026) |
 | Extraction | OpenAI GPT-4o-mini | Via Vercel AI SDK `generateObject` with Zod schemas |
 | Embeddings | OpenAI text-embedding-3-small | 1536 dimensions |
-| Orchestration | Vercel AI SDK v6 (`ai@^6.0.82`, `@ai-sdk/openai@^3.0.27`, `@ai-sdk/react`) | `streamText`, `generateObject`, `useChat` |
+| Orchestration | Vercel AI SDK v6 (`ai@^6.0.82`, `@ai-sdk/openai@^3.0.27`, `@ai-sdk/react`) | `streamText`, `generateObject`, `useChat`, `tool`, `stepCountIs` |
+| Web Search | Tavily Search API (raw `fetch`, no SDK) | Agentic RAG tool for real-time web intelligence; optional (`TAVILY_API_KEY`) |
 | Markdown | `react-markdown` | For chat response rendering |
 
 ### Phase Status
@@ -89,7 +90,7 @@ src/
 │   │   └── layout.tsx                 # Auth guard + sidebar
 │   ├── shared/[token]/page.tsx        # Public shared report page (no auth)
 │   ├── api/
-│   │   ├── chat/route.ts             # streamText + hybrid_search RAG
+│   │   ├── chat/route.ts             # Agentic RAG: streamText + hybrid_search + Tavily web search tool (maxSteps: 3)
 │   │   ├── interviews/route.ts       # Create + submit to AssemblyAI
 │   │   ├── interviews/[id]/route.ts  # DELETE interview (Storage + CASCADE)
 │   │   ├── interviews/[id]/poll/route.ts  # Polling fallback
@@ -137,6 +138,8 @@ src/
 
 8. **Interview deletion uses CASCADE** — Deleting from `interviews` automatically removes all `interview_chunks`, `entity_mentions`, `entity_relationships`, and `content_snippets`. Audio is deleted from Storage separately in the DELETE API handler.
 
+9. **Agentic RAG uses `stopWhen: stepCountIs(3)`** — AI SDK v6 replaced `maxSteps` with `stopWhen`. The chat route uses `stepCountIs(3)` to allow up to 3 steps: internal context → optional web search → final answer. The `tool()` helper uses `inputSchema` (not `parameters`). Tavily web search is optional — if `TAVILY_API_KEY` is missing, the tool returns a graceful "unavailable" message instead of throwing.
+
 ### Environment Variables (`.env.local` — populated, gitignored)
 
 ```
@@ -147,6 +150,7 @@ ASSEMBLYAI_API_KEY=<set>
 OPENAI_API_KEY=<set>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 WEBHOOK_SECRET=<set>
+TAVILY_API_KEY=<set>  # Optional — web search disabled gracefully if missing
 ```
 
 ---

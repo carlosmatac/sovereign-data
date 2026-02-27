@@ -25,6 +25,9 @@
 │  │ AssemblyAI │→ │ GPT-4o-mini│→ │ Chunking │→ │ Embeddings│  │
 │  │ Universal-2│  │ Extraction │  │ Speaker  │  │ OAI Small │  │
 │  └────────────┘  └────────────┘  └──────────┘  └───────────┘  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ Agentic RAG: hybrid_search + Tavily web search (tool use) │ │
+│  └────────────────────────────────────────────────────────────┘ │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────────────┐
@@ -48,6 +51,7 @@
 | Extraction | OpenAI GPT-4o-mini | Structured intelligence extraction |
 | Embeddings | OpenAI text-embedding-3-small | 1536-dim vectors for RAG |
 | Search | Hybrid (SQL + HNSW) | Pre-filtered semantic search |
+| Web Search | Tavily Search API | Real-time web intelligence for Agentic RAG |
 
 ## Getting Started
 
