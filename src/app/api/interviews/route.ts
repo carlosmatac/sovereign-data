@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
+import { parseExpectedSpeakers } from "@/lib/constants";
 
 /**
  * POST /api/interviews
@@ -23,18 +24,30 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { title, description, project_id, audio_url, language } = body as {
+  const { title, description, project_id, audio_url, language, expectedSpeakers: rawExpectedSpeakers } = body as {
     title: string;
     project_id: string;
     audio_url: string;
     description?: string;
     language?: string;
+    expectedSpeakers?: unknown;
   };
 
   // Validate required fields
   if (!title || !project_id || !audio_url) {
     return NextResponse.json(
       { error: "Missing required fields: title, project_id, audio_url" },
+      { status: 400 }
+    );
+  }
+
+  // Validate optional expectedSpeakers
+  let expectedSpeakers: number | null;
+  try {
+    expectedSpeakers = parseExpectedSpeakers(rawExpectedSpeakers);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid expectedSpeakers value" },
       { status: 400 }
     );
   }
@@ -53,6 +66,7 @@ export async function POST(request: NextRequest) {
       language: language ?? "en",
       status: "PROCESSING",
       created_by: user.id,
+      expected_speakers: expectedSpeakers,
     })
     .select()
     .single();
@@ -75,6 +89,7 @@ export async function POST(request: NextRequest) {
       webhookUrl,
       webhookSecret: process.env.WEBHOOK_SECRET!,
       languageCode: language,
+      speakersExpected: expectedSpeakers,
     });
 
     // Update with AssemblyAI ID

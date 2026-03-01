@@ -174,6 +174,36 @@ export const AI_CONFIG = {
   maxSearchResults: 10,
 } as const;
 
+// Speaker diarization — expected speaker count range for AssemblyAI `speakers_expected`
+export const MIN_EXPECTED_SPEAKERS = 1;
+export const MAX_EXPECTED_SPEAKERS = 8;
+
+/**
+ * Validate and parse an `expectedSpeakers` value from user input.
+ * Returns the validated integer, or `null` if the value represents "Auto".
+ * Throws a descriptive error string if the value is present but invalid.
+ */
+export function parseExpectedSpeakers(
+  value: unknown
+): number | null {
+  if (value === undefined || value === null || value === "") return null;
+
+  const num = typeof value === "string" ? parseInt(value, 10) : Number(value);
+
+  if (!Number.isInteger(num)) {
+    throw new Error(
+      `expectedSpeakers must be an integer (received "${value}")`
+    );
+  }
+  if (num < MIN_EXPECTED_SPEAKERS || num > MAX_EXPECTED_SPEAKERS) {
+    throw new Error(
+      `expectedSpeakers must be between ${MIN_EXPECTED_SPEAKERS} and ${MAX_EXPECTED_SPEAKERS} (received ${num})`
+    );
+  }
+
+  return num;
+}
+
 // Supported audio formats
 export const SUPPORTED_AUDIO_FORMATS = [
   "audio/mpeg",      // .mp3

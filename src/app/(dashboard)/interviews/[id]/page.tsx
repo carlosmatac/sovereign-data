@@ -21,6 +21,7 @@ import {
   Link2,
   Mail,
   User,
+  Users,
   Building2,
   MapPin,
   AlertTriangle,
@@ -163,6 +164,12 @@ export default async function InterviewDetailPage({
                 <span className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
                   {formatDuration(interview.audio_duration)}
+                </span>
+              )}
+              {interview.expected_speakers != null && (
+                <span className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  {interview.expected_speakers} speakers (expected)
                 </span>
               )}
             </div>

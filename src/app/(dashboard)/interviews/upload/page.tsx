@@ -29,6 +29,8 @@ import {
   SUPPORTED_AUDIO_FORMATS,
   MAX_AUDIO_SIZE_MB,
   MAX_AUDIO_SIZE_BYTES,
+  MIN_EXPECTED_SPEAKERS,
+  MAX_EXPECTED_SPEAKERS,
 } from "@/lib/constants";
 import type { Project } from "@/types/database";
 
@@ -47,6 +49,7 @@ export default function UploadInterviewPage() {
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState(searchParams.get("project") ?? "");
   const [language, setLanguage] = useState("en");
+  const [expectedSpeakers, setExpectedSpeakers] = useState<string>("auto");
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -153,6 +156,7 @@ export default function UploadInterviewPage() {
           project_id: projectId,
           audio_url: urlData.publicUrl,
           language,
+          expectedSpeakers: expectedSpeakers === "auto" ? undefined : parseInt(expectedSpeakers, 10),
         }),
       });
 
@@ -358,6 +362,38 @@ export default function UploadInterviewPage() {
                     <SelectItem value="ar">Arabic</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Expected Speakers — mitigates diarization over-segmentation */}
+              <div className="space-y-2">
+                <Label htmlFor="expected-speakers">
+                  How many people participated in the interview?
+                </Label>
+                <Select
+                  value={expectedSpeakers}
+                  onValueChange={setExpectedSpeakers}
+                >
+                  <SelectTrigger id="expected-speakers">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    {Array.from(
+                      { length: MAX_EXPECTED_SPEAKERS - MIN_EXPECTED_SPEAKERS + 1 },
+                      (_, i) => {
+                        const n = MIN_EXPECTED_SPEAKERS + i;
+                        return (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}
+                          </SelectItem>
+                        );
+                      }
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Recommended: improves speaker identification accuracy.
+                </p>
               </div>
 
               {/* Submit */}

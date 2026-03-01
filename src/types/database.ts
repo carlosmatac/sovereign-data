@@ -207,6 +207,7 @@ export interface Database {
           assemblyai_id: string | null;
           language: string;
           source_type: SourceType;
+          expected_speakers: number | null;
           conducted_at: string | null;
           created_by: string;
           created_at: string;
@@ -229,6 +230,7 @@ export interface Database {
           assemblyai_id?: string | null;
           language?: string;
           source_type?: SourceType;
+          expected_speakers?: number | null;
           conducted_at?: string | null;
           created_by?: string;
           created_at?: string;
@@ -251,6 +253,7 @@ export interface Database {
           assemblyai_id?: string | null;
           language?: string;
           source_type?: SourceType;
+          expected_speakers?: number | null;
           conducted_at?: string | null;
           created_by?: string;
           created_at?: string;

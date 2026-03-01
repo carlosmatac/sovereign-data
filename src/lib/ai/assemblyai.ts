@@ -11,6 +11,7 @@ interface TranscriptionRequest {
   webhook_auth_header_name?: string;
   webhook_auth_header_value?: string;
   speaker_labels: boolean;
+  speakers_expected?: number;
   language_code?: string;
   language_detection?: boolean;
 }
@@ -49,11 +50,14 @@ export async function submitTranscription({
   webhookUrl,
   webhookSecret,
   languageCode,
+  speakersExpected,
 }: {
   audioUrl: string;
   webhookUrl: string;
   webhookSecret: string;
   languageCode?: string;
+  /** Hint for diarization: reduces over-segmentation when the speaker count is known. */
+  speakersExpected?: number | null;
 }): Promise<{ transcriptId: string }> {
   const body: TranscriptionRequest = {
     audio_url: audioUrl,
@@ -61,9 +65,10 @@ export async function submitTranscription({
     webhook_url: webhookUrl,
     webhook_auth_header_name: "x-webhook-secret",
     webhook_auth_header_value: webhookSecret,
-    speaker_labels: true, // Critical: enables speaker diarization
+    speaker_labels: true,
     language_detection: !languageCode,
     ...(languageCode && { language_code: languageCode }),
+    ...(speakersExpected != null && { speakers_expected: speakersExpected }),
   };
 
   const response = await fetch(`${ASSEMBLYAI_BASE_URL}/transcript`, {
