@@ -72,6 +72,9 @@ cp .env.local.example .env.local
 
 # Start development server
 npm run dev
+
+# Reset database (wipe all data, keep schema + auth users)
+npx tsx scripts/reset-database.ts
 ```
 
 ## Project Structure

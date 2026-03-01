@@ -155,6 +155,16 @@ WEBHOOK_SECRET=<set>
 TAVILY_API_KEY=<set>  # Optional — web search disabled gracefully if missing
 ```
 
+### Database Reset (Wipe All Data)
+
+To start fresh (e.g., before a testing round), run:
+
+```bash
+npx tsx scripts/reset-database.ts
+```
+
+This deletes **all** projects, interviews, chunks, entities, relationships, snippets, reports, and audio files from Storage. Auth users and profiles are preserved — you can still log in after the reset. The script uses the service role key from `.env.local` and deletes tables in dependency order to respect foreign keys.
+
 ---
 
 ## 3. PHASE 3 — Team Management & Reports (COMPLETE)
