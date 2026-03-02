@@ -96,15 +96,25 @@ export async function extractIntelligence({
   interviewTitle,
   country,
   speakerMap,
+  primaryPerson,
+  primaryOrg,
 }: {
   transcript: string;
   interviewTitle: string;
   country?: string;
   speakerMap?: Record<string, string>;
+  primaryPerson?: string | null;
+  primaryOrg?: string | null;
 }): Promise<ExtractionResult> {
   const speakerContext = speakerMap
     ? `\nSpeaker identification: ${JSON.stringify(speakerMap)}`
     : "";
+  const primaryEntitiesContext =
+    primaryPerson || primaryOrg
+      ? `\nPrimary Entities:
+- Primary PERSON: ${primaryPerson ?? "unknown"}
+- Primary ORG: ${primaryOrg ?? "unknown"}`
+      : "";
 
   const { object } = await generateObject({
     model: openai(AI_CONFIG.extractionModel),
@@ -114,7 +124,7 @@ export async function extractIntelligence({
 Analyze the following interview transcript and extract structured intelligence.
 
 Interview: "${interviewTitle}"
-${country ? `Country/Region: ${country}` : ""}${speakerContext}
+${country ? `Country/Region: ${country}` : ""}${speakerContext}${primaryEntitiesContext}
 
 TRANSCRIPT:
 ${transcript}
@@ -125,6 +135,7 @@ INSTRUCTIONS:
 - Be precise with sentiment — distinguish between the interviewee's opinion and factual statements.
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
 - Risks and opportunities should be actionable intelligence, not generic statements.
+- If Primary Entities are provided, prefer those exact spellings when matching/extracting entities and relationships.
 - RELATIONSHIPS: Identify how entities are connected to each other. For every pair of entities with a discernible relationship, output a relationship edge. Use the exact entity names from the entities array. Include the direct quote that establishes the relationship when possible.`,
   });
 

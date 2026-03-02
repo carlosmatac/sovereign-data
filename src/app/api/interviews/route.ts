@@ -4,9 +4,37 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 import { parseExpectedSpeakers } from "@/lib/constants";
 
+const MAX_ANCHOR_LENGTH = 120;
+const HONORIFIC_PREFIX_REGEX = /^\s*(mr|mrs|ms|dr|prof)\.?\s+/i;
+
+function sanitizeOptionalAnchor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  if (cleaned.length > MAX_ANCHOR_LENGTH) {
+    return cleaned.slice(0, MAX_ANCHOR_LENGTH);
+  }
+  return cleaned;
+}
+
+function buildAnchorWordBoost(anchor: string): string[] {
+  const out = new Set<string>();
+  const trimmed = anchor.trim();
+  if (!trimmed) return [];
+
+  out.add(trimmed);
+  out.add(trimmed.replace(/\s+/g, " "));
+
+  const withoutTitle = trimmed.replace(HONORIFIC_PREFIX_REGEX, "").trim();
+  if (withoutTitle) out.add(withoutTitle);
+
+  return [...out].filter(Boolean);
+}
+
 async function getWordBoostAliases(
   admin: ReturnType<typeof createAdminClient>,
-  projectId: string
+  projectId: string,
+  anchors: { intervieweeName: string | null; intervieweeOrg: string | null }
 ): Promise<string[]> {
   const [projectAliasesRes, globalAliasesRes] = await Promise.all([
     admin
@@ -32,19 +60,32 @@ async function getWordBoostAliases(
 
   const out: string[] = [];
   const seen = new Set<string>();
+  const MAX_WORD_BOOST = 220;
+
+  const anchorCandidates = [
+    ...(anchors.intervieweeName ? buildAnchorWordBoost(anchors.intervieweeName) : []),
+    ...(anchors.intervieweeOrg ? buildAnchorWordBoost(anchors.intervieweeOrg) : []),
+  ];
+
+  for (const term of anchorCandidates) {
+    if (!term || seen.has(term)) continue;
+    seen.add(term);
+    out.push(term);
+    if (out.length >= MAX_WORD_BOOST) return out;
+  }
 
   for (const alias of projectAliasesRes.data ?? []) {
     if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
     seen.add(alias.alias_normalized);
     out.push(alias.alias_normalized);
-    if (out.length >= 200) return out;
+    if (out.length >= MAX_WORD_BOOST) return out;
   }
 
   for (const alias of globalAliasesRes.data ?? []) {
     if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
     seen.add(alias.alias_normalized);
     out.push(alias.alias_normalized);
-    if (out.length >= 200) break;
+    if (out.length >= MAX_WORD_BOOST) break;
   }
 
   return out;
@@ -70,13 +111,24 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { title, description, project_id, audio_url, language, expectedSpeakers: rawExpectedSpeakers } = body as {
+  const {
+    title,
+    description,
+    project_id,
+    audio_url,
+    language,
+    expectedSpeakers: rawExpectedSpeakers,
+    interviewee_name: rawIntervieweeName,
+    interviewee_org: rawIntervieweeOrg,
+  } = body as {
     title: string;
     project_id: string;
     audio_url: string;
     description?: string;
     language?: string;
     expectedSpeakers?: unknown;
+    interviewee_name?: unknown;
+    interviewee_org?: unknown;
   };
 
   // Validate required fields
@@ -98,6 +150,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
+  const intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+
   // 2. Use admin client for DB operations (bypasses RLS, safe after auth check)
   const admin = createAdminClient();
 
@@ -113,6 +168,8 @@ export async function POST(request: NextRequest) {
       status: "PROCESSING",
       created_by: user.id,
       expected_speakers: expectedSpeakers,
+      interviewee_name: intervieweeName,
+      interviewee_org: intervieweeOrg,
     })
     .select()
     .single();
@@ -129,7 +186,10 @@ export async function POST(request: NextRequest) {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
     const webhookUrl = `${appUrl}/api/webhooks/transcription`;
-    const wordBoost = await getWordBoostAliases(admin, project_id);
+    const wordBoost = await getWordBoostAliases(admin, project_id, {
+      intervieweeName,
+      intervieweeOrg,
+    });
 
     const { transcriptId } = await submitTranscription({
       audioUrl: audio_url,

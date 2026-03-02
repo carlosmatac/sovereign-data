@@ -50,6 +50,8 @@ export default function UploadInterviewPage() {
   const [projectId, setProjectId] = useState(searchParams.get("project") ?? "");
   const [language, setLanguage] = useState("en");
   const [expectedSpeakers, setExpectedSpeakers] = useState<string>("auto");
+  const [intervieweeName, setIntervieweeName] = useState("");
+  const [intervieweeOrg, setIntervieweeOrg] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -157,6 +159,8 @@ export default function UploadInterviewPage() {
           audio_url: urlData.publicUrl,
           language,
           expectedSpeakers: expectedSpeakers === "auto" ? undefined : parseInt(expectedSpeakers, 10),
+          interviewee_name: intervieweeName.trim() || undefined,
+          interviewee_org: intervieweeOrg.trim() || undefined,
         }),
       });
 
@@ -306,15 +310,42 @@ export default function UploadInterviewPage() {
                   placeholder="e.g. Minister of Energy — Abuja, Feb 2026"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  disabled={loading}
                   required
                 />
+              </div>
+
+              {/* Primary Entities (optional anchor hints) */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="interviewee-name">Interviewee name</Label>
+                  <Input
+                    id="interviewee-name"
+                    placeholder="e.g., Fessor Mbango"
+                    value={intervieweeName}
+                    onChange={(e) => setIntervieweeName(e.target.value)}
+                    maxLength={120}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="interviewee-org">Organization / Company</Label>
+                  <Input
+                    id="interviewee-org"
+                    placeholder="e.g., CENORED"
+                    value={intervieweeOrg}
+                    onChange={(e) => setIntervieweeOrg(e.target.value)}
+                    maxLength={120}
+                    disabled={loading}
+                  />
+                </div>
               </div>
 
               {/* Project Selection */}
               <div className="space-y-2">
                 <Label>Project *</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger>
+                  <SelectTrigger disabled={loading}>
                     <SelectValue placeholder="Assign to a project" />
                   </SelectTrigger>
                   <SelectContent>
@@ -345,13 +376,14 @@ export default function UploadInterviewPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
+                  disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>Language</Label>
                 <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger>
+                  <SelectTrigger disabled={loading}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -373,7 +405,7 @@ export default function UploadInterviewPage() {
                   value={expectedSpeakers}
                   onValueChange={setExpectedSpeakers}
                 >
-                  <SelectTrigger id="expected-speakers">
+                  <SelectTrigger id="expected-speakers" disabled={loading}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

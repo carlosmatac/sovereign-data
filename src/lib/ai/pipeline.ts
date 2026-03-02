@@ -127,7 +127,7 @@ export async function processTranscription(
     // Fetch interview metadata for extraction context
     const { data: interview } = await supabase
       .from("interviews")
-      .select("title, project_id, projects(country)")
+      .select("title, project_id, interviewee_name, interviewee_org, projects(country)")
       .eq("id", interviewId)
       .single();
 
@@ -138,6 +138,8 @@ export async function processTranscription(
       interviewTitle: interview?.title ?? "Unknown Interview",
       country,
       speakerMap,
+      primaryPerson: interview?.interviewee_name ?? null,
+      primaryOrg: interview?.interviewee_org ?? null,
     });
 
     // Save extraction results

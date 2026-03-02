@@ -206,6 +206,8 @@ export interface Database {
           topics: string[] | null;
           assemblyai_id: string | null;
           language: string;
+          interviewee_name: string | null;
+          interviewee_org: string | null;
           source_type: SourceType;
           expected_speakers: number | null;
           conducted_at: string | null;
@@ -229,6 +231,8 @@ export interface Database {
           topics?: string[] | null;
           assemblyai_id?: string | null;
           language?: string;
+          interviewee_name?: string | null;
+          interviewee_org?: string | null;
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
@@ -252,6 +256,8 @@ export interface Database {
           topics?: string[] | null;
           assemblyai_id?: string | null;
           language?: string;
+          interviewee_name?: string | null;
+          interviewee_org?: string | null;
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
