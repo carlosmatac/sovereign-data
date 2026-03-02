@@ -201,6 +201,7 @@ export interface Database {
           error_message: string | null;
           speaker_map: SpeakerMap;
           transcript_full: string | null;
+          transcript_display: string | null;
           summary: string | null;
           sentiment: SentimentData | null;
           topics: string[] | null;
@@ -226,6 +227,7 @@ export interface Database {
           error_message?: string | null;
           speaker_map?: SpeakerMap;
           transcript_full?: string | null;
+          transcript_display?: string | null;
           summary?: string | null;
           sentiment?: SentimentData | null;
           topics?: string[] | null;
@@ -251,6 +253,7 @@ export interface Database {
           error_message?: string | null;
           speaker_map?: SpeakerMap;
           transcript_full?: string | null;
+          transcript_display?: string | null;
           summary?: string | null;
           sentiment?: SentimentData | null;
           topics?: string[] | null;

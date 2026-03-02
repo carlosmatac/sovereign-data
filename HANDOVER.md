@@ -51,17 +51,17 @@ The team wastes hours manually clipping interviews for social media. The system 
 | **Phase 2** | COMPLETE | Dashboard (stats, project breakdown, topic distribution), Intelligence Chat (streaming RAG), Network Explorer (entity relationship browser), interview deletion |
 | **Phase 2.5** | COMPLETE | Graph schema evolution (`entity_relationships`, `content_snippets`, `source_type`), relationship extraction in pipeline, auto-generated marketing snippets (LinkedIn, Twitter, Newsletter, Summary) |
 | **Phase 3** | COMPLETE | Team management (invite, roles, RBAC), AI report generator (5 templates), PDF export, report sharing (public links + password) |
-| **Phase 3.5** | COMPLETE | Intelligence Chat upgrades (TBY persona, Second-Order Thinking, Agentic RAG), Sales War Room on project dashboard (mock CRM data) |
+| **Phase 3.5** | COMPLETE | Intelligence Chat upgrades (TBY persona, Second-Order Thinking, Agentic RAG), Sales War Room, interview anchor fields (primary person/org), transcript display layer with cleaned/original toggle |
 | **Phase 4** | NOT STARTED | Production deployment |
 
-### Database — 10 Tables, 7 Migrations Applied
+### Database — 10 Tables, 11 Migrations Applied
 
 | Table | Purpose |
 |-------|---------|
 | `profiles` | Extends auth.users (auto-created via trigger) |
 | `projects` | RLS root, contains country/region |
 | `project_members` | Many-to-many with roles (owner/editor/viewer), `invited_email` for pending invites |
-| `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` |
+| `interviews` | Audio assets with status, raw+display transcript, summary, sentiment, topics, `source_type`, primary anchors (`interviewee_name`, `interviewee_org`) |
 | `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware |
 | `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) |
 | `entity_mentions` | Entity ↔ interview links with sentiment |
@@ -73,7 +73,7 @@ Key SQL extensions: `vector` (not "pgvector"), `pg_trgm`, `uuid-ossp` — all in
 
 Key enums (12 total): `interview_status`, `entity_type`, `user_role`, `relation_type`, `source_type`, `snippet_platform`, `snippet_tone`, `snippet_status`, `report_status`, `report_template`.
 
-Migrations: `00001` (initial), `00002` (RLS SECURITY DEFINER), `00003` (created_by default), `00004` (graph + content), `00005` (team invitations), `00006` (reports), `00007` (report sharing).
+Migrations: `00001` (initial), `00002` (RLS SECURITY DEFINER), `00003` (created_by default), `00004` (graph + content), `00005` (team invitations), `00006` (reports), `00007` (report sharing), `00008` (expected speakers), `00009` (entity normalization), `00010` (interview primary anchors), `00011` (transcript display).
 
 ### File Structure (~90 source files)
 
@@ -248,8 +248,10 @@ Current state: Phases 0–3.5 are ALL COMPLETE. The platform has:
 - Report sharing via public links with optional password protection
 - Interview deletion with CASCADE cleanup
 - Sales War Room on project dashboard (mock CRM data, ready for HubSpot integration)
+- Upload anchors for Interviewee + Organization, used in ASR and extraction prompt
+- Transcript display layer (`transcript_display`) with cleaned/original toggle and owner recompute action
 
-The database has 10 tables across 7 migrations. See ROADMAP.md for full task
+The database has 10 tables across 11 migrations. See ROADMAP.md for full task
 history and architecture decisions.
 
 Your immediate task is Phase 4: Production Deployment. Propose the approach first,

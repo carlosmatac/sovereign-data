@@ -348,14 +348,14 @@
 
 ---
 
-## Database Schema Summary (10 Tables, 7 Migrations)
+## Database Schema Summary (10 Tables, 11 Migrations)
 
 | Table | Purpose | Migration |
 |-------|---------|-----------|
 | `profiles` | Extends auth.users (auto-created via trigger) | 00001 |
 | `projects` | RLS root, contains country/region | 00001 |
 | `project_members` | Many-to-many with roles (owner/editor/viewer), invitation support | 00001, 00005 |
-| `interviews` | Audio assets with status, transcript, summary, sentiment, topics, `source_type` | 00001, 00004 |
+| `interviews` | Audio assets with status, transcript (`transcript_full` raw + `transcript_display` cleaned), summary, sentiment, topics, `source_type`, `expected_speakers`, interview anchors (`interviewee_name`, `interviewee_org`) | 00001, 00004, 00008, 00010, 00011 |
 | `interview_chunks` | Vector store, HNSW indexed (`vector(1536)`), speaker-aware | 00001 |
 | `entities` | Knowledge graph nodes (PERSON, COMPANY, GOVERNMENT, etc.) | 00001 |
 | `entity_mentions` | Entity ↔ interview links with sentiment | 00001 |
@@ -386,8 +386,10 @@ Current state: Phases 0–3.5 are ALL COMPLETE. The platform has:
 - Report sharing via public links with optional password protection
 - Interview deletion with CASCADE cleanup
 - Sales War Room on project dashboard (mock CRM data, ready for HubSpot integration)
+- Upload anchors for interviewee/org to improve ASR + extraction consistency
+- Transcript display layer with cleaned/original toggle and owner-triggered recompute
 
-The database has 10 tables across 7 migrations. See ROADMAP.md for full task
+The database has 10 tables across 11 migrations. See ROADMAP.md for full task
 history and architecture decisions.
 
 Your immediate task is Phase 4: Production Deployment. Propose the approach first,

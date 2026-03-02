@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, MessageSquareText } from "lucide-react";
 
 interface TranscriptViewerProps {
-  transcript: string;
+  transcriptRaw: string;
+  transcriptDisplay?: string | null;
   speakerMap?: Record<string, string>;
+  replacementsApplied?: number;
+  actions?: ReactNode;
 }
 
 const SPEAKER_STYLES = [
@@ -26,10 +30,23 @@ const SPEAKER_STYLES = [
 ];
 
 export function TranscriptViewer({
-  transcript,
+  transcriptRaw,
+  transcriptDisplay,
   speakerMap,
+  replacementsApplied,
+  actions,
 }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const hasCleanedTranscript =
+    Boolean(transcriptDisplay?.trim()) &&
+    transcriptDisplay?.trim() !== transcriptRaw.trim();
+  const [viewMode, setViewMode] = useState<"cleaned" | "original">(
+    hasCleanedTranscript ? "cleaned" : "original"
+  );
+  const activeTranscript =
+    hasCleanedTranscript && viewMode === "cleaned"
+      ? transcriptDisplay ?? transcriptRaw
+      : transcriptRaw;
 
   // Parse transcript into speaker segments
   const segments = useMemo(() => {
@@ -39,7 +56,7 @@ export function TranscriptViewer({
     // Collect all label positions in one pass
     const labels: Array<{ speaker: string; start: number; contentStart: number }> = [];
     let m: RegExpExecArray | null;
-    while ((m = speakerRegex.exec(transcript)) !== null) {
+    while ((m = speakerRegex.exec(activeTranscript)) !== null) {
       labels.push({
         speaker: m[1],
         start: m.index,
@@ -48,27 +65,27 @@ export function TranscriptViewer({
     }
 
     if (labels.length === 0) {
-      return [{ speaker: null, text: transcript }];
+      return [{ speaker: null, text: activeTranscript }];
     }
 
     // Text before first label
     if (labels[0].start > 0) {
-      const before = transcript.slice(0, labels[0].start).trim();
+      const before = activeTranscript.slice(0, labels[0].start).trim();
       if (before) parts.push({ speaker: null, text: before });
     }
 
     // Build segments from label positions
     for (let i = 0; i < labels.length; i++) {
-      const endIndex = i + 1 < labels.length ? labels[i + 1].start : transcript.length;
+      const endIndex = i + 1 < labels.length ? labels[i + 1].start : activeTranscript.length;
       const speakerName = speakerMap?.[labels[i].speaker] ?? labels[i].speaker;
-      const text = transcript.slice(labels[i].contentStart, endIndex).trim();
+      const text = activeTranscript.slice(labels[i].contentStart, endIndex).trim();
       if (text) {
         parts.push({ speaker: speakerName, text });
       }
     }
 
     return parts;
-  }, [transcript, speakerMap]);
+  }, [activeTranscript, speakerMap]);
 
   // Build speaker -> style map
   const speakerStyles = useMemo(() => {
@@ -101,6 +118,33 @@ export function TranscriptViewer({
           <div className="flex items-center gap-2">
             <MessageSquareText className="h-4 w-4 text-primary" />
             <CardTitle className="text-base">Full Transcript</CardTitle>
+            {hasCleanedTranscript && (
+              <span className="text-xs text-muted-foreground">
+                Cleaned transcript
+                {typeof replacementsApplied === "number" &&
+                replacementsApplied > 0
+                  ? `: ${replacementsApplied} replacements`
+                  : ""}
+              </span>
+            )}
+            {hasCleanedTranscript && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() =>
+                  setViewMode((prev) =>
+                    prev === "cleaned" ? "original" : "cleaned"
+                  )
+                }
+              >
+                {viewMode === "cleaned"
+                  ? "View original transcript"
+                  : "View cleaned transcript"}
+              </Button>
+            )}
+            {actions}
           </div>
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />

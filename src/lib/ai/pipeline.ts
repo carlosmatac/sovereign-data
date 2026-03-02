@@ -12,6 +12,7 @@ import { generateContentSnippets } from "./content-generation";
 import type { InterviewStatus } from "@/types/database";
 import { normalizeEntityName } from "@/lib/entities/normalize";
 import { matchOrCreateEntity } from "@/lib/entities/match";
+import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 
 /**
  * Update interview status in the database.
@@ -114,17 +115,7 @@ export async function processTranscription(
         .join("\n\n");
     }
 
-    // Save speaker-formatted transcript
-    await updateInterviewStatus(interviewId, "EXTRACTING", {
-      transcript_full: formattedTranscript,
-      speaker_map: speakerMap,
-      audio_duration: transcription.audio_duration
-        ? Math.round(transcription.audio_duration / 1000)
-        : null,
-    });
-
-    // ── Step 2: Extract intelligence ─────────────────────────────
-    // Fetch interview metadata for extraction context
+    // Fetch interview metadata for extraction context + transcript display anchors
     const { data: interview } = await supabase
       .from("interviews")
       .select("title, project_id, interviewee_name, interviewee_org, projects(country)")
@@ -132,6 +123,28 @@ export async function processTranscription(
       .single();
 
     const country = (interview?.projects as Record<string, unknown>)?.country as string | undefined;
+    const normalizedTranscript = normalizeTranscriptDisplay(formattedTranscript, {
+      intervieweeName: interview?.interviewee_name,
+      intervieweeOrg: interview?.interviewee_org,
+    });
+
+    // Save speaker-formatted raw transcript + cleaned display transcript
+    await updateInterviewStatus(interviewId, "EXTRACTING", {
+      transcript_full: formattedTranscript,
+      transcript_display: normalizedTranscript.transcriptDisplay,
+      speaker_map: speakerMap,
+      audio_duration: transcription.audio_duration
+        ? Math.round(transcription.audio_duration / 1000)
+        : null,
+    });
+
+    if (normalizedTranscript.stats.replacementsApplied > 0) {
+      console.log(
+        `Transcript display normalized for ${interviewId}: ${normalizedTranscript.stats.replacementsApplied} replacements`
+      );
+    }
+
+    // ── Step 2: Extract intelligence ─────────────────────────────
 
     const extraction = await extractIntelligence({
       transcript: transcription.text,

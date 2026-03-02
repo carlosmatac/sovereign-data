@@ -31,6 +31,8 @@ import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
+import { RecomputeCleanedTranscriptButton } from "@/components/interviews/recompute-cleaned-transcript-button";
+import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 
 export default async function InterviewDetailPage({
   params,
@@ -53,6 +55,7 @@ export default async function InterviewDetailPage({
 
   const userRole = await getUserProjectRole(interview.project_id);
   const canEdit = userRole === "owner" || userRole === "editor";
+  const isOwner = userRole === "owner";
 
   // Fetch entities for this interview
   const { data: mentions } = await supabase
@@ -134,6 +137,14 @@ export default async function InterviewDetailPage({
     score?: number;
     highlights?: Array<{ text: string; sentiment: string }>;
   } | null;
+
+  const transcriptNormalizationStats =
+    interview.transcript_full
+      ? normalizeTranscriptDisplay(interview.transcript_full, {
+          intervieweeName: interview.interviewee_name,
+          intervieweeOrg: interview.interviewee_org,
+        }).stats
+      : null;
 
   return (
     <div className="p-6">
@@ -293,7 +304,18 @@ export default async function InterviewDetailPage({
             {/* Full Transcript */}
             {interview.transcript_full && (
               <TranscriptViewer
-                transcript={interview.transcript_full}
+                transcriptRaw={interview.transcript_full}
+                transcriptDisplay={interview.transcript_display}
+                replacementsApplied={
+                  transcriptNormalizationStats?.replacementsApplied
+                }
+                actions={
+                  isOwner ? (
+                    <RecomputeCleanedTranscriptButton
+                      interviewId={interview.id}
+                    />
+                  ) : null
+                }
                 speakerMap={
                   interview.speaker_map as Record<string, string>
                 }
