@@ -20,12 +20,8 @@ import {
   Hash,
   Link2,
   Mail,
-  User,
   Users,
-  Building2,
   MapPin,
-  AlertTriangle,
-  TrendingUp,
   FileText,
   Newspaper,
 } from "lucide-react";
@@ -34,6 +30,7 @@ import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
+import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
 
 export default async function InterviewDetailPage({
   params,
@@ -76,18 +73,33 @@ export default async function InterviewDetailPage({
     .eq("interview_id", id)
     .order("platform");
 
-  // Build entity name lookup from mentions for relationship display
+  const entityMentions =
+    mentions
+      ?.map((m) => {
+        const entity = m.entities as unknown as {
+          id: string;
+          name: string;
+          type: string;
+          description: string | null;
+        } | null;
+
+        if (!entity) return null;
+
+        return {
+          mentionId: m.id,
+          entityId: m.entity_id,
+          name: entity.name,
+          type: entity.type,
+          description: entity.description,
+          sentiment: m.sentiment,
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null) ?? [];
+
+  // Build entity name lookup from mentions for relationship display.
   const entityNameMap: Record<string, { name: string; type: string }> = {};
-  if (mentions) {
-    for (const m of mentions) {
-      const entity = m.entities as unknown as {
-        name: string;
-        type: string;
-      } | null;
-      if (entity) {
-        entityNameMap[m.entity_id] = entity;
-      }
-    }
+  for (const m of entityMentions) {
+    entityNameMap[m.entityId] = { name: m.name, type: m.type };
   }
 
   const platformIcons: Record<string, React.ReactNode> = {
@@ -122,15 +134,6 @@ export default async function InterviewDetailPage({
     score?: number;
     highlights?: Array<{ text: string; sentiment: string }>;
   } | null;
-
-  const entityTypeIcons: Record<string, React.ReactNode> = {
-    PERSON: <User className="h-3.5 w-3.5" />,
-    COMPANY: <Building2 className="h-3.5 w-3.5" />,
-    GOVERNMENT: <Globe className="h-3.5 w-3.5" />,
-    ORGANIZATION: <Globe className="h-3.5 w-3.5" />,
-    LOCATION: <MapPin className="h-3.5 w-3.5" />,
-    EVENT: <Clock className="h-3.5 w-3.5" />,
-  };
 
   return (
     <div className="p-6">
@@ -356,71 +359,22 @@ export default async function InterviewDetailPage({
             )}
 
             {/* Entities */}
-            {mentions && mentions.length > 0 && (
+            {entityMentions.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
                     Entities Mentioned
                   </CardTitle>
                   <CardDescription>
-                    {mentions.length} entities identified
+                    {entityMentions.length} entities identified
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {mentions.map((mention) => {
-                      const entity = mention.entities as unknown as {
-                        name: string;
-                        type: string;
-                        description: string | null;
-                      } | null;
-                      if (!entity) return null;
-
-                      return (
-                        <div
-                          key={mention.id}
-                          className="flex items-start gap-2 rounded-md p-2 hover:bg-muted"
-                        >
-                          <div className="mt-0.5 text-muted-foreground">
-                            {entityTypeIcons[entity.type] ?? (
-                              <Globe className="h-3.5 w-3.5" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">
-                              {entity.name}
-                            </p>
-                            {entity.description && (
-                              <p className="text-xs text-muted-foreground">
-                                {entity.description}
-                              </p>
-                            )}
-                            <div className="mt-0.5 flex items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                {entity.type}
-                              </Badge>
-                              {mention.sentiment && (
-                                <span
-                                  className={`text-[10px] ${
-                                    mention.sentiment === "positive"
-                                      ? "text-green-600"
-                                      : mention.sentiment === "negative"
-                                        ? "text-red-600"
-                                        : "text-gray-500"
-                                  }`}
-                                >
-                                  {mention.sentiment}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <EntityMentionsList
+                    mentions={entityMentions}
+                    projectId={interview.project_id}
+                    canEdit={canEdit}
+                  />
                 </CardContent>
               </Card>
             )}

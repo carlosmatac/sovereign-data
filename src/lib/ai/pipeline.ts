@@ -10,6 +10,8 @@ import { chunkTranscript, chunkPlainText } from "./chunking";
 import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
 import type { InterviewStatus } from "@/types/database";
+import { normalizeEntityName } from "@/lib/entities/normalize";
+import { matchOrCreateEntity } from "@/lib/entities/match";
 
 /**
  * Update interview status in the database.
@@ -28,6 +30,37 @@ async function updateInterviewStatus(
 
   if (error) {
     console.error(`Failed to update interview ${interviewId} to ${status}:`, error);
+  }
+}
+
+async function markEntityNeedsReview(
+  supabase: ReturnType<typeof createAdminClient>,
+  entityId: string
+) {
+  const { data: existing, error: fetchError } = await supabase
+    .from("entities")
+    .select("metadata")
+    .eq("id", entityId)
+    .maybeSingle<{ metadata: Record<string, unknown> | null }>();
+
+  if (fetchError) {
+    console.error("Failed to fetch entity metadata for review flag:", fetchError);
+    return;
+  }
+
+  const metadata = {
+    ...(existing?.metadata ?? {}),
+    needs_review: true,
+    review_source: "entity_normalization",
+  };
+
+  const { error: updateError } = await supabase
+    .from("entities")
+    .update({ metadata })
+    .eq("id", entityId);
+
+  if (updateError) {
+    console.error("Failed to update entity metadata with needs_review flag:", updateError);
   }
 }
 
@@ -159,37 +192,48 @@ export async function processTranscription(
       }
     }
 
-    // ── Step 6: Persist entities ─────────────────────────────────
+    // ── Step 6: Match/create canonical entities + persist mentions ──
     const entityIdMap = new Map<string, string>();
+    const projectId = interview?.project_id;
+
+    if (!projectId) {
+      throw new Error(`Missing project_id for interview ${interviewId}`);
+    }
 
     for (const entity of extraction.entities) {
-      const { data: entityRow } = await supabase
-        .from("entities")
-        .upsert(
-          {
-            name: entity.name,
-            type: entity.type,
-            description: entity.description ?? null,
-          },
-          { onConflict: "name,type" }
-        )
-        .select("id")
-        .single();
+      const { entityId, needsReview } = await matchOrCreateEntity({
+        projectId,
+        nameRaw: entity.name,
+        type: entity.type,
+        supabaseClient: supabase,
+      });
 
-      if (entityRow) {
-        entityIdMap.set(entity.name, entityRow.id);
-        await supabase.from("entity_mentions").insert({
-          entity_id: entityRow.id,
-          interview_id: interviewId,
-          sentiment: entity.sentiment ?? null,
-        });
+      entityIdMap.set(entity.name, entityId);
+      entityIdMap.set(normalizeEntityName(entity.name), entityId);
+
+      const { error: mentionError } = await supabase.from("entity_mentions").insert({
+        entity_id: entityId,
+        interview_id: interviewId,
+        sentiment: entity.sentiment ?? null,
+      });
+
+      if (mentionError) {
+        console.error("Failed to insert entity mention:", mentionError);
+      }
+
+      if (needsReview) {
+        await markEntityNeedsReview(supabase, entityId);
       }
     }
 
     // ── Step 7: Persist relationships ────────────────────────────
     for (const rel of extraction.relationships) {
-      const sourceId = entityIdMap.get(rel.source_name);
-      const targetId = entityIdMap.get(rel.target_name);
+      const sourceId =
+        entityIdMap.get(rel.source_name) ??
+        entityIdMap.get(normalizeEntityName(rel.source_name));
+      const targetId =
+        entityIdMap.get(rel.target_name) ??
+        entityIdMap.get(normalizeEntityName(rel.target_name));
 
       if (sourceId && targetId) {
         const { error: relError } = await supabase

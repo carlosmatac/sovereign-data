@@ -4,6 +4,52 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 import { parseExpectedSpeakers } from "@/lib/constants";
 
+async function getWordBoostAliases(
+  admin: ReturnType<typeof createAdminClient>,
+  projectId: string
+): Promise<string[]> {
+  const [projectAliasesRes, globalAliasesRes] = await Promise.all([
+    admin
+      .from("entity_aliases")
+      .select("alias_normalized")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    admin
+      .from("entity_aliases")
+      .select("alias_normalized")
+      .is("project_id", null)
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+
+  if (projectAliasesRes.error) {
+    console.error("Failed to fetch project aliases for word_boost:", projectAliasesRes.error);
+  }
+  if (globalAliasesRes.error) {
+    console.error("Failed to fetch global aliases for word_boost:", globalAliasesRes.error);
+  }
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const alias of projectAliasesRes.data ?? []) {
+    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
+    seen.add(alias.alias_normalized);
+    out.push(alias.alias_normalized);
+    if (out.length >= 200) return out;
+  }
+
+  for (const alias of globalAliasesRes.data ?? []) {
+    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
+    seen.add(alias.alias_normalized);
+    out.push(alias.alias_normalized);
+    if (out.length >= 200) break;
+  }
+
+  return out;
+}
+
 /**
  * POST /api/interviews
  *
@@ -83,6 +129,7 @@ export async function POST(request: NextRequest) {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
     const webhookUrl = `${appUrl}/api/webhooks/transcription`;
+    const wordBoost = await getWordBoostAliases(admin, project_id);
 
     const { transcriptId } = await submitTranscription({
       audioUrl: audio_url,
@@ -90,6 +137,7 @@ export async function POST(request: NextRequest) {
       webhookSecret: process.env.WEBHOOK_SECRET!,
       languageCode: language,
       speakersExpected: expectedSpeakers,
+      wordBoost,
     });
 
     // Update with AssemblyAI ID

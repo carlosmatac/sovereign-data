@@ -327,6 +327,9 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          project_id: string | null;
+          canonical_entity_id: string | null;
+          normalized_name: string;
           type: EntityType;
           description: string | null;
           metadata: Record<string, unknown>;
@@ -336,6 +339,9 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          project_id?: string | null;
+          canonical_entity_id?: string | null;
+          normalized_name?: string;
           type: EntityType;
           description?: string | null;
           metadata?: Record<string, unknown>;
@@ -345,13 +351,82 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          project_id?: string | null;
+          canonical_entity_id?: string | null;
+          normalized_name?: string;
           type?: EntityType;
           description?: string | null;
           metadata?: Record<string, unknown>;
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "entities_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "entities_canonical_entity_id_fkey";
+            columns: ["canonical_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      entity_aliases: {
+        Row: {
+          id: string;
+          entity_id: string;
+          alias: string;
+          alias_normalized: string;
+          source: string | null;
+          confidence: number;
+          project_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_id: string;
+          alias: string;
+          alias_normalized: string;
+          source?: string | null;
+          confidence?: number;
+          project_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_id?: string;
+          alias?: string;
+          alias_normalized?: string;
+          source?: string | null;
+          confidence?: number;
+          project_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "entity_aliases_entity_id_fkey";
+            columns: ["entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "entity_aliases_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       entity_mentions: {
         Row: {
@@ -628,6 +703,7 @@ export type ProjectMember = Tables<"project_members">;
 export type Interview = Tables<"interviews">;
 export type InterviewChunk = Tables<"interview_chunks">;
 export type Entity = Tables<"entities">;
+export type EntityAlias = Tables<"entity_aliases">;
 export type EntityMention = Tables<"entity_mentions">;
 export type EntityRelationship = Tables<"entity_relationships">;
 export type ContentSnippet = Tables<"content_snippets">;
