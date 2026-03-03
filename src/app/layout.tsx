@@ -22,10 +22,10 @@ export const metadata: Metadata = {
     "Transform exclusive interviews into actionable business intelligence for emerging markets.",
   icons: {
     icon: [
-      { url: "/logo-white.jpg", type: "image/jpeg" },
+      { url: "/Logo.png", type: "image/jpeg" },
     ],
     apple: [
-      { url: "/logo-white.jpg", type: "image/jpeg" },
+      { url: "/Logo.png.jpg", type: "image/jpeg" },
     ],
   },
 };

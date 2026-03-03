@@ -49,7 +49,7 @@ const navItems = [
     icon: FolderKanban,
   },
   {
-    title: "Interviews",
+    title: "All Interviews (Search)",
     href: "/interviews",
     icon: Mic,
   },
@@ -112,7 +112,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarMenuItem>
             <Link href="/projects" className="flex items-center px-2 py-3">
               <Image
-                src="/logo-long-transparent.png"
+                src="/apaisado_con_logo.png"
                 alt="Sovereign Data — Intelligence Platform"
                 width={900}
                 height={200}
