@@ -2,127 +2,108 @@
 
 **Frontier Markets Intelligence Platform** — Transform exclusive interviews with decision-makers into a searchable, AI-powered business intelligence database.
 
-## Architecture
+---
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  FRONTEND (Next.js 15 / Vercel)                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ Projects  │  │Interviews│  │  Search   │  │   Settings    │  │
-│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘  │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────────┐
-│  API LAYER                                                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐  │
-│  │ /api/interviews  │  │ /api/webhooks/* │  │  /api/search   │  │
-│  └─────────────────┘  └─────────────────┘  └────────────────┘  │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────────┐
-│  AI PIPELINE                                                     │
-│  ┌────────────┐  ┌────────────┐  ┌──────────┐  ┌───────────┐  │
-│  │ AssemblyAI │→ │ GPT-4o-mini│→ │ Chunking │→ │ Embeddings│  │
-│  │ Universal-2│  │ Extraction │  │ Speaker  │  │ OAI Small │  │
-│  └────────────┘  └────────────┘  └──────────┘  └───────────┘  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Agentic RAG: hybrid_search + Tavily web search (tool use) │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────────┐
-│  SUPABASE                                                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ Auth     │  │ Postgres │  │ pgvector │  │   Storage     │  │
-│  │ MagicLink│  │ + RLS    │  │ HNSW     │  │   (Audio)     │  │
-│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+## What Is Sovereign?
+
+Sovereign is an internal intelligence engine for media/consulting firms operating in emerging markets. It ingests 60–90 minute audio interviews with Ministers, CEOs, and Diplomats, then extracts entities, relationships, sentiment, and topics — building a queryable knowledge graph with an AI-powered chat interface.
+
+### Core Capabilities
+
+- **Audio Ingestion Pipeline** — Upload → AssemblyAI transcription → GPT-4o-mini extraction → pgvector embeddings
+- **Agentic RAG Chat** — Conversational intelligence with tool calling (entity lookup, relationship traversal, Tavily web search)
+- **Knowledge Graph** — Cross-project entity relationships with confidence scores and evidence provenance
+- **AI Report Generator** — 5 templates powered by GPT-4o streaming, with PDF export and password-protected sharing
+- **Team Management** — Role-based access (owner/editor/viewer) with email invitations
+- **Sales War Room** — Project-level revenue tracking and pipeline health (CRM-ready)
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Frontend | Next.js 15, Tailwind CSS, Shadcn/ui | App Router, RSC, modern UI |
-| Auth | Supabase Auth | Magic Links (token_hash flow) |
-| Database | PostgreSQL 16 + pgvector | Relational data + vector search |
-| Storage | Supabase Storage | Audio file hosting (S3 wrapper) |
-| Transcription | AssemblyAI Universal-2 | Speaker diarization, accented speech |
-| Extraction | OpenAI GPT-4o-mini | Structured intelligence extraction |
-| Embeddings | OpenAI text-embedding-3-small | 1536-dim vectors for RAG |
-| Search | Hybrid (SQL + HNSW) | Pre-filtered semantic search |
-| Web Search | Tavily Search API | Real-time web intelligence for Agentic RAG |
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS v4, Shadcn/ui |
+| Auth | Supabase Auth (Magic Links via `token_hash` flow) |
+| Database | PostgreSQL 16 + pgvector (HNSW), Supabase |
+| Transcription | AssemblyAI Universal-2 (speaker diarization) |
+| AI Extraction | OpenAI GPT-4o-mini (Vercel AI SDK v6) |
+| Embeddings | OpenAI `text-embedding-3-small` (1536 dimensions) |
+| Web Search | Tavily Search API (optional) |
+| PDF Export | `@react-pdf/renderer` |
 
 ## Getting Started
 
-See [SETUP.md](./SETUP.md) for the complete setup guide, including external service configuration and known issues.
-
-### Quick Start
+See [SETUP.md](./SETUP.md) for the complete setup guide.
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy environment variables
 cp .env.local.example .env.local
-# → Fill in your Supabase, AssemblyAI, and OpenAI keys
-
-# Run database migrations (see SETUP.md for details)
-# Run storage setup (see SETUP.md for details)
-
-# Start development server
+# Fill in Supabase, AssemblyAI, OpenAI, and optionally Tavily keys
 npm run dev
-
-# Reset database (wipe all data, keep schema + auth users)
-npx tsx scripts/reset-database.ts
 ```
+
+## Documentation Hub
+
+Deep technical documentation lives in the `docs/` directory. Each file is self-contained — AI agents and developers can read a specific file to understand a feature without needing the entire project context.
+
+### Architecture
+
+| Document | Description |
+|----------|-------------|
+| [Ingestion Pipeline](./docs/architecture/ingestion-pipeline.md) | 10-step audio upload → transcription → extraction → embedding → knowledge graph flow |
+| [Agentic RAG](./docs/architecture/agentic-rag.md) | Intelligence Chat: hybrid search, tool calling, system prompt, Tavily web search |
+
+### Infrastructure
+
+| Document | Description |
+|----------|-------------|
+| [Database Schema](./docs/infrastructure/database-schema.md) | 10 tables, multi-tenant design, RLS policies, entity canonical merges, migration history |
+| [Cost Model & FinOps](./docs/infrastructure/cost-model-finops.md) | Per-service cost breakdown, scale scenarios, optimization levers |
+
+### Features
+
+| Document | Description |
+|----------|-------------|
+| [Human-in-the-Loop](./docs/features/human-in-the-loop.md) | Entity Editor: rename vs. merge flows, alias learning, downstream effects |
+| [Report Generation](./docs/features/report-generation.md) | GPT-4o streaming reports, PDF export, password-protected sharing |
+
+### Root Files
+
+| Document | Description |
+|----------|-------------|
+| [HANDOVER.md](./HANDOVER.md) | Active handover notes, critical gotchas, Phase 4 deployment plan |
+| [ROADMAP.md](./ROADMAP.md) | Full phase history and architecture decisions |
+| [SETUP.md](./SETUP.md) | Environment setup, external service configuration |
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── (auth)/              # Login + auth callback (no sidebar)
-│   │   ├── login/           # Magic link login page
-│   │   └── auth/
-│   │       ├── callback/    # Server route: redirects to /auth/confirm
-│   │       └── confirm/     # Client page: verifies token_hash, sets session
-│   ├── (dashboard)/         # Authenticated app shell (with sidebar)
-│   │   ├── projects/        # Project list, detail (Sales War Room), create
-│   │   ├── interviews/      # Interview list, upload, detail view
-│   │   ├── search/          # Hybrid RAG intelligence search
-│   │   └── settings/        # Platform configuration
-│   └── api/
-│       ├── interviews/      # POST: create interview + trigger transcription
-│       ├── search/          # POST: hybrid RAG search
-│       └── webhooks/
-│           └── transcription/ # AssemblyAI webhook callback
-├── components/
-│   ├── dashboard/           # App sidebar
-│   ├── interviews/          # Status tracker, transcript viewer
-│   └── ui/                  # Shadcn/ui components
+│   ├── (auth)/                # Login + auth callback
+│   ├── (dashboard)/           # Authenticated app (sidebar layout)
+│   │   ├── dashboard/         # Analytics home
+│   │   ├── chat/              # Intelligence Chat (Agentic RAG)
+│   │   ├── network/           # Entity relationship explorer
+│   │   ├── projects/          # Projects + Sales War Room
+│   │   ├── interviews/        # Upload, list, detail
+│   │   ├── reports/           # Generate, view, export, share
+│   │   └── search/            # Hybrid RAG search
+│   ├── shared/                # Public shared reports (no auth)
+│   └── api/                   # Route handlers
+├── components/                # React components (Shadcn/ui + custom)
 ├── lib/
-│   ├── ai/                  # AI pipeline modules
-│   │   ├── assemblyai.ts    # Transcription submission + polling
-│   │   ├── extraction.ts    # GPT-4o-mini structured extraction
-│   │   ├── chunking.ts      # Speaker-aware semantic chunking
-│   │   ├── embeddings.ts    # OpenAI embedding generation
-│   │   └── pipeline.ts      # Full ETL orchestrator
-│   ├── supabase/            # Supabase client factories
-│   │   ├── client.ts        # Browser client (uses anon key)
-│   │   ├── server.ts        # Server Component client (cookie sessions)
-│   │   └── admin.ts         # Service role client (bypasses RLS)
-│   ├── mockHubspot.ts       # Mock CRM service (HubSpot-like deal data)
-│   └── constants.ts         # App constants, AI config, status labels
-├── types/
-│   └── database.ts          # Full typed Supabase Database interface
-└── middleware.ts             # Auth gate + session refresh
+│   ├── ai/                    # Pipeline modules (AssemblyAI, extraction, chunking, embeddings, RAG)
+│   ├── entities/              # Entity matching + normalization
+│   ├── pdf/                   # React PDF renderer
+│   ├── supabase/              # Client factories (browser, server, admin)
+│   └── constants.ts           # AI config, templates, labels
+├── types/database.ts          # Full typed Supabase Database interface
+└── middleware.ts              # Auth gate + session refresh
 
 supabase/
-├── migrations/
-│   └── 00001_initial_schema.sql  # Full schema + RLS + hybrid_search()
-├── setup-storage.sql              # Storage bucket + policies
-└── enable-realtime.sql            # Realtime publication for interviews
+├── migrations/                # 11 migration files (00001–00011)
+├── setup-storage.sql          # Storage bucket + policies
+└── enable-realtime.sql        # Realtime publication
 ```
 
 ## Security
@@ -131,7 +112,7 @@ supabase/
 - **Zero Data Retention** — AI providers configured for no training data retention
 - **GDPR compliant** — EU data residency (Frankfurt)
 - **Webhook verification** — Signed webhooks for AssemblyAI callbacks
-- **Auth via token_hash** — No PKCE cookies, works cross-browser
+- **Auth via token_hash** — Cross-browser compatible, no PKCE cookies
 
 ## License
 

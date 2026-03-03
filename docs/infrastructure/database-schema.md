@@ -1,0 +1,444 @@
+# Database Schema
+
+> Multi-tenant PostgreSQL with pgvector, RLS, and Knowledge Graph
+
+This document details Sovereign's database design: 10 tables across 11 migrations, multi-tenant isolation via `project_id`, Row Level Security with SECURITY DEFINER helpers, and the entity/alias canonical merge system.
+
+---
+
+## Extensions
+
+Defined in `supabase/migrations/00001_initial_schema.sql`:
+
+| Extension | Schema | Purpose |
+|-----------|--------|---------|
+| `vector` | `extensions` | pgvector for 1536-dim embeddings + HNSW index |
+| `uuid-ossp` | `extensions` | `uuid_generate_v4()` for primary keys |
+| `pg_trgm` | `extensions` | Trigram similarity for fuzzy entity name matching |
+
+> **Naming**: Supabase names the extension `vector`, not `pgvector`. Using `CREATE EXTENSION "pgvector"` will fail.
+
+---
+
+## Schema Overview
+
+```mermaid
+erDiagram
+    profiles ||--o{ project_members : "user_id"
+    projects ||--o{ project_members : "project_id"
+    projects ||--o{ interviews : "project_id"
+    projects ||--o{ reports : "project_id"
+    projects ||--o{ entities : "project_id (nullable)"
+    interviews ||--o{ interview_chunks : "interview_id"
+    interviews ||--o{ entity_mentions : "interview_id"
+    interviews ||--o{ entity_relationships : "interview_id"
+    interviews ||--o{ content_snippets : "interview_id"
+    entities ||--o{ entity_mentions : "entity_id"
+    entities ||--o{ entity_aliases : "entity_id"
+    entities ||--o{ entity_relationships : "source_entity_id"
+    entities ||--o{ entity_relationships : "target_entity_id"
+    entities ||--o| entities : "canonical_entity_id"
+```
+
+---
+
+## Tables
+
+### `profiles`
+
+Extends `auth.users`. Auto-created via the `handle_new_user` trigger on `auth.users`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK, references `auth.users(id)` |
+| `email` | `TEXT` | |
+| `full_name` | `TEXT` | Nullable |
+| `avatar_url` | `TEXT` | Nullable |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | Auto-updated via trigger |
+
+**Migration**: `00001`
+
+### `projects`
+
+Tenant root. All data access flows through project membership.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `name` | `TEXT` | NOT NULL |
+| `description` | `TEXT` | |
+| `country` | `TEXT` | |
+| `region` | `TEXT` | |
+| `created_by` | `UUID` | DEFAULT `auth.uid()` |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Migrations**: `00001`, `00003`
+
+### `project_members`
+
+Many-to-many join between users and projects, with role-based access.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `project_id` | `UUID` | FK → `projects`, NOT NULL |
+| `user_id` | `UUID` | FK → `profiles`, nullable (NULL while invite pending) |
+| `role` | `user_role` | `owner`, `editor`, `viewer` |
+| `invited_email` | `TEXT` | Nullable, for pending invites |
+| `created_at` | `TIMESTAMPTZ` | |
+
+**Constraint**: `check_member_or_invite` — at least one of `user_id` or `invited_email` must be set.
+
+**Trigger**: `claim_pending_invites()` — when a new profile is created, any pending invites matching the email are claimed (sets `user_id`, clears `invited_email`).
+
+**Migrations**: `00001`, `00005`
+
+### `interviews`
+
+Audio assets with full lifecycle status tracking.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `project_id` | `UUID` | FK → `projects`, NOT NULL |
+| `title` | `TEXT` | NOT NULL |
+| `audio_url` | `TEXT` | Supabase Storage public URL |
+| `status` | `interview_status` | See status enum below |
+| `assemblyai_id` | `TEXT` | AssemblyAI transcript ID |
+| `transcript_full` | `TEXT` | Raw transcript (speaker-labeled) |
+| `transcript_display` | `TEXT` | Cleaned transcript (normalized names) |
+| `speaker_map` | `JSONB` | `{ "A": "Speaker A", ... }` |
+| `audio_duration` | `REAL` | Duration in seconds |
+| `summary` | `TEXT` | GPT-4o-mini executive summary |
+| `sentiment` | `JSONB` | `{ overall, score, highlights }` |
+| `topics` | `TEXT[]` | Extracted topic labels |
+| `source_type` | `source_type` | `audio` (default) |
+| `expected_speakers` | `INTEGER` | 1–10, nullable |
+| `interviewee_name` | `TEXT` | Primary person anchor |
+| `interviewee_org` | `TEXT` | Primary organization anchor |
+| `language` | `TEXT` | |
+| `created_by` | `UUID` | DEFAULT `auth.uid()` |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Status enum** (`interview_status`):
+`PROCESSING` → `TRANSCRIBING` → `EXTRACTING` → `EMBEDDING` → `COMPLETED` | `FAILED`
+
+**Migrations**: `00001`, `00004`, `00008`, `00010`, `00011`
+
+### `interview_chunks`
+
+Vector store for RAG. Each chunk is a speaker-aware segment of an interview.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `interview_id` | `UUID` | FK → `interviews`, CASCADE delete |
+| `content` | `TEXT` | Chunk text (~500 tokens) |
+| `embedding` | `vector(1536)` | OpenAI `text-embedding-3-small` |
+| `speaker` | `TEXT` | Speaker label |
+| `start_time` | `REAL` | Timestamp in seconds |
+| `end_time` | `REAL` | Timestamp in seconds |
+| `metadata` | `JSONB` | `{ chunk_index, token_count }` |
+| `created_at` | `TIMESTAMPTZ` | |
+
+**Index**: `idx_chunks_embedding` — HNSW with `vector_cosine_ops`, `m = 16`, `ef_construction = 64`.
+
+**Migration**: `00001`
+
+### `entities`
+
+Knowledge graph nodes. Supports both project-scoped and global entities.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `name` | `TEXT` | NOT NULL |
+| `type` | `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` |
+| `description` | `TEXT` | |
+| `metadata` | `JSONB` | |
+| `project_id` | `UUID` | FK → `projects`, nullable. NULL = global entity |
+| `canonical_entity_id` | `UUID` | FK → `entities(id)`, self-reference for merges |
+| `normalized_name` | `TEXT` | Lowercased, stripped, collapsed |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Trigram index**: GIN index with `gin_trgm_ops` on `name` for fuzzy matching.
+
+**Migrations**: `00001`, `00009`
+
+### `entity_aliases`
+
+Maps alternative names to canonical entities. Used for ASR word boost and entity resolution.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `entity_id` | `UUID` | FK → `entities` |
+| `alias` | `TEXT` | NOT NULL |
+| `alias_normalized` | `TEXT` | NOT NULL |
+| `source` | `TEXT` | e.g., `user_correction`, `auto_merge` |
+| `confidence` | `REAL` | 0–1, default 0.7 |
+| `project_id` | `UUID` | Nullable. NULL = global scope |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Unique**: `(entity_id, alias_normalized, COALESCE(project_id, sentinel_uuid))`.
+
+**RLS**: Not enabled. Accessible to any authenticated user.
+
+**Migration**: `00009`
+
+### `entity_mentions`
+
+Links entities to the interviews where they were discussed.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `entity_id` | `UUID` | FK → `entities` |
+| `interview_id` | `UUID` | FK → `interviews`, CASCADE delete |
+| `sentiment` | `TEXT` | |
+| `context` | `TEXT` | Surrounding text |
+| `created_at` | `TIMESTAMPTZ` | |
+
+**Migration**: `00001`
+
+### `entity_relationships`
+
+Knowledge graph edges with typed relations, confidence, and evidence provenance.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `source_entity_id` | `UUID` | FK → `entities` |
+| `target_entity_id` | `UUID` | FK → `entities` |
+| `relation_type` | `relation_type` | See enum below |
+| `confidence` | `REAL` | 0–1 |
+| `evidence_text` | `TEXT` | Quote from transcript |
+| `interview_id` | `UUID` | FK → `interviews`, provenance |
+| `created_at` | `TIMESTAMPTZ` | |
+
+**Unique**: `(source_entity_id, target_entity_id, relation_type, interview_id)`.
+
+**Relation type enum**: `business_partner`, `competitor`, `regulator`, `critic`, `ally`, `subsidiary`, `investor`, `advisor`, `supplier`, `acquirer`.
+
+**Migration**: `00004`
+
+### `content_snippets`
+
+Auto-generated marketing assets per interview.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `interview_id` | `UUID` | FK → `interviews`, CASCADE delete |
+| `platform` | `snippet_platform` | `linkedin`, `twitter`, `newsletter`, `summary` |
+| `content` | `TEXT` | Generated text |
+| `tone` | `snippet_tone` | `professional`, `casual`, `formal` |
+| `status` | `snippet_status` | `draft` → `approved` → `published` |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Migration**: `00004`
+
+### `reports`
+
+AI-generated business intelligence reports with sharing support.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `project_id` | `UUID` | FK → `projects`, NOT NULL |
+| `title` | `TEXT` | |
+| `template` | `report_template` | See enum below |
+| `status` | `report_status` | `generating`, `completed`, `failed` |
+| `content` | `TEXT` | Markdown output from GPT-4o |
+| `summary` | `TEXT` | |
+| `interview_ids` | `UUID[]` | Source interviews used |
+| `parameters` | `JSONB` | Template-specific config |
+| `error_message` | `TEXT` | |
+| `share_token` | `TEXT` | UNIQUE, for public sharing |
+| `share_password` | `TEXT` | SHA-256 hash, nullable |
+| `created_by` | `UUID` | |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Report template enum**: `country_risk`, `sector_analysis`, `entity_profile`, `executive_briefing`, `custom`.
+
+**Migrations**: `00006`, `00007`
+
+---
+
+## Multi-Tenant Architecture
+
+### Tenant Model
+
+`projects` is the tenant root. All data is scoped to a project either directly (via `project_id` column) or transitively (via `interview_id → interviews.project_id`).
+
+```mermaid
+flowchart TD
+    P[projects] --> PM[project_members]
+    P --> I[interviews]
+    P --> R[reports]
+    P -.->|nullable| E[entities]
+    P -.->|nullable| EA[entity_aliases]
+    I --> IC[interview_chunks]
+    I --> EM[entity_mentions]
+    I --> ER[entity_relationships]
+    I --> CS[content_snippets]
+    E --> EM
+    E --> ER
+    E --> EA
+```
+
+### Scoping Rules
+
+| Table | Scope | Method |
+|-------|-------|--------|
+| `project_members` | Direct | `project_id` NOT NULL |
+| `interviews` | Direct | `project_id` NOT NULL |
+| `reports` | Direct | `project_id` NOT NULL |
+| `entities` | Hybrid | `project_id` nullable — NULL = global |
+| `entity_aliases` | Hybrid | `project_id` nullable — NULL = global |
+| `interview_chunks` | Transitive | `interview_id` → `interviews.project_id` |
+| `entity_mentions` | Transitive | `interview_id` → `interviews.project_id` |
+| `entity_relationships` | Transitive | `interview_id` → `interviews.project_id` |
+| `content_snippets` | Transitive | `interview_id` → `interviews.project_id` |
+
+### Access Control Flow
+
+1. User authenticates via Supabase Auth (Magic Link / token_hash).
+2. `project_members` defines which projects a user can access, and with what role.
+3. RLS policies on every table check membership via SECURITY DEFINER helper functions.
+4. Write operations use the admin client pattern: verify user server-side with `getUser()`, then use the service role client for mutations.
+
+---
+
+## Entity Canonical Merge System
+
+Entities support deduplication via a canonical merge pattern:
+
+```mermaid
+flowchart LR
+    A["SNEL (variant)"] -->|canonical_entity_id| C["Société Nationale d'Électricité (canonical)"]
+    B["Snel SA (variant)"] -->|canonical_entity_id| C
+    D["alias: snel"] -->|entity_id| C
+    E["alias: société nationale d'électricité"] -->|entity_id| C
+```
+
+### How It Works
+
+1. **`entities.canonical_entity_id`** — if set, this entity is a variant. The canonical entity is the target.
+2. **`entity_aliases`** — maps alternative name strings to a canonical entity. Sources include `user_correction`, `auto_merge`, and pipeline detection.
+3. **`resolveCanonicalEntityId()`** in `src/lib/entities/match.ts` follows the `canonical_entity_id` chain to find the ultimate canonical entity.
+4. **`normalizeEntityName()`** in `src/lib/entities/normalize.ts` produces a normalized form: lowercase, NFKD normalization, diacritic stripping, punctuation removal, whitespace collapse.
+
+### Auto-Merge Thresholds
+
+During ingestion (`matchOrCreateEntity`):
+
+| Similarity | Action |
+|------------|--------|
+| ≥ 0.9 | Auto-merge: reuse existing entity |
+| 0.8 – 0.9 | Create new entity, flag `needs_review` |
+| < 0.8 | Create new entity |
+
+### User Corrections
+
+When a user renames an entity via the Entity Editor:
+- **No match found** → rename in place, create alias for old name with `source: "user_correction"`.
+- **Match found** → merge: remap all mentions and relationships to the target entity, set `canonical_entity_id`, create alias.
+
+---
+
+## Row Level Security (RLS)
+
+### SECURITY DEFINER Helper Functions
+
+Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite recursion in `project_members` policies:
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `is_project_member` | `(p_project_id UUID) → BOOLEAN` | User is any role in project |
+| `is_project_owner` | `(p_project_id UUID) → BOOLEAN` | User is owner of project |
+| `is_project_editor` | `(p_project_id UUID) → BOOLEAN` | User is editor or owner |
+| `get_interview_project` | `(p_interview_id UUID) → UUID` | Returns the project_id for an interview |
+
+### Policies by Table
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|-------|--------|--------|--------|--------|
+| `profiles` | Own profile | — | Own profile | — |
+| `projects` | Member | Authenticated | Owner | Owner |
+| `project_members` | Member | Owner | Owner | Owner |
+| `interviews` | Member | Editor | Editor | — |
+| `interview_chunks` | Member (via interview) | — | — | — |
+| `entities` | Authenticated | Authenticated | Authenticated | — |
+| `entity_mentions` | Member (via interview) | Authenticated | — | — |
+| `entity_relationships` | Member (via interview) | Authenticated | Authenticated | — |
+| `content_snippets` | Member (via interview) | Authenticated | Authenticated | — |
+| `reports` | Member | Editor | Editor | Owner |
+| `entity_aliases` | **No RLS** | **No RLS** | **No RLS** | **No RLS** |
+
+### Known Gaps
+
+- **`entity_aliases`**: RLS is not enabled. The table is accessible to any authenticated user.
+- **`entities`**: No project-based filtering — any authenticated user can read/insert/update all entities, regardless of project membership. This is intentional for cross-project entity resolution but may need tightening for strict multi-tenancy.
+
+---
+
+## Enums (12 Total)
+
+| Enum | Values | Migration |
+|------|--------|-----------|
+| `interview_status` | `PROCESSING`, `TRANSCRIBING`, `EXTRACTING`, `EMBEDDING`, `COMPLETED`, `FAILED` | `00001` |
+| `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` | `00001` |
+| `user_role` | `owner`, `editor`, `viewer` | `00001` |
+| `relation_type` | `business_partner`, `competitor`, `regulator`, `critic`, `ally`, `subsidiary`, `investor`, `advisor`, `supplier`, `acquirer` | `00004` |
+| `source_type` | `audio`, `pdf`, `text` | `00004` |
+| `snippet_platform` | `linkedin`, `twitter`, `newsletter`, `summary` | `00004` |
+| `snippet_tone` | `professional`, `casual`, `formal` | `00004` |
+| `snippet_status` | `draft`, `approved`, `published` | `00004` |
+| `report_status` | `generating`, `completed`, `failed` | `00006` |
+| `report_template` | `country_risk`, `sector_analysis`, `entity_profile`, `executive_briefing`, `custom` | `00006` |
+
+---
+
+## Migration History
+
+| Migration | Description |
+|-----------|-------------|
+| `00001_initial_schema.sql` | Core tables, RLS, HNSW index, `hybrid_search()` function, triggers |
+| `00002_fix_rls_recursion.sql` | SECURITY DEFINER helpers, recreated RLS policies |
+| `00003_fix_created_by_default.sql` | `DEFAULT auth.uid()` on `projects` and `interviews` |
+| `00004_graph_and_content.sql` | `entity_relationships`, `content_snippets`, `source_type`, new enums |
+| `00005_team_invitation_support.sql` | `invited_email`, nullable `user_id`, `claim_pending_invites` trigger |
+| `00006_reports.sql` | `reports` table, `report_status` and `report_template` enums |
+| `00007_report_sharing.sql` | `share_token`, `share_password` on `reports` |
+| `00008_expected_speakers.sql` | `interviews.expected_speakers` |
+| `00009_entity_normalization.sql` | `entities.project_id`, `canonical_entity_id`, `normalized_name`, `entity_aliases` table, trigram indexes |
+| `00010_interview_primary_entities.sql` | `interviews.interviewee_name`, `interviews.interviewee_org` |
+| `00011_transcript_display.sql` | `interviews.transcript_display` |
+
+---
+
+## TypeScript Types
+
+**File**: `src/types/database.ts`
+
+Provides a full `Database` interface with `Tables`, `Views`, `Functions`, and `Enums` types. Convenience aliases:
+
+```typescript
+type Tables<T> = Database["public"]["Tables"][T]["Row"];
+type InsertTables<T> = Database["public"]["Tables"][T]["Insert"];
+
+type Profile = Tables<"profiles">;
+type Project = Tables<"projects">;
+type Interview = Tables<"interviews">;
+// ... etc.
+```
+
+JSON sub-types: `SpeakerMap`, `SentimentData`, `ChunkMetadata`.
