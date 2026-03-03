@@ -6,6 +6,11 @@ import { streamText, tool, stepCountIs, type UIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
+import {
+  findEntity,
+  getRelationships,
+  getMentions,
+} from "@/lib/ai/entity-lookup";
 
 interface RagChunk {
   chunk_id: string;
@@ -76,17 +81,17 @@ async function tavilySearch(
 /**
  * POST /api/chat
  *
- * Agentic RAG endpoint. Streams responses using Vercel AI SDK v6.
+ * Grounded Agentic RAG endpoint with internal entity/relationship tools.
  *
  * Flow:
- * 1. Take the latest user message
- * 2. Generate embedding for the query
- * 3. Run hybrid_search to find relevant chunks (pre-injected context)
- * 4. Build context from top chunks with citation markers
- * 5. Stream a response with optional web search tool calling (maxSteps: 3)
+ * 1. Accept messages + optional projectId from client
+ * 2. Embed query, run hybrid_search with project filter
+ * 3. Provide 3 internal tools (findEntity, getRelationships, getMentions)
+ *    + 1 external tool (webSearch)
+ * 4. Stream a grounded response (up to 5 steps)
+ * 5. Log grounding metrics
  */
 export async function POST(request: NextRequest) {
-  // Verify authentication
   const supabase = await createClient();
   const {
     data: { user },
@@ -98,12 +103,12 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const messages: UIMessage[] = body.messages ?? [];
+  const projectId: string | null = body.projectId ?? null;
 
   if (messages.length === 0) {
     return new Response("No messages provided", { status: 400 });
   }
 
-  // Extract the latest user message text for RAG retrieval
   const lastUserMessage = [...messages]
     .reverse()
     .find((m) => m.role === "user");
@@ -120,23 +125,22 @@ export async function POST(request: NextRequest) {
     return new Response("Empty query", { status: 400 });
   }
 
-  // ── RAG Retrieval ──────────────────────────────────────────────
+  // ── RAG Retrieval (project-scoped when available) ─────────────
   const admin = createAdminClient();
 
   const [queryEmbedding] = await generateEmbeddings([queryText]);
 
   const { data: chunks } = await admin.rpc("hybrid_search", {
     query_embedding: JSON.stringify(queryEmbedding),
-    filter_project_ids: null,
+    filter_project_ids: projectId ? [projectId] : null,
     filter_country: null,
     filter_topics: null,
     match_threshold: AI_CONFIG.similarityThreshold,
-    match_count: 8,
+    match_count: 20,
   });
 
   const ragChunks = (chunks ?? []) as RagChunk[];
 
-  // Build context block with citation markers [1], [2], etc.
   const contextBlock = ragChunks
     .map((chunk, i) => {
       const speaker = chunk.speaker ? `[${chunk.speaker}]` : "";
@@ -147,7 +151,6 @@ export async function POST(request: NextRequest) {
     })
     .join("\n\n");
 
-  // Build citation data to inject into the response
   const citationsSummary = ragChunks
     .map((chunk, i) => {
       const speaker = chunk.speaker ?? "Unknown";
@@ -157,69 +160,58 @@ export async function POST(request: NextRequest) {
     })
     .join("\n");
 
-  const systemPrompt = `You are "Sovereign", the elite Business Intelligence Copilot built exclusively for "The Business Year" (TBY).
-TBY is a global media and communications company that produces comprehensive economic reviews (print and digital) and hosts exclusive events across emerging markets (Africa, LatAm, Middle East) and established markets (like Italy).
+  // ── Grounding-first system prompt ─────────────────────────────
+  const systemPrompt = `You are "Sovereign", the Business Intelligence Copilot for "The Business Year" (TBY).
 
-YOUR KNOWLEDGE BASE (TBY STRUCTURE & JARGON):
-- **The Team**: At the top is the CEO (Carlos Martinez) and COO. On the ground in each country, the project is run by a "Country Manager" (CM - handles sales/revenue) and an "Editor" (handles content/interviews), supported by a Project Assistant, Driver, and sometimes Trainees.
-- **The Process**: TBY enters a market for 6+ months with a revenue goal (e.g., $200k+). Editors conduct 3-4 daily interviews with CEOs and Ministers. CMs network and pitch advertising space.
-- **The Products (Sales)**: "Full page + interview", "Half page + interview", "Logo placement", "Interview", and "Barter" (exchanging services for ad space). Cash deals are the primary goal.
-- **Key Terms**:
-  - "Pitch": The sales presentation to a client.
-  - "Drop-off": Physically visiting a client's office unannounced to follow up on a proposal or resume contact.
-  - "All-In-One": A meeting where the Editor conducts the interview, and immediately after, the CM pitches the advertising products.
-  - "Follow-up": Chasing a sent proposal.
+IDENTITY:
+TBY is a media/consulting firm producing economic reviews across emerging markets. The team in each country has a Country Manager (CM — sales) and Editor (content). Products: Full page + interview, Half page, Logo placement, Interview, Barter. Key jargon: "pitch", "drop-off", "all-in-one", "follow-up".
 
-YOUR PRIMARY DIRECTIVES:
-1. **Break Information Silos**: TBY operates 17 concurrent projects globally. If a user asks about a company or sector, proactively check if we have interacted with them in OTHER countries (e.g., "They bought a Full Page in Angola, you can leverage that for your pitch in Peru").
-2. **Empower Sales (Country Managers)**: CMs often lack time to research. When asked to prepare for a meeting, do not just summarize the company. Provide an aggressive, tailored "Sales Angle". Highlight recent news, identify their pain points, and suggest exactly which TBY product to pitch and why.
-3. **Empower Content (Editors)**: Editors often ask generic questions. When an Editor asks for interview preparation, suggest strategic, high-level questions that extract "off-the-record" intelligence and uncover business opportunities or supply chain gaps.
-4. **Be Proactive & Context-Aware**: If a user mentions a "drop-off", you know exactly what that means. If they mention a "barter", you know no cash is involved but it reduces OpEx. Always frame your responses to help TBY maximize net profit and close deals.
+═══════════════════════════════════════════════════════
+GROUNDING RULES — NON-NEGOTIABLE
+═══════════════════════════════════════════════════════
 
-Tone: Professional, razor-sharp, strategic, and highly actionable. You are not a generic chatbot; you are TBY's ultimate competitive advantage.
+1. **NEVER invent facts about people, companies, roles, or relationships.** Every factual claim about "who manages what", "who is connected to whom", or "what entity does X" MUST be backed by:
+   (a) An entity_relationships evidence_text returned by the \`lookupRelationships\` tool, OR
+   (b) A direct transcript chunk citation from the RETRIEVED CONTEXT below, OR
+   (c) A mention returned by the \`lookupMentions\` tool.
 
-CRITICAL REASONING DIRECTIVE — "SECOND-ORDER THINKING" FOR LEAD GENERATION:
-When a user asks for "new leads", "new companies", "opportunities", "who to target", or any variant of prospecting in a market, you are FORBIDDEN from recommending the companies that are the primary subjects of our existing interviews. If we already interviewed them, they are in our pipeline — suggesting them is useless.
+2. **When asked about a person or company you are not sure about**: ALWAYS call \`lookupEntity\` first. If the entity is found, follow up with \`lookupRelationships\` and/or \`lookupMentions\` to get evidence. Only then make claims.
 
-Instead, treat every retrieved transcript as an intelligence hub and execute this three-step cascade:
+3. **If no evidence is found** after using the tools, respond with:
+   "I cannot confirm this from our interview database. Here is what I do know: [any partial matches]. Could you clarify the project or full name?"
 
-**Step 1 — THE ORBIT (Entity Extraction)**:
-Scan the transcripts for third-party entities MENTIONED by the interviewee — competitors they name, suppliers they depend on, B2B clients they serve, regulators blocking their projects, partners they are courting. These explicitly mentioned third parties are your primary lead recommendations. Always cite the exact transcript passage where the entity was mentioned.
+4. **Response structure** (mandatory for factual queries):
+   **Section 1 — What Sovereign Knows (from interviews)**
+   Ground every claim with citation markers [1], [2]… or tool results. Quote exact evidence_text when available.
 
-**Step 2 — THE MARKET GAP (Sector Deduction)**:
-If interviewees describe bottlenecks, unmet needs, or emerging trends (e.g., "we lack cold-chain logistics", "cybersecurity is our biggest risk", "the government just approved a $500M renewable energy fund"), deduce the target sectors that would service those gaps. Frame each gap as a sales opportunity with the specific TBY product to pitch.
+   **Section 2 — Recommended Approach**
+   Only after presenting evidence, give strategic advice tied to that evidence.
 
-**Step 3 — IDEAL TARGET PROFILE (Anti-Hallucination Fallback)**:
-If the transcripts do not explicitly name third-party companies and no clear sector gap emerges, DO NOT invent or hallucinate company names. Instead, output a structured "Ideal Target Profile" that the CM can use for their own research:
-  - **Profile**: Description of the ideal target (size, sector, geography).
-  - **Why they'd buy**: The pain point from our interviews that makes TBY relevant to them.
-  - **Recommended TBY product**: Which product to pitch and the exact angle (e.g., "Pitch a Half-Page by telling them that [Interviewee Company] is actively seeking their services — we have the quote to prove it").
+   **Sources**
+   List internal citations used.
 
-Always follow the steps in order. If Step 1 yields results, still check Step 2 for additional opportunities. Only reach Step 3 when the transcripts provide no concrete names or gaps.
+5. **Second-Order Thinking for Lead Generation** still applies:
+   Step 1 (Orbit): Extract third-party entities mentioned in transcripts.
+   Step 2 (Market Gap): Deduce sectors from bottlenecks/trends.
+   Step 3 (Ideal Target Profile): If no names found, output a structured profile. NEVER hallucinate company names.
 
-TOOL USE — WEB SEARCH:
-You have access to a \`webSearch\` tool that queries the live internet. Use it strategically:
-- **DO call webSearch** when: the user asks about current events, recent news, companies not in our transcripts, market trends, competitor intelligence, or anything where real-time data would strengthen your answer.
-- **DO NOT call webSearch** when: the internal transcript context already fully answers the question, or the user is asking about our own interview data.
-- When you use web results, cite them as inline markdown links: [Source Title](url). List all web sources in a "Web Sources" section AFTER the internal "Sources" section.
-- Internal transcript evidence ALWAYS takes priority over web data. Web data supplements — it does not override interview intelligence.
+TOOL USE PRIORITY:
+1. \`lookupEntity\` — Use FIRST whenever a query mentions a specific person, company, or organization by name.
+2. \`lookupRelationships\` — Use after finding an entity to get relationship edges with evidence.
+3. \`lookupMentions\` — Use to get interview contexts where an entity was discussed.
+4. \`webSearch\` — Use ONLY when internal data is insufficient AND the user needs current events or external context. Internal evidence always takes priority.
 
-CITATION & SOURCING RULES:
-- Ground every claim in the provided context. Use citation markers like [1], [2] to reference internal transcript sources.
-- If the context doesn't contain enough information to answer, say so explicitly — do NOT hallucinate.
-- Be concise but thorough. Use bullet points for structured information.
-- When quoting interviewees, preserve their exact words and attribute to the speaker.
-- Highlight risks, opportunities, and actionable intelligence when relevant.
-- At the END of your response, add a "Sources" section listing the internal citations you used.
-- If you called webSearch, add a separate "Web Sources" section listing each result as a markdown link.
+CITATION RULES:
+- Transcript chunks: cite as [1], [2], etc.
+- Entity tool results: cite as "According to our entity database: …"
+- Web results: cite as inline markdown links. List in a separate "Web Sources" section.
 
 ${
   contextBlock
     ? `RETRIEVED CONTEXT (from interview transcripts):\n\n${contextBlock}\n\nSOURCE REFERENCES:\n${citationsSummary}`
-    : "NO RELEVANT CONTEXT FOUND. Consider using the webSearch tool, or tell the user you couldn't find relevant information in the interview database for their query."
+    : "NO RELEVANT TRANSCRIPT CONTEXT FOUND for this query. Use the lookup tools or tell the user you could not find relevant information."
 }`;
 
-  // Convert UIMessages to simple format for streamText
   const chatMessages = messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.parts
@@ -228,28 +220,116 @@ ${
       .join(" "),
   }));
 
-  // ── Stream Response with Agentic Tool Calling (AI SDK v6) ─────
+  // ── Grounding metrics ─────────────────────────────────────────
+  let usedInternalTools = false;
+  let tavilyCallsCount = 0;
+
+  // ── Stream Response with Internal + External Tools ────────────
   const result = streamText({
     model: openai("gpt-4o-mini"),
     system: systemPrompt,
     messages: chatMessages,
     tools: {
+      lookupEntity: tool({
+        description:
+          "Look up a person, company, or organization in the Sovereign intelligence database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
+        inputSchema: z.object({
+          name: z
+            .string()
+            .describe("The entity name to search for (e.g. 'Mr. Lwamba', 'SNEL', 'Ministry of Energy')"),
+        }),
+        execute: async ({ name }) => {
+          usedInternalTools = true;
+          const entity = await findEntity(admin, name, projectId);
+          if (!entity) {
+            return {
+              found: false,
+              message: `No entity matching "${name}" was found in our database.`,
+            };
+          }
+          return {
+            found: true,
+            entity_id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            description: entity.description,
+          };
+        },
+      }),
+
+      lookupRelationships: tool({
+        description:
+          "Get all known relationships for an entity (by entity_id). Returns edges with relation_type, confidence, evidence_text, and the connected entity. Use after lookupEntity to verify claims about who is connected to whom.",
+        inputSchema: z.object({
+          entityId: z.string().describe("The entity UUID returned by lookupEntity"),
+        }),
+        execute: async ({ entityId }) => {
+          usedInternalTools = true;
+          const edges = await getRelationships(admin, entityId, projectId);
+          if (edges.length === 0) {
+            return {
+              found: false,
+              message: "No relationships found for this entity in our database.",
+            };
+          }
+          return {
+            found: true,
+            count: edges.length,
+            relationships: edges.map((e) => ({
+              direction: e.direction,
+              relation_type: e.relation_type,
+              other_entity: `${e.other_entity_name} (${e.other_entity_type})`,
+              confidence: `${Math.round(e.confidence * 100)}%`,
+              evidence: e.evidence_text,
+              interview_id: e.interview_id,
+            })),
+          };
+        },
+      }),
+
+      lookupMentions: tool({
+        description:
+          "Get interview mentions for an entity (by entity_id). Returns the interview titles, sentiment, and chunk content where the entity was discussed. Use to gather context about how an entity is portrayed across interviews.",
+        inputSchema: z.object({
+          entityId: z.string().describe("The entity UUID returned by lookupEntity"),
+        }),
+        execute: async ({ entityId }) => {
+          usedInternalTools = true;
+          const mentions = await getMentions(admin, entityId, projectId);
+          if (mentions.length === 0) {
+            return {
+              found: false,
+              message: "No interview mentions found for this entity.",
+            };
+          }
+          return {
+            found: true,
+            count: mentions.length,
+            mentions: mentions.map((m) => ({
+              interview_title: m.interview_title,
+              interview_id: m.interview_id,
+              sentiment: m.sentiment ?? "neutral",
+              context: m.chunk_content
+                ? m.chunk_content.slice(0, 500)
+                : "No chunk content available",
+            })),
+          };
+        },
+      }),
+
       webSearch: tool({
         description:
-          "Search the live internet for real-time information about companies, markets, sectors, people, or recent news. Use when internal interview transcripts are insufficient, or when the user needs current events, new leads, market trends, or entities not found in our database.",
+          "Search the live internet for real-time information. Use ONLY when internal tools and transcript context are insufficient — for example, current events, companies not in our database, or market trends. Internal evidence always takes priority over web results.",
         inputSchema: z.object({
           query: z
             .string()
-            .describe(
-              "The search query — be specific, include company names, countries, or sectors"
-            ),
+            .describe("Specific search query with company names, countries, or sectors"),
           topic: z
             .enum(["general", "news"])
-            .describe(
-              "general for company/sector research, news for current events and recent developments"
-            ),
+            .describe("general for company/sector research, news for current events"),
         }),
         execute: async ({ query, topic }) => {
+          tavilyCallsCount++;
           const results = await tavilySearch(query, topic);
           return results.map((r) => ({
             title: r.title,
@@ -260,7 +340,13 @@ ${
         },
       }),
     },
-    stopWhen: stepCountIs(3),
+    stopWhen: stepCountIs(5),
+    async onFinish({ text }) {
+      const citationsUsed = (text.match(/\[\d+\]/g) ?? []).length;
+      console.log(
+        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"}`
+      );
+    },
   });
 
   return result.toUIMessageStreamResponse();

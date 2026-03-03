@@ -1,7 +1,9 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useState, useRef, useEffect } from "react";
+import { DefaultChatTransport } from "ai";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,8 +29,19 @@ import ReactMarkdown from "react-markdown";
 export default function ChatPage() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("project");
 
-  const { messages, sendMessage, status, error } = useChat();
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: projectId ? { projectId } : undefined,
+      }),
+    [projectId]
+  );
+
+  const { messages, sendMessage, status, error } = useChat({ transport });
 
   const isLoading = status === "submitted" || status === "streaming";
 
