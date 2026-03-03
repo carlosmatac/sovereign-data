@@ -7,7 +7,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Mic, Clock } from "lucide-react";
+import { Plus, Mic, Clock, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
@@ -59,19 +59,28 @@ export default async function InterviewsPage({
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Interviews</h1>
+          <h1 className="text-3xl font-bold tracking-tight">All Interviews</h1>
           <p className="mt-1 text-muted-foreground">
-            Audio interviews being processed through the intelligence pipeline.
+            Cross-project interview index. For day-to-day workflow, start in Projects
+            and manage interviews in project context.
           </p>
         </div>
-        {canUpload && (
-          <Button asChild>
-            <Link href="/interviews/upload">
-              <Plus className="mr-2 h-4 w-4" />
-              Upload Interview
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/projects">
+              <FolderKanban className="mr-2 h-4 w-4" />
+              View Projects
             </Link>
           </Button>
-        )}
+          {canUpload && (
+            <Button asChild>
+              <Link href="/interviews/upload">
+                <Plus className="mr-2 h-4 w-4" />
+                Upload Interview
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Interview List */}

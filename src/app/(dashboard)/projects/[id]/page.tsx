@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
+import { ProjectInterviewsSection } from "@/components/projects/project-interviews-section";
 import { SalesWarRoom } from "./war-room";
 
 interface Props {
@@ -46,12 +47,12 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   if (!project) notFound();
 
-  // Fetch counts
-  const [interviewRes, memberRes] = await Promise.all([
+  const [interviewsRes, memberRes] = await Promise.all([
     admin
       .from("interviews")
-      .select("id", { count: "exact", head: true })
-      .eq("project_id", projectId),
+      .select("id, title, status, audio_duration, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false }),
     admin
       .from("project_members")
       .select("id", { count: "exact", head: true })
@@ -59,7 +60,8 @@ export default async function ProjectDetailPage({ params }: Props) {
       .not("user_id", "is", null),
   ]);
 
-  const interviewCount = interviewRes.count ?? 0;
+  const interviews = interviewsRes.data ?? [];
+  const interviewCount = interviews.length;
   const memberCount = memberRes.count ?? 0;
   const canEdit = role === "owner" || role === "editor";
 
@@ -123,11 +125,16 @@ export default async function ProjectDetailPage({ params }: Props) {
       {/* Two-column layout: War Room (left) + Project Ops (right) */}
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* ── Sales War Room ─────────────────────────────────────── */}
-        <section>
+        <section className="space-y-6">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">
             Sales War Room
           </h2>
           <SalesWarRoom projectId={projectId} />
+          <ProjectInterviewsSection
+            interviews={interviews}
+            projectId={projectId}
+            canEdit={canEdit}
+          />
         </section>
 
         {/* ── Project Ops (sidebar) ──────────────────────────────── */}
