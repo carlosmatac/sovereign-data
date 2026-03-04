@@ -8,10 +8,10 @@ import { Plus, FileText, Calendar, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { REPORT_TEMPLATES } from "@/lib/constants";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof FileText }> = {
-  generating: { label: "Generating", color: "bg-yellow-100 text-yellow-800", icon: Loader2 },
-  completed: { label: "Completed", color: "bg-green-100 text-green-800", icon: FileText },
-  failed: { label: "Failed", color: "bg-red-100 text-red-800", icon: AlertTriangle },
+const STATUS_CONFIG: Record<string, { label: string; variant: "warning" | "success" | "destructive-soft"; icon: typeof FileText }> = {
+  generating: { label: "Generating", variant: "warning", icon: Loader2 },
+  completed: { label: "Completed", variant: "success", icon: FileText },
+  failed: { label: "Failed", variant: "destructive-soft", icon: AlertTriangle },
 };
 
 export default async function ReportsPage() {
@@ -115,7 +115,7 @@ export default async function ReportsPage() {
                         <Calendar className="h-3.5 w-3.5" />
                         {new Date(report.created_at).toLocaleDateString()}
                       </span>
-                      <Badge className={statusInfo.color}>
+                      <Badge variant={statusInfo.variant}>
                         {statusInfo.label}
                       </Badge>
                     </div>

@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, FolderKanban, MapPin } from "lucide-react";
 import Link from "next/link";
+import { IconWrapper } from "@/components/ui/icon-wrapper";
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
@@ -47,9 +48,9 @@ export default async function ProjectsPage() {
       ) : !projects || projects.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <FolderKanban className="h-7 w-7 text-muted-foreground" />
-            </div>
+            <IconWrapper color="blue" size="lg" className="mb-4">
+              <FolderKanban className="h-7 w-7" />
+            </IconWrapper>
             <h3 className="font-semibold">No projects yet</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Create your first project to start ingesting interviews.

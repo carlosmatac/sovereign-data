@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUS_LABELS } from "@/lib/constants";
 import type { InterviewStatus } from "@/types/database";
 import { Clock, Mic, Upload } from "lucide-react";
+import { IconWrapper } from "@/components/ui/icon-wrapper";
 
 const PAGE_SIZE = 30;
 
@@ -105,7 +106,7 @@ export function ProjectInterviewsSection({
             {visibleInterviews.map((interview) => {
               const statusInfo = STATUS_LABELS[interview.status] ?? {
                 label: interview.status,
-                color: "bg-gray-100 text-gray-800",
+                variant: "secondary" as const,
               };
 
               return (
@@ -118,9 +119,9 @@ export function ProjectInterviewsSection({
                       href={`/interviews/${interview.id}`}
                       className="flex min-w-0 flex-1 items-center gap-4"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Mic className="h-5 w-5 text-muted-foreground" />
-                      </div>
+                      <IconWrapper color="indigo" size="md">
+                        <Mic className="h-5 w-5" />
+                      </IconWrapper>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{interview.title}</p>
                         <p className="text-sm text-muted-foreground">
@@ -132,7 +133,7 @@ export function ProjectInterviewsSection({
                           <Clock className="h-3.5 w-3.5" />
                           {formatDuration(interview.audio_duration)}
                         </span>
-                        <Badge variant="secondary" className={statusInfo.color}>
+                        <Badge variant={statusInfo.variant}>
                           {statusInfo.label}
                         </Badge>
                       </div>

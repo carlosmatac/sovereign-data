@@ -5,15 +5,18 @@
 export const APP_NAME = "Sovereign Data";
 export const APP_DESCRIPTION = "Frontier Markets Intelligence Platform";
 
-// Interview processing statuses with UI labels
-export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  UPLOADING: { label: "Uploading", color: "bg-blue-100 text-blue-800" },
-  PROCESSING: { label: "Processing", color: "bg-yellow-100 text-yellow-800" },
-  TRANSCRIBING: { label: "Transcribing", color: "bg-purple-100 text-purple-800" },
-  EXTRACTING: { label: "Extracting Intel", color: "bg-orange-100 text-orange-800" },
-  EMBEDDING: { label: "Indexing", color: "bg-indigo-100 text-indigo-800" },
-  COMPLETED: { label: "Ready", color: "bg-green-100 text-green-800" },
-  FAILED: { label: "Failed", color: "bg-red-100 text-red-800" },
+// Interview processing statuses with UI labels and badge variants
+export const STATUS_LABELS: Record<
+  string,
+  { label: string; variant: "success" | "warning" | "destructive-soft" | "secondary" }
+> = {
+  UPLOADING: { label: "Uploading", variant: "warning" },
+  PROCESSING: { label: "Processing", variant: "warning" },
+  TRANSCRIBING: { label: "Transcribing", variant: "warning" },
+  EXTRACTING: { label: "Extracting Intel", variant: "warning" },
+  EMBEDDING: { label: "Indexing", variant: "warning" },
+  COMPLETED: { label: "Ready", variant: "success" },
+  FAILED: { label: "Failed", variant: "destructive-soft" },
 };
 
 // Regions for the Global South focus

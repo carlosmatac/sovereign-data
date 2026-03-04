@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Mic, Clock, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
+import { IconWrapper } from "@/components/ui/icon-wrapper";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 
 export default async function InterviewsPage({
@@ -93,9 +94,9 @@ export default async function InterviewsPage({
       ) : !interviews || interviews.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <Mic className="h-7 w-7 text-muted-foreground" />
-            </div>
+            <IconWrapper color="indigo" size="lg" className="mb-4">
+              <Mic className="h-7 w-7" />
+            </IconWrapper>
             <h3 className="font-semibold">No interviews yet</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Upload your first audio interview to start extracting intelligence.
@@ -115,7 +116,7 @@ export default async function InterviewsPage({
           {interviews.map((interview) => {
             const statusInfo = STATUS_LABELS[interview.status] ?? {
               label: interview.status,
-              color: "bg-gray-100 text-gray-800",
+              variant: "secondary" as const,
             };
 
             return (
@@ -125,9 +126,9 @@ export default async function InterviewsPage({
                     href={`/interviews/${interview.id}`}
                     className="flex min-w-0 flex-1 items-center gap-4"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Mic className="h-5 w-5 text-muted-foreground" />
-                    </div>
+                    <IconWrapper color="indigo" size="md">
+                      <Mic className="h-5 w-5" />
+                    </IconWrapper>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">
                         {interview.title}
@@ -147,10 +148,7 @@ export default async function InterviewsPage({
                           {formatDuration(interview.audio_duration)}
                         </span>
                       )}
-                      <Badge
-                        variant="secondary"
-                        className={statusInfo.color}
-                      >
+                      <Badge variant={statusInfo.variant}>
                         {statusInfo.label}
                       </Badge>
                     </div>

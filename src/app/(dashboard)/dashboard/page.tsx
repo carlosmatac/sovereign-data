@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
+import { IconWrapper } from "@/components/ui/icon-wrapper";
 import type { InterviewStatus } from "@/types/database";
 
 export default async function DashboardPage() {
@@ -150,6 +151,7 @@ export default async function DashboardPage() {
           title="Projects"
           value={projectCount}
           icon={FolderKanban}
+          iconColor="blue"
           description="Active intelligence projects"
           href="/projects"
         />
@@ -157,6 +159,7 @@ export default async function DashboardPage() {
           title="Interviews"
           value={interviewCount}
           icon={Mic}
+          iconColor="indigo"
           description={`${completedCount} completed, ${processingCount} processing`}
           href="/interviews"
         />
@@ -164,6 +167,7 @@ export default async function DashboardPage() {
           title="Knowledge Chunks"
           value={chunkCount}
           icon={MessageSquare}
+          iconColor="emerald"
           description="Searchable transcript segments"
           href="/chat"
         />
@@ -171,6 +175,7 @@ export default async function DashboardPage() {
           title="Entities"
           value={entityCount}
           icon={Users}
+          iconColor="amber"
           description={`${relationshipCount} relationships mapped`}
           href="/network"
         />
@@ -218,7 +223,7 @@ export default async function DashboardPage() {
                     } | null;
                     const statusInfo = STATUS_LABELS[interview.status] ?? {
                       label: interview.status,
-                      color: "bg-gray-100 text-gray-800",
+                      variant: "secondary" as const,
                     };
 
                     return (
@@ -246,7 +251,7 @@ export default async function DashboardPage() {
                               </p>
                             </div>
                           </div>
-                          <Badge className={`text-[10px] ${statusInfo.color}`}>
+                          <Badge variant={statusInfo.variant} className="text-[10px]">
                             {statusInfo.label}
                           </Badge>
                         </div>
@@ -304,26 +309,38 @@ export default async function DashboardPage() {
               <div className="space-y-3">
                 <StatusRow
                   icon={
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <IconWrapper color="emerald" size="sm">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </IconWrapper>
                   }
                   label="Completed"
                   count={completedCount}
                 />
                 <StatusRow
                   icon={
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <IconWrapper color="blue" size="sm">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    </IconWrapper>
                   }
                   label="Processing"
                   count={processingCount}
                 />
                 <StatusRow
-                  icon={<XCircle className="h-4 w-4 text-red-500" />}
+                  icon={
+                    <IconWrapper color="rose" size="sm">
+                      <XCircle className="h-3.5 w-3.5" />
+                    </IconWrapper>
+                  }
                   label="Failed"
                   count={failedCount}
                 />
                 <Separator />
                 <StatusRow
-                  icon={<Mic className="h-4 w-4 text-muted-foreground" />}
+                  icon={
+                    <IconWrapper color="slate" size="sm">
+                      <Mic className="h-3.5 w-3.5" />
+                    </IconWrapper>
+                  }
                   label="Total"
                   count={interviewCount}
                   bold
@@ -431,12 +448,14 @@ function StatsCard({
   title,
   value,
   icon: Icon,
+  iconColor = "primary",
   description,
   href,
 }: {
   title: string;
   value: number;
   icon: React.ComponentType<{ className?: string }>;
+  iconColor?: "blue" | "indigo" | "emerald" | "amber" | "rose" | "purple" | "slate" | "primary";
   description: string;
   href?: string;
 }) {
@@ -446,7 +465,9 @@ function StatsCard({
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <IconWrapper color={iconColor} size="sm">
+          <Icon className="h-3.5 w-3.5" />
+        </IconWrapper>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value.toLocaleString()}</div>
@@ -485,12 +506,22 @@ function StatusRow({
 function StatusIcon({ status }: { status: InterviewStatus }) {
   switch (status) {
     case "COMPLETED":
-      return <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />;
+      return (
+        <IconWrapper color="emerald" size="sm">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        </IconWrapper>
+      );
     case "FAILED":
-      return <XCircle className="h-4 w-4 shrink-0 text-red-500" />;
+      return (
+        <IconWrapper color="rose" size="sm">
+          <XCircle className="h-3.5 w-3.5" />
+        </IconWrapper>
+      );
     default:
       return (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-600" />
+        <IconWrapper color="amber" size="sm">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        </IconWrapper>
       );
   }
 }

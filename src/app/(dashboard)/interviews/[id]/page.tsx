@@ -113,7 +113,7 @@ export default async function InterviewDetailPage({
 
   const statusInfo = STATUS_LABELS[interview.status] ?? {
     label: interview.status,
-    color: "bg-gray-100 text-gray-800",
+    variant: "secondary" as const,
   };
 
   const project = interview.projects as unknown as {
@@ -188,7 +188,7 @@ export default async function InterviewDetailPage({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
             {canEdit && (
               <DeleteInterviewButton
                 interviewId={interview.id}
