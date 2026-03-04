@@ -16,7 +16,6 @@ import {
   ArrowRight,
   Briefcase,
   Clock,
-  Globe,
   Hash,
   Link2,
   Mail,

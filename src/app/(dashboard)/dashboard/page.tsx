@@ -21,7 +21,6 @@ import {
   XCircle,
   Upload,
   ArrowRight,
-  Globe,
   MessageSquare,
   Network,
   Link2,

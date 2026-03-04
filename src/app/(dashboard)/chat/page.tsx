@@ -21,7 +21,6 @@ import {
   User,
   Sparkles,
   MessageSquare,
-  Globe,
   Shield,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -213,7 +212,9 @@ function EmptyState() {
         <div className="grid gap-2 text-left">
           {[
             {
-              icon: Globe,
+              icon: ({ className }: { className?: string }) => (
+                <img src="/SD.svg" alt="SD" className={className} />
+              ),
               text: "What are the key risks in Mozambique's energy sector?",
             },
             {

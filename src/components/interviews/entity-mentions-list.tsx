@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import {
   Building2,
   Check,
-  Globe,
   Loader2,
   MapPin,
   Pencil,
@@ -34,11 +33,15 @@ type EntityMentionsListProps = {
   canEdit: boolean;
 };
 
+const SdIcon = ({ className }: { className?: string }) => (
+  <img src="/SD.svg" alt="SD" className={className} />
+);
+
 const ENTITY_ICON_BY_TYPE: Record<string, React.ReactNode> = {
   PERSON: <User className="h-3.5 w-3.5" />,
   COMPANY: <Building2 className="h-3.5 w-3.5" />,
-  GOVERNMENT: <Globe className="h-3.5 w-3.5" />,
-  ORGANIZATION: <Globe className="h-3.5 w-3.5" />,
+  GOVERNMENT: <SdIcon className="h-3.5 w-3.5" />,
+  ORGANIZATION: <SdIcon className="h-3.5 w-3.5" />,
   LOCATION: <MapPin className="h-3.5 w-3.5" />,
   EVENT: <Clock className="h-3.5 w-3.5" />,
 };
@@ -100,7 +103,7 @@ export function EntityMentionsList({
           >
             <div className="mt-0.5 text-muted-foreground">
               {ENTITY_ICON_BY_TYPE[mention.type] ?? (
-                <Globe className="h-3.5 w-3.5" />
+                <SdIcon className="h-3.5 w-3.5" />
               )}
             </div>
             <div className="min-w-0 flex-1">

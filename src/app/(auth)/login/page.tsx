@@ -13,7 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Globe, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -51,9 +52,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="w-full max-w-md px-4">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Globe className="h-7 w-7" />
-          </div>
+          <Image src="/SD.svg" alt="Sovereign Data" width={56} height={56} className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold tracking-tight">Sovereign Data</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Frontier Markets Intelligence Platform

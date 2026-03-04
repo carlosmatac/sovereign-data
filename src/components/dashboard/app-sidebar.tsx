@@ -112,7 +112,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarMenuItem>
             <Link href="/projects" className="flex items-center px-2 py-3">
               <Image
-                src="/apaisado_con_logo.png"
+                src="/apaisado_con_logo.svg"
                 alt="Sovereign Data — Intelligence Platform"
                 width={900}
                 height={200}

@@ -16,7 +16,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowRight,
   Building2,
-  Globe,
   MapPin,
   Clock,
   User,
@@ -54,11 +53,15 @@ const entityTypeColors: Record<string, string> = {
   EVENT: "bg-amber-100 text-amber-800",
 };
 
+const SdIcon = ({ className }: { className?: string }) => (
+  <img src="/SD.svg" alt="SD" className={className} />
+);
+
 const entityTypeIcons: Record<string, React.ReactNode> = {
   PERSON: <User className="h-4 w-4" />,
   COMPANY: <Building2 className="h-4 w-4" />,
-  GOVERNMENT: <Globe className="h-4 w-4" />,
-  ORGANIZATION: <Globe className="h-4 w-4" />,
+  GOVERNMENT: <SdIcon className="h-4 w-4" />,
+  ORGANIZATION: <SdIcon className="h-4 w-4" />,
   LOCATION: <MapPin className="h-4 w-4" />,
   EVENT: <Clock className="h-4 w-4" />,
 };
