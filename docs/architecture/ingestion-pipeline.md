@@ -28,10 +28,11 @@ flowchart TD
     L --> M[extractIntelligence — GPT-4o-mini]
     M --> N[chunkTranscript — speaker-aware]
     N --> N2[Anchor-aware chunk normalization]
-    N2 --> O[generateEmbeddings — from normalized text]
+    N2 --> O[generateEmbeddings — from anchor-enriched text]
     O --> P[Persist chunks + embeddings + metadata]
     P --> Q[Match/create entities]
-    Q --> Q2[Backfill anchor entity IDs into chunk metadata]
+    Q --> Q1[Hybrid entity grounding — chunk-level mentions]
+    Q1 --> Q2[Backfill anchor entity IDs into chunk metadata]
     Q2 --> R[Persist entity relationships]
     R --> S[Generate content snippets]
     S --> T[(status: COMPLETED)]
@@ -183,20 +184,31 @@ After extraction, the summary, sentiment, and topics are saved to the interview 
 
 **File**: `src/lib/chunks/anchor-normalization.ts`
 
-After chunking, each chunk is run through anchor-aware normalization. This produces a retrieval-grade version of the chunk text that replaces likely ASR variants of the primary person and organization anchors with their canonical names.
+**Architectural rule**: Prefer anchor enrichment over speculative text replacement.
+
+After chunking, each chunk is run through anchor-aware normalization. Rather than aggressively rewriting ASR variants (which caused unsafe substitutions like "Buddha" → "Boudab"), the system now uses a two-layer approach:
+
+1. **Conservative text normalization** — only replaces deterministic derivatives of the canonical anchor name (e.g. stripping an honorific period: "Dr Mohamed" → "Dr. Mohamed"). Proximity-based variant detection has been removed from the replacement path entirely.
+
+2. **Anchor enrichment for embeddings** — builds `content_for_embedding` by appending structured anchor context to the chunk text:
+   - `Primary interviewee: <name>`
+   - `Primary institution: <org>`
+
+This ensures chunks become retrievable for anchor-related queries (e.g. searching for "Mohamed Reda Boudab" finds chunks where ASR produced "Buddha") without corrupting the evidence.
 
 | Concept | Detail |
 |---------|--------|
 | Raw evidence | Stored in `interview_chunks.content` — never mutated |
-| Normalized text | Stored in `interview_chunks.metadata.normalized_content` |
-| Embedding source | Uses `normalized_content` when available, raw `content` as fallback |
-| Confidence | `high` (both anchors + replacements), `medium` (one anchor or no replacements but anchor present), `low` (no anchors) |
+| Normalized text | Stored in `metadata.normalized_content` — only high-confidence deterministic replacements |
+| Embedding source | `metadata.content_for_embedding` — anchor-enriched text (high-confidence normalized or raw + anchor context) |
+| Confidence | `high` (both anchors present + safe replacements applied), `medium` (anchor present, no replacements), `low` (no anchors) |
 
-The normalization is conservative: it detects variants using the same proximity/role-prefix/org-marker heuristics as the transcript display normalizer, but scoped per-chunk. If `interviewee_org` is null (e.g., ministers, presidents), no org normalization is attempted — no fake values are injected.
+If `interviewee_org` is null (e.g., ministers, presidents), no org normalization is attempted and only the person anchor is appended to the embedding context.
 
 Additional metadata stored per chunk:
 - `normalization_applied` — boolean flag
 - `normalization_confidence` — `high` / `medium` / `low`
+- `content_for_embedding` — the actual text sent to the embedding model
 - `primary_person_name` / `primary_org_name` — interview-level anchors used
 - `primary_person_entity_id` / `primary_org_entity_id` — backfilled after entity matching
 
@@ -211,7 +223,7 @@ Additional metadata stored per chunk:
 | Endpoint | `https://api.openai.com/v1/embeddings` |
 | Batch limit | 2048 inputs per API call |
 
-`generateEmbeddings(texts)` takes the chunk text array and returns ordered embedding vectors. As of the anchor normalization upgrade, the input texts are the `metadata.normalized_content` values (falling back to raw `content` when normalization was not applied).
+`generateEmbeddings(texts)` takes the chunk text array and returns ordered embedding vectors. The input texts are the `metadata.content_for_embedding` values — anchor-enriched text that combines the chunk content with structured anchor context (primary interviewee and institution). This replaces the previous approach of embedding from `normalized_content`, which risked encoding unsafe ASR variant substitutions.
 
 ### Step 10: Persist Chunks + Entities + Relationships
 
@@ -219,7 +231,7 @@ Additional metadata stored per chunk:
 
 **Chunk persistence**:
 - Inserts into `interview_chunks` in batches of 50.
-- Each row includes: `content` (raw evidence), `embedding` (from normalized text), `interview_id`, `speaker`, `start_time`, `end_time`, `metadata` (country, topics, entities, plus anchor normalization fields).
+- Each row includes: `content` (raw evidence), `embedding` (from anchor-enriched text), `interview_id`, `speaker`, `start_time`, `end_time`, `metadata` (country, topics, entities, plus anchor normalization fields including `content_for_embedding`).
 
 **Entity persistence**:
 - For each extracted entity, calls `matchOrCreateEntity()` from `src/lib/entities/match.ts`.
@@ -232,9 +244,18 @@ Additional metadata stored per chunk:
 - Auto-merge threshold: similarity ≥ 0.9
 - Needs-review threshold: 0.8 ≤ similarity < 0.9
 - Below 0.8: creates a new entity
-- Inserts `entity_mentions` linking the entity to the interview with sentiment.
 
-**Relationship persistence** (lines 242–273):
+**Hybrid entity grounding** (`src/lib/entities/ground-mentions.ts`):
+- After entity matching, persisted chunks are fetched and each entity is grounded to specific chunks using a four-tier hybrid strategy:
+  1. **Exact match** — canonical entity name found in chunk text (confidence: HIGH)
+  2. **Alias match** — known alias from `entity_aliases` found in chunk (confidence: HIGH)
+  3. **Anchor context** — primary interviewee/institution inferred from contextual clues (name tokens, honorific patterns, org token overlap) even when ASR misspells the name (confidence: MEDIUM)
+  4. **Conservative fuzzy** — high-threshold trigram similarity (≥ 0.75) on capitalized word sequences (confidence: MEDIUM only if sharing a distinctive token)
+- Grounded mentions are persisted with `chunk_id` + `context` (evidence excerpt).
+- Entities that cannot be grounded to any chunk receive a fallback interview-level mention (null chunk_id).
+- A backfill endpoint (`POST /api/interviews/[id]/backfill-mentions`) can re-ground existing ungrounded mentions.
+
+**Relationship persistence**:
 - Builds an `entityIdMap` (name → UUID) from matched/created entities.
 - Upserts into `entity_relationships` with `source_entity_id`, `target_entity_id`, `relation_type`, `confidence`, `evidence_text`, `interview_id`.
 - Unique constraint on `(source_entity_id, target_entity_id, relation_type, interview_id)`.
@@ -275,7 +296,9 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Embedding generation | `src/lib/ai/embeddings.ts` |
 | Anchor-aware chunk normalization | `src/lib/chunks/anchor-normalization.ts` |
 | Entity matching | `src/lib/entities/match.ts` |
+| Hybrid entity grounding | `src/lib/entities/ground-mentions.ts` |
 | Entity normalization | `src/lib/entities/normalize.ts` |
+| Backfill mentions API | `src/app/api/interviews/[id]/backfill-mentions/route.ts` |
 | Transcript display | `src/lib/transcript/normalizeDisplay.ts` |
 | Content snippet generation | `src/lib/ai/content-generation.ts` |
 | Status tracker (UI) | `src/components/interviews/status-tracker.tsx` |

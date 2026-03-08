@@ -75,7 +75,7 @@ export default async function InterviewDetailPage({
     .eq("interview_id", id)
     .order("platform");
 
-  const entityMentions =
+  const allMentions =
     mentions
       ?.map((m) => {
         const entity = m.entities as unknown as {
@@ -97,6 +97,18 @@ export default async function InterviewDetailPage({
         };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null) ?? [];
+
+  // Deduplicate: show unique entities (not repeated mention rows)
+  const entityMentions = Array.from(
+    allMentions
+      .reduce((map, m) => {
+        if (!map.has(m.entityId)) map.set(m.entityId, m);
+        return map;
+      }, new Map<string, (typeof allMentions)[number]>())
+      .values()
+  );
+
+  const totalMentionCount = allMentions.length;
 
   // Build entity name lookup from mentions for relationship display.
   const entityNameMap: Record<string, { name: string; type: string }> = {};
@@ -387,7 +399,7 @@ export default async function InterviewDetailPage({
                     Entities Mentioned
                   </CardTitle>
                   <CardDescription>
-                    {entityMentions.length} entities identified
+                    {entityMentions.length} unique entit{entityMentions.length === 1 ? "y" : "ies"}{totalMentionCount > entityMentions.length ? ` · ${totalMentionCount} mentions` : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

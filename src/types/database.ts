@@ -75,9 +75,9 @@ export interface ChunkMetadata {
 
   // ── Anchor-aware normalization layer ──────────────────────────
   // Raw evidence lives in interview_chunks.content (never mutated).
-  // These metadata fields provide a retrieval-grade normalized view
-  // used for embedding generation and downstream intelligence.
+  // Prefer anchor enrichment over speculative text replacement.
   normalized_content?: string;
+  content_for_embedding?: string;
   normalization_applied?: boolean;
   normalization_confidence?: "high" | "medium" | "low";
   primary_person_name?: string | null;

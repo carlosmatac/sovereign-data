@@ -37,8 +37,10 @@
 
 ### What's Built
 
-- Full audio ingestion pipeline (upload → transcribe → extract → chunk → normalize → embed → graph)
-- Anchor-aware chunk normalization (retrieval-grade normalized text in metadata, raw evidence untouched)
+- Full audio ingestion pipeline (upload → transcribe → extract → resolve → chunk → normalize → embed → ground → graph)
+- Two-stage extraction: raw intelligence extraction (GPT-4o-mini) → entity resolution with anchor-aware matching, description enrichment, and confidence tracking
+- Anchor-aware chunk normalization (anchor enrichment for embeddings, conservative text replacement only at high confidence)
+- Hybrid entity grounding (exact → alias → anchor_context → fuzzy) linking entity_mentions to specific chunks with evidence context
 - Agentic RAG chat with TBY persona, Second-Order Thinking, and Tavily web search
 - Dashboard with analytics (project breakdown, topic distribution)
 - Network Explorer for entity relationships

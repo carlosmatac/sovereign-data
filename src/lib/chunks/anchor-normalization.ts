@@ -1,30 +1,31 @@
 // ============================================
 // Anchor-Aware Chunk Normalization
 // ============================================
-// Architectural decision: raw evidence vs retrieval-grade intelligence layer.
+//
+// ARCHITECTURAL RULE: Prefer anchor enrichment over speculative text replacement.
 //
 // interview_chunks.content holds the raw ASR output — the evidentiary truth.
-// This module produces a *normalized* version of that text, stored in
-// interview_chunks.metadata.normalized_content, used exclusively for:
-//   - embedding generation (better retrieval)
-//   - downstream intelligence (reports, chat grounding)
+// This module produces:
 //
-// Normalization is conservative and anchor-driven:
-//   1. Detect likely ASR variants of the primary person and org anchors.
-//   2. Replace only those variants with canonical anchor names.
-//   3. Never broadly rewrite the chunk or invent anchors.
-//   4. Record confidence so downstream consumers can decide trust level.
+//   1. normalized_content — conservative text with ONLY high-confidence,
+//      deterministic replacements (canonical anchor-name derivatives).
+//      Proximity-guessed ASR variants are NEVER substituted.
+//
+//   2. content_for_embedding — the text actually sent to the embedding model:
+//      - high-confidence normalized text OR raw chunk text
+//      - PLUS structured anchor context (primary person, primary institution)
+//
+// This design ensures:
+//   - Raw evidence remains untouched in interview_chunks.content
+//   - Embeddings benefit from canonical anchor names via appended context
+//   - No unsafe ASR variant substitutions corrupt the embedding input
+//     (e.g. "Buddha" is never forcibly rewritten to "Boudab")
+//   - Chunks become retrievable for anchor-related queries via context,
+//     not via risky text rewriting
 
 import type { ChunkMetadata } from "@/types/database";
 
-// ── Regex helpers (shared with normalizeDisplay.ts by design pattern) ──
-
 const HONORIFIC_PREFIX_RE = /^\s*(mr|mrs|ms|dr|prof)\.?\s+/i;
-const ROLE_PREFIX_RE =
-  /\b(?:mr|mrs|ms|dr|prof|minister|governor|chairman|ambassador|ceo|president|director|secretary|commissioner|comptroller)\.?\s+[A-Za-z][\p{L}'-]*(?:\s+[A-Za-z][\p{L}'-]*){0,2}/giu;
-const ORG_MARKER_RE =
-  /\b[A-Za-z][\p{L}&.'-]*(?:\s+[A-Za-z][\p{L}&.'-]*){0,3}\s+(?:ltd|inc|sa|llc|bank|ministry|authority|company|corporation|utility|operator|agency|commission|board|fund)\b/giu;
-const ACRONYM_RE = /\b[A-Z]{3,}\b/g;
 
 export interface ChunkAnchors {
   intervieweeName: string | null;
@@ -33,22 +34,24 @@ export interface ChunkAnchors {
 
 export interface NormalizedChunkResult {
   normalizedContent: string;
+  contentForEmbedding: string;
   normalizationApplied: boolean;
   confidence: "high" | "medium" | "low";
   replacementCount: number;
 }
 
 /**
- * Build retrieval-grade normalized chunk metadata from raw chunk content
- * and interview-level anchors.
+ * Build retrieval-grade normalized chunk from raw content + interview anchors.
  *
- * Returns enriched metadata to merge into the chunk's existing metadata JSONB.
- * Raw `content` column is never mutated.
+ * Prefer anchor enrichment over speculative text replacement.
+ * Only deterministic variants of the canonical anchor names are replaced
+ * (e.g. "Dr Mohamed" → "Dr. Mohamed"). Proximity-guessed ASR variants
+ * are never substituted — anchor context appended to the embedding input
+ * handles retrieval instead.
  */
 export function normalizeChunkWithAnchors(
   rawContent: string,
-  anchors: ChunkAnchors,
-  interviewTranscript: string
+  anchors: ChunkAnchors
 ): NormalizedChunkResult {
   const personAnchor = normalizeSpaces(anchors.intervieweeName ?? "");
   const orgAnchor = normalizeSpaces(anchors.intervieweeOrg ?? "");
@@ -56,17 +59,17 @@ export function normalizeChunkWithAnchors(
   if (!personAnchor && !orgAnchor) {
     return {
       normalizedContent: rawContent,
+      contentForEmbedding: rawContent,
       normalizationApplied: false,
       confidence: "low",
       replacementCount: 0,
     };
   }
 
-  const replacementPlan = buildReplacementPlan(
-    interviewTranscript,
-    personAnchor,
-    orgAnchor
-  );
+  // Only use deterministic anchor-name derivatives for text replacement.
+  // Proximity-based candidates caused unsafe substitutions (e.g. "Buddha" → "Boudab")
+  // and have been removed from the replacement path entirely.
+  const replacementPlan = buildSafeReplacementPlan(personAnchor, orgAnchor);
 
   let output = rawContent;
   let totalReplacements = 0;
@@ -86,8 +89,21 @@ export function normalizeChunkWithAnchors(
     rawContent
   );
 
+  // Prefer anchor enrichment over speculative text replacement.
+  // High-confidence: safe deterministic replacements → use normalized text as base.
+  // Otherwise: preserve raw wording and rely on anchor context for retrieval.
+  const normalizedContent =
+    confidence === "high" && totalReplacements > 0 ? output : rawContent;
+
+  const embeddingBase = normalizedContent;
+  const contentForEmbedding = buildContentForEmbedding(embeddingBase, {
+    intervieweeName: personAnchor || null,
+    intervieweeOrg: orgAnchor || null,
+  });
+
   return {
-    normalizedContent: output,
+    normalizedContent,
+    contentForEmbedding,
     normalizationApplied: totalReplacements > 0,
     confidence,
     replacementCount: totalReplacements,
@@ -105,14 +121,12 @@ export function buildNormalizedChunkMetadata(
 ): ChunkMetadata {
   return {
     ...baseMetadata,
-    // Retrieval-grade normalized text — embeddings should use this.
     normalized_content: normResult.normalizedContent,
+    content_for_embedding: normResult.contentForEmbedding,
     normalization_applied: normResult.normalizationApplied,
     normalization_confidence: normResult.confidence,
-    // Anchor provenance — which interview-level anchors were used.
     primary_person_name: anchors.intervieweeName || null,
     primary_org_name: anchors.intervieweeOrg || null,
-    // Entity IDs can be backfilled after entity matching completes.
     primary_person_entity_id: null,
     primary_org_entity_id: null,
   };
@@ -122,40 +136,57 @@ export function buildNormalizedChunkMetadata(
 
 type ReplacementEntry = { canonical: string; variants: string[] };
 
-function buildReplacementPlan(
-  transcript: string,
+/**
+ * Build replacement plan using ONLY deterministic anchor-name derivatives.
+ * No proximity-based or speculative variant detection — those caused
+ * unsafe substitutions like "Buddha" → "Boudab".
+ */
+function buildSafeReplacementPlan(
   personAnchor: string,
   orgAnchor: string
 ): ReplacementEntry[] {
   const plan: ReplacementEntry[] = [];
 
   if (personAnchor) {
-    const proximityVariants = orgAnchor
-      ? extractNameCandidatesNearOrg(transcript, orgAnchor)
-      : [];
     plan.push({
       canonical: personAnchor,
-      variants: dedupeCandidates(personAnchor, [
-        ...buildAnchorVariants(personAnchor),
-        ...proximityVariants,
-      ]),
+      variants: dedupeCandidates(
+        personAnchor,
+        buildAnchorVariants(personAnchor)
+      ),
     });
   }
 
   if (orgAnchor) {
-    const proximityVariants = personAnchor
-      ? extractOrgCandidatesNearName(transcript, personAnchor)
-      : [];
     plan.push({
       canonical: orgAnchor,
-      variants: dedupeCandidates(orgAnchor, [
-        ...buildAnchorVariants(orgAnchor),
-        ...proximityVariants,
-      ]),
+      variants: dedupeCandidates(orgAnchor, buildAnchorVariants(orgAnchor)),
     });
   }
 
   return plan;
+}
+
+/**
+ * Build anchor-enriched text for embedding generation.
+ * Appends structured anchor context so the embedding captures
+ * the primary person/institution even when the raw text uses
+ * ASR-mangled variants of their names.
+ */
+function buildContentForEmbedding(
+  baseText: string,
+  anchors: ChunkAnchors
+): string {
+  const parts = [baseText];
+
+  if (anchors.intervieweeName) {
+    parts.push(`Primary interviewee: ${anchors.intervieweeName}`);
+  }
+  if (anchors.intervieweeOrg) {
+    parts.push(`Primary institution: ${anchors.intervieweeOrg}`);
+  }
+
+  return parts.join("\n");
 }
 
 function deriveConfidence(
@@ -209,71 +240,6 @@ function buildAnchorVariants(anchor: string): string[] {
   return [...variants].filter(Boolean).sort((a, b) => b.length - a.length);
 }
 
-function findOccurrences(text: string, needle: string): number[] {
-  if (!needle) return [];
-  const escaped = escapeRegExp(needle);
-  const regex = new RegExp(
-    `(^|[^\\p{L}\\p{N}])(${escaped})(?=$|[^\\p{L}\\p{N}])`,
-    "giu"
-  );
-  const out: number[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    out.push(match.index + (match[1]?.length ?? 0));
-  }
-  return out;
-}
-
-const PROXIMITY_WINDOW = 80;
-
-function collectNearWindow(text: string, center: number): string {
-  const start = Math.max(0, center - PROXIMITY_WINDOW);
-  const end = Math.min(text.length, center + PROXIMITY_WINDOW);
-  return text.slice(start, end);
-}
-
-function extractNameCandidatesNearOrg(
-  transcript: string,
-  orgAnchor: string
-): string[] {
-  const candidates = new Set<string>();
-  const hits = findOccurrences(transcript, orgAnchor);
-
-  for (const index of hits) {
-    const window = collectNearWindow(transcript, index);
-    for (const match of window.matchAll(ROLE_PREFIX_RE)) {
-      const found = normalizeSpaces(match[0] ?? "");
-      if (found.length >= 3) candidates.add(found);
-      const noTitle = stripLeadingHonorific(found);
-      if (noTitle.length >= 3) candidates.add(noTitle);
-    }
-  }
-
-  return [...candidates];
-}
-
-function extractOrgCandidatesNearName(
-  transcript: string,
-  nameAnchor: string
-): string[] {
-  const candidates = new Set<string>();
-  const hits = findOccurrences(transcript, nameAnchor);
-
-  for (const index of hits) {
-    const window = collectNearWindow(transcript, index);
-    for (const match of window.matchAll(ORG_MARKER_RE)) {
-      const found = normalizeSpaces(match[0] ?? "");
-      if (found.length >= 3) candidates.add(found);
-    }
-    const acronyms = window.match(ACRONYM_RE) ?? [];
-    for (const token of acronyms) {
-      if (token.length >= 3) candidates.add(token);
-    }
-  }
-
-  return [...candidates];
-}
-
 function dedupeCandidates(canonical: string, candidates: string[]): string[] {
   const seen = new Set<string>();
   const canonicalNorm = normalizeSpaces(canonical).toLowerCase();
@@ -302,5 +268,8 @@ function replaceSafeWordBounded(
     `(^|[^\\p{L}\\p{N}])(${escapeRegExp(candidate)})(?=$|[^\\p{L}\\p{N}])`,
     "giu"
   );
-  return input.replace(regex, (_match, prefix: string) => `${prefix}${canonical}`);
+  return input.replace(
+    regex,
+    (_match, prefix: string) => `${prefix}${canonical}`
+  );
 }

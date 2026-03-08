@@ -11,12 +11,20 @@ import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
 import type { ChunkMetadata, InterviewStatus } from "@/types/database";
 import { normalizeEntityName } from "@/lib/entities/normalize";
-import { matchOrCreateEntity } from "@/lib/entities/match";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 import {
   normalizeChunkWithAnchors,
   buildNormalizedChunkMetadata,
 } from "@/lib/chunks/anchor-normalization";
+import {
+  groundEntityMentions,
+  type EntityForGrounding,
+  type ChunkForGrounding,
+} from "@/lib/entities/ground-mentions";
+import {
+  resolveExtractedEntities,
+  type RawExtractedEntity,
+} from "@/lib/entities/resolve";
 
 /**
  * Update interview status in the database.
@@ -179,10 +187,10 @@ export async function processTranscription(
       : chunkPlainText(transcription.text);
 
     // ── Step 3b: Anchor-aware chunk normalization ────────────────
+    // Prefer anchor enrichment over speculative text replacement.
     // Raw evidence stays in interview_chunks.content (immutable).
-    // A retrieval-grade normalized version is stored in metadata
-    // and used for embedding generation so vector search benefits
-    // from canonical anchor names instead of ASR variants.
+    // content_for_embedding carries the anchor-enriched text for
+    // embedding generation — raw/normalized text + primary anchors.
     const chunkAnchors = {
       intervieweeName: interview?.interviewee_name ?? null,
       intervieweeOrg: interview?.interviewee_org ?? null,
@@ -191,15 +199,11 @@ export async function processTranscription(
     const baseMetadata: Partial<ChunkMetadata> = {
       country,
       topics: extraction.topics,
-      entities: extraction.entities.map((e) => e.name),
+      entities: extraction.entities.map((e) => e.canonical_name),
     };
 
     const enrichedChunks = chunks.map((chunk) => {
-      const normResult = normalizeChunkWithAnchors(
-        chunk.content,
-        chunkAnchors,
-        formattedTranscript
-      );
+      const normResult = normalizeChunkWithAnchors(chunk.content, chunkAnchors);
       const metadata = buildNormalizedChunkMetadata(
         baseMetadata,
         normResult,
@@ -209,10 +213,11 @@ export async function processTranscription(
     });
 
     // ── Step 4: Generate embeddings ──────────────────────────────
-    // Use normalized content for embedding when available — this is
-    // the retrieval-grade intelligence layer, not the raw evidence.
+    // Prefer anchor enrichment over speculative text replacement.
+    // content_for_embedding = (high-confidence normalized text OR raw text)
+    // + structured anchor context (primary interviewee, primary institution).
     const embeddingTexts = enrichedChunks.map((ec) =>
-      ec.metadata.normalized_content ?? ec.chunk.content
+      ec.metadata.content_for_embedding ?? ec.chunk.content
     );
     const embeddings = await generateEmbeddings(embeddingTexts);
 
@@ -251,7 +256,10 @@ export async function processTranscription(
       }
     }
 
-    // ── Step 6: Match/create canonical entities + persist mentions ──
+    // ── Step 6: Entity resolution (Stage 2 of extraction pipeline) ──
+    // Raw entities from GPT carry raw_name + canonical_name.
+    // This stage resolves them against interview anchors, existing
+    // entities, and aliases — with confidence/method tracking.
     const entityIdMap = new Map<string, string>();
     const projectId = interview?.project_id;
 
@@ -259,30 +267,131 @@ export async function processTranscription(
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
 
-    for (const entity of extraction.entities) {
-      const { entityId, needsReview } = await matchOrCreateEntity({
-        projectId,
-        nameRaw: entity.name,
-        type: entity.type,
-        supabaseClient: supabase,
+    const rawEntities: RawExtractedEntity[] = extraction.entities.map((e) => ({
+      raw_name: e.raw_name,
+      canonical_name: e.canonical_name,
+      type: e.type,
+      description: e.description,
+      sentiment: e.sentiment ?? null,
+    }));
+
+    const resolvedEntities = await resolveExtractedEntities({
+      rawEntities,
+      anchors: {
+        intervieweeName: interview?.interviewee_name ?? null,
+        intervieweeOrg: interview?.interviewee_org ?? null,
+      },
+      projectId,
+      supabaseClient: supabase,
+    });
+
+    const entitiesForGrounding: EntityForGrounding[] = [];
+
+    for (const resolved of resolvedEntities) {
+      entityIdMap.set(resolved.resolvedName, resolved.entityId);
+      entityIdMap.set(normalizeEntityName(resolved.resolvedName), resolved.entityId);
+      // Also register raw_name so relationship lookup works
+      if (resolved.rawName) {
+        entityIdMap.set(resolved.rawName, resolved.entityId);
+        entityIdMap.set(normalizeEntityName(resolved.rawName), resolved.entityId);
+      }
+
+      entitiesForGrounding.push({
+        name: resolved.resolvedName,
+        entityId: resolved.entityId,
+        sentiment: resolved.sentiment,
       });
 
-      entityIdMap.set(entity.name, entityId);
-      entityIdMap.set(normalizeEntityName(entity.name), entityId);
+      if (resolved.needsReview) {
+        await markEntityNeedsReview(supabase, resolved.entityId);
+      }
+    }
 
-      const { error: mentionError } = await supabase.from("entity_mentions").insert({
-        entity_id: entityId,
-        interview_id: interviewId,
-        sentiment: entity.sentiment ?? null,
-      });
+    console.log(
+      `Entity resolution: ${resolvedEntities.length} unique entities from ${rawEntities.length} raw mentions (interview ${interviewId})`
+    );
+
+    // ── Step 6a: Ground entity mentions to chunks ─────────────────
+    // Hybrid strategy: exact → alias → anchor_context → fuzzy.
+    // Grounded mentions carry chunk_id + context evidence so chat
+    // and reports can surface exact transcript provenance.
+    const { data: persistedChunks } = await supabase
+      .from("interview_chunks")
+      .select("id, chunk_index, content, speaker")
+      .eq("interview_id", interviewId)
+      .order("chunk_index");
+
+    const chunksForGrounding: ChunkForGrounding[] = (persistedChunks ?? []).map((c) => ({
+      id: c.id,
+      chunkIndex: c.chunk_index,
+      content: c.content,
+      speaker: c.speaker,
+    }));
+
+    const groundedMap = await groundEntityMentions({
+      entities: entitiesForGrounding,
+      chunks: chunksForGrounding,
+      anchors: {
+        intervieweeName: interview?.interviewee_name ?? null,
+        intervieweeOrg: interview?.interviewee_org ?? null,
+      },
+      entityIdMap,
+      supabaseClient: supabase,
+    });
+
+    // Persist grounded mentions (with chunk_id + context)
+    const groundedEntityIds = new Set<string>();
+    const mentionRows: Array<{
+      entity_id: string;
+      interview_id: string;
+      chunk_id: string | null;
+      context: string | null;
+      sentiment: string | null;
+    }> = [];
+
+    for (const [entityId, mentions] of groundedMap.entries()) {
+      groundedEntityIds.add(entityId);
+      for (const gm of mentions) {
+        mentionRows.push({
+          entity_id: gm.entityId,
+          interview_id: interviewId,
+          chunk_id: gm.chunkId,
+          context: gm.context,
+          sentiment: gm.sentiment,
+        });
+      }
+    }
+
+    // Fallback: interview-level mention for entities with no chunk grounding
+    for (const entity of entitiesForGrounding) {
+      if (!groundedEntityIds.has(entity.entityId)) {
+        mentionRows.push({
+          entity_id: entity.entityId,
+          interview_id: interviewId,
+          chunk_id: null,
+          context: null,
+          sentiment: entity.sentiment,
+        });
+      }
+    }
+
+    // Batch-upsert mentions (ignore duplicates from re-processing)
+    for (let i = 0; i < mentionRows.length; i += 50) {
+      const batch = mentionRows.slice(i, i + 50);
+      const { error: mentionError } = await supabase
+        .from("entity_mentions")
+        .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
 
       if (mentionError) {
-        console.error("Failed to insert entity mention:", mentionError);
+        console.error("Failed to upsert entity mentions batch:", mentionError);
       }
+    }
 
-      if (needsReview) {
-        await markEntityNeedsReview(supabase, entityId);
-      }
+    if (groundedEntityIds.size > 0) {
+      const totalGrounded = mentionRows.filter((r) => r.chunk_id).length;
+      console.log(
+        `Entity grounding: ${groundedEntityIds.size}/${entitiesForGrounding.length} entities grounded to ${totalGrounded} chunk mentions for interview ${interviewId}`
+      );
     }
 
     // ── Step 6b: Backfill anchor entity IDs into chunk metadata ──
@@ -364,7 +473,7 @@ export async function processTranscription(
     await updateInterviewStatus(interviewId, "COMPLETED");
 
     console.log(
-      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${extraction.entities.length} entities, ${extraction.relationships.length} relationships`
+      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${extraction.entities.length} raw), ${extraction.relationships.length} relationships`
     );
 
     // ── Step 8: Content generation (non-critical) ────────────────
