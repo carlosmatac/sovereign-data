@@ -10,6 +10,7 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
+import { withRetry } from "./retry";
 
 const ExtractionSchema = z.object({
   summary: z
@@ -164,10 +165,12 @@ export async function extractIntelligence({
 - Primary ORG: ${primaryOrg ?? "unknown"}`
       : "";
 
-  const { object } = await generateObject({
-    model: openai(AI_CONFIG.extractionModel),
-    schema: ExtractionSchema,
-    prompt: `You are an expert political and business intelligence analyst specializing in emerging markets (Global South: Africa, Latin America, Asia).
+  const { object } = await withRetry(
+    () =>
+      generateObject({
+        model: openai(AI_CONFIG.extractionModel),
+        schema: ExtractionSchema,
+        prompt: `You are an expert political and business intelligence analyst specializing in emerging markets (Global South: Africa, Latin America, Asia).
 
 Analyze the following interview transcript and extract structured intelligence.
 
@@ -189,7 +192,9 @@ INSTRUCTIONS:
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
 - Risks and opportunities should be actionable intelligence, not generic statements.
 - RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.`,
-  });
+      }),
+    "extractIntelligence"
+  );
 
   return object;
 }

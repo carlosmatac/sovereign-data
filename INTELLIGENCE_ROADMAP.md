@@ -2,7 +2,7 @@
 
 **Date**: March 8, 2026
 **Author**: Principal Product Architect + Technical Lead
-**Status**: PLANNING ONLY — No implementation yet
+**Status**: P1 COMPLETE — P2 next
 **Revision**: v2 — Restructured for shortest credible path to CEO demo
 
 ---
@@ -26,9 +26,9 @@ Everything else is deferred — not deleted, but explicitly sequenced after the 
 Six phases. Tight scope. Commercially motivated ordering.
 
 ```
-P1  Chunk & Ingestion Quality Fix
+P1  Chunk & Ingestion Quality Fix    ✅ COMPLETE
  ↓
-P2  Entity Resolution & Relationship Fix
+P2  Entity Resolution & Relationship Fix  ← NEXT
  ↓
 P3  Keyword Search + Smarter Retrieval
  ↓
@@ -45,7 +45,7 @@ Phase 6 is lightweight and rounds out the commercial story for the CEO demo.
 
 ---
 
-### P1 — Chunk & Ingestion Quality Fix
+### P1 — Chunk & Ingestion Quality Fix ✅ COMPLETE
 
 **Objective**: Fix chunk splitting so evidence doesn't break at boundaries, and add basic API retry so re-processing is safe.
 
@@ -70,6 +70,20 @@ Phase 6 is lightweight and rounds out the commercial story for the CEO demo.
 - Manually inspect 10 chunk boundaries: zero mid-sentence splits
 - Simulate OpenAI 500 error on first call: retry succeeds without manual intervention
 - Re-process an existing interview with new chunking: completes without error
+
+#### P1 Implementation Log
+
+**Status**: ✅ ALL 5 SUB-STEPS COMPLETE — Not yet tested with a fresh interview upload.
+
+| Sub-step | File(s) modified | What was done |
+|----------|-----------------|---------------|
+| P1.1 Sentence splitting | `src/lib/ai/chunking.ts` | Replaced broken regex `/[^.!?]+[.!?]+/g` with `splitSentences()` — handles 35 abbreviations (Dr., Inc., U.S., etc.), single-letter initials, multi-char initials (U.S., J.P.), and trailing text without punctuation. Boundary detection requires uppercase/quote after period+space. |
+| P1.2 Chunk overlap | `src/lib/ai/chunking.ts` | Added `getOverlapText()` helper. Last ~50 tokens of each emitted chunk are carried forward to the next chunk within the same speaker group. `overlapLen` tracked separately for accurate timestamp interpolation. Applied to both `chunkTranscript` and `chunkPlainText`. |
+| P1.3 Min/max enforcement | `src/lib/ai/chunking.ts` | Added `enforceChunkBounds()` post-processor that runs after both chunking functions. Splits chunks >600 tokens at word boundaries via `splitOversizedChunk()`. Merges chunks <50 tokens into previous same-speaker neighbor (guarded by max cap). Reassigns chunk indices. Helper functions: `getChunkBody()`, `formatChunkContent()`. |
+| P1.4 Retry wrapper | `src/lib/ai/retry.ts` (NEW), `src/lib/ai/extraction.ts`, `src/lib/ai/embeddings.ts` | Created `withRetry(fn, label, options?)` — 3 retries, 1s/2s/4s exponential backoff. Only retries on transient errors (429, 5xx, network failures). Non-retryable errors (4xx) thrown immediately. Wrapped `generateObject()` in extraction and `fetchEmbeddingBatch()` in embeddings. Error objects now carry `.status` for accurate retryability detection. |
+| P1.5 Batch embeddings | `src/lib/ai/embeddings.ts` | `generateEmbeddings()` now splits inputs into groups of 100 (`EMBEDDING_BATCH_SIZE`). Each batch independently retried. Results concatenated in order. For ≤100 texts (common case), single call as before. |
+
+**Testing needed**: Upload a new interview and verify in Supabase that `interview_chunks` show no mid-sentence splits, no chunks under ~200 chars or over ~2400 chars, and that overlap text appears at chunk boundaries within same-speaker groups.
 
 ---
 
@@ -347,9 +361,9 @@ These are ordered by priority within the hardening track, not by dependency on t
 CEO-DEMO CRITICAL PATH                    HARDENING / SCALE
 ─────────────────────                      ────────────────────
 
-P1  Chunk & Ingestion Quality Fix
+P1  Chunk & Ingestion Quality Fix ✅
  ↓
-P2  Entity Resolution & Relationship Fix
+P2  Entity Resolution & Relationship Fix ← NEXT
  ↓
 P3  Keyword Search + Smarter Retrieval
  ↓
@@ -395,14 +409,14 @@ None of these are deleted. They are sequenced after the demo, where they belong.
 
 ### 3. Each critical path phase is implementable in a focused session
 
-| Phase | Estimated complexity |
-|-------|---------------------|
-| P1: Chunk fix + retry wrapper | 1 focused session |
-| P2: Relationship fix + description protection | 1 focused session |
-| P3: Keyword search + dynamic cutoff + alias rewriting | 1–2 focused sessions |
-| P4: Evidence-first chat context restructuring | 1 focused session |
-| P5: Meeting preparation mode | 2 focused sessions |
-| P6: Follow-up lite | 1 focused session |
+| Phase | Estimated complexity | Status |
+|-------|---------------------|--------|
+| P1: Chunk fix + retry wrapper | 1 focused session | ✅ DONE |
+| P2: Relationship fix + description protection | 1 focused session | ← NEXT |
+| P3: Keyword search + dynamic cutoff + alias rewriting | 1–2 focused sessions | |
+| P4: Evidence-first chat context restructuring | 1 focused session | |
+| P5: Meeting preparation mode | 2 focused sessions | |
+| P6: Follow-up lite | 1 focused session | |
 
 Total: roughly 7–8 focused sessions for the complete critical path. The original plan had 11 phases, many of which were multi-session programs.
 
@@ -435,6 +449,41 @@ This makes the next planning conversation after the CEO demo straightforward: pi
 
 ---
 
+## HANDOVER / IMPLEMENTATION NOTES FOR NEXT AGENT
+
+### Current State (as of March 8, 2026)
+
+**P1 is fully implemented but not yet validated by the user with a fresh interview upload.** The user reported a browser freeze issue during their attempt to test, which was diagnosed as a Supabase Auth rate-limiting problem (429 errors from too many rapid auth requests from the `/chat` page), NOT related to P1 changes. The rate limit clears by closing all tabs, waiting 30s, and opening a single fresh tab. The dev server was restarted cleanly.
+
+### Files Modified in P1
+
+| File | What changed |
+|------|-------------|
+| `src/lib/ai/chunking.ts` | Replaced sentence regex with `splitSentences()` (~40 lines), added `getOverlapText()`, added `enforceChunkBounds()` post-processor with `splitOversizedChunk()`/merge logic, added constants `CHUNK_MIN_TOKENS=50`, `CHUNK_MAX_TOKENS=600`. Both `chunkTranscript` and `chunkPlainText` call `enforceChunkBounds()` before returning. |
+| `src/lib/ai/retry.ts` | **NEW FILE**. Exports `withRetry<T>(fn, label, options?)`. Retries transient errors (429, 5xx, network). 3 retries, exponential backoff 1s/2s/4s. |
+| `src/lib/ai/embeddings.ts` | Added `fetchEmbeddingBatch()` extracted from old inline fetch. `generateEmbeddings()` now splits into batches of 100, each wrapped with `withRetry`. Double-cast `(err as unknown as Record<string, unknown>).status` to avoid TS error. |
+| `src/lib/ai/extraction.ts` | Wrapped `generateObject()` call with `withRetry(..., "extractIntelligence")`. |
+
+### How to Continue — P2: Entity Resolution & Relationship Fix
+
+**Read these files first** (they are the working context for P2):
+- `HANDOVER.md` — full system context, architecture, constraints
+- `src/lib/ai/pipeline.ts` — the orchestrator that calls extraction → resolution → persistence
+- `src/lib/ai/entity-resolution.ts` — current resolution logic (aliases, normalization, matching)
+- `src/lib/ai/persistence.ts` — where entities, relationships, and mentions are written to Supabase
+- `src/types/intelligence.ts` — TypeScript types for extracted data (entities, relationships, etc.)
+
+**P2 scope (from this roadmap above)**:
+1. Fix relationship persistence to use the **resolved entity ID map** instead of `normalizeEntityName(rel.source_name)`. After resolution, rebuild relationship source/target mapping using actual resolved IDs.
+2. Add extraction-time validation: log warnings when a relationship references an entity name not in extracted entities.
+3. Deduplicate entities at extraction time: merge entities with the same normalized name before resolution.
+4. Protect entity descriptions from regression: never overwrite a description with one that has fewer factual keywords (title, CEO, Minister, Director, headquartered, founded, etc.).
+
+**Critical architectural constraint**: The app uses a Supabase admin client pattern — writes go through `createAdminClient()` to bypass RLS. Auth uses `token_hash` flow. See `HANDOVER.md` for details.
+
+**Execution protocol**: Work phase by phase, break each phase into sub-steps. After each sub-step: stop, explain what changed, explain how to test, wait for user feedback. The user speaks Spanish sometimes. Robustness > speed.
+
+**Known issue**: The `/chat` page can trigger Supabase Auth rate-limiting (429) if many tabs are open or rapid re-renders occur. This is NOT a code bug — it's a usage pattern issue. If the user reports browser freezes, advise: close all tabs, wait 30s, open one fresh tab.
+
 **End of execution plan v2.**
-No code. No diffs. No implementation.
 Optimized for: shortest credible path to a product that sells.
