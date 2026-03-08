@@ -1,8 +1,8 @@
 # Ingestion Pipeline
 
-> Audio Upload → Transcription → AI Extraction → Chunking → Embedding → Knowledge Graph
+> Audio Upload → Transcription → AI Extraction → Chunking → Anchor Normalization → Embedding → Knowledge Graph
 
-This document details Sovereign's 10-step ingestion pipeline that transforms raw audio interviews into searchable, structured business intelligence.
+This document details Sovereign's ingestion pipeline that transforms raw audio interviews into searchable, structured business intelligence.
 
 ---
 
@@ -27,10 +27,12 @@ flowchart TD
     K --> L[Save raw transcript + speaker map]
     L --> M[extractIntelligence — GPT-4o-mini]
     M --> N[chunkTranscript — speaker-aware]
-    N --> O[generateEmbeddings — OpenAI]
-    O --> P[Persist chunks + embeddings]
+    N --> N2[Anchor-aware chunk normalization]
+    N2 --> O[generateEmbeddings — from normalized text]
+    O --> P[Persist chunks + embeddings + metadata]
     P --> Q[Match/create entities]
-    Q --> R[Persist entity relationships]
+    Q --> Q2[Backfill anchor entity IDs into chunk metadata]
+    Q2 --> R[Persist entity relationships]
     R --> S[Generate content snippets]
     S --> T[(status: COMPLETED)]
 ```
@@ -177,6 +179,27 @@ After extraction, the summary, sentiment, and topics are saved to the interview 
 
 `chunkPlainText(text)` is a fallback for non-diarized input, splitting by paragraphs.
 
+### Step 8b: Anchor-Aware Chunk Normalization
+
+**File**: `src/lib/chunks/anchor-normalization.ts`
+
+After chunking, each chunk is run through anchor-aware normalization. This produces a retrieval-grade version of the chunk text that replaces likely ASR variants of the primary person and organization anchors with their canonical names.
+
+| Concept | Detail |
+|---------|--------|
+| Raw evidence | Stored in `interview_chunks.content` — never mutated |
+| Normalized text | Stored in `interview_chunks.metadata.normalized_content` |
+| Embedding source | Uses `normalized_content` when available, raw `content` as fallback |
+| Confidence | `high` (both anchors + replacements), `medium` (one anchor or no replacements but anchor present), `low` (no anchors) |
+
+The normalization is conservative: it detects variants using the same proximity/role-prefix/org-marker heuristics as the transcript display normalizer, but scoped per-chunk. If `interviewee_org` is null (e.g., ministers, presidents), no org normalization is attempted — no fake values are injected.
+
+Additional metadata stored per chunk:
+- `normalization_applied` — boolean flag
+- `normalization_confidence` — `high` / `medium` / `low`
+- `primary_person_name` / `primary_org_name` — interview-level anchors used
+- `primary_person_entity_id` / `primary_org_entity_id` — backfilled after entity matching
+
 ### Step 9: Embedding Generation
 
 **File**: `src/lib/ai/embeddings.ts`
@@ -188,17 +211,17 @@ After extraction, the summary, sentiment, and topics are saved to the interview 
 | Endpoint | `https://api.openai.com/v1/embeddings` |
 | Batch limit | 2048 inputs per API call |
 
-`generateEmbeddings(texts)` takes the chunk text array and returns ordered embedding vectors.
+`generateEmbeddings(texts)` takes the chunk text array and returns ordered embedding vectors. As of the anchor normalization upgrade, the input texts are the `metadata.normalized_content` values (falling back to raw `content` when normalization was not applied).
 
 ### Step 10: Persist Chunks + Entities + Relationships
 
-**File**: `src/lib/ai/pipeline.ts` (lines 179–297)
+**File**: `src/lib/ai/pipeline.ts`
 
-**Chunk persistence** (lines 179–206):
+**Chunk persistence**:
 - Inserts into `interview_chunks` in batches of 50.
-- Each row includes: `content`, `embedding` (cast to `vector`), `interview_id`, `speaker`, `start_time`, `end_time`, `metadata` (chunk index, token count).
+- Each row includes: `content` (raw evidence), `embedding` (from normalized text), `interview_id`, `speaker`, `start_time`, `end_time`, `metadata` (country, topics, entities, plus anchor normalization fields).
 
-**Entity persistence** (lines 208–240):
+**Entity persistence**:
 - For each extracted entity, calls `matchOrCreateEntity()` from `src/lib/entities/match.ts`.
 - Match algorithm (5-tier):
   1. Exact match on `normalized_name` (project-scoped)
@@ -250,6 +273,7 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Intelligence extraction | `src/lib/ai/extraction.ts` |
 | Speaker-aware chunking | `src/lib/ai/chunking.ts` |
 | Embedding generation | `src/lib/ai/embeddings.ts` |
+| Anchor-aware chunk normalization | `src/lib/chunks/anchor-normalization.ts` |
 | Entity matching | `src/lib/entities/match.ts` |
 | Entity normalization | `src/lib/entities/normalize.ts` |
 | Transcript display | `src/lib/transcript/normalizeDisplay.ts` |

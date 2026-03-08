@@ -16,8 +16,12 @@ flowchart TD
     D --> E[Step 4: Generate]
 
     E -->|POST /api/reports| F[Create report row<br/>status: generating]
-    F --> G[Fetch interview context]
-    G --> H[Build prompt with template sections]
+    F --> IL[buildReportIntelligenceLayer]
+    IL --> IL1[Load interviews + chunks + mentions + relationships]
+    IL1 --> IL2[Entity hygiene: canonical names + aliases + confidence]
+    IL2 --> IL3[Build evidence ledger with provenance]
+    IL3 --> IL4[GPT-4o structured synthesis → reusable insight blocks]
+    IL4 --> H[Build prompt with intelligence layer + template sections]
     H --> I[streamText — GPT-4o]
     I -->|onFinish| J[Save content + summary<br/>status: completed]
     I -->|onError| K[Save error<br/>status: failed]
@@ -61,8 +65,27 @@ Each template defines a `label`, `description`, and `sections` array that struct
 
 1. **Auth**: Verifies user, checks editor/owner role on the project.
 2. **Insert**: Creates a `reports` row with `status: "generating"`, template, title, and `interview_ids`.
-3. **Fetch context**: Loads full interview data (summaries, entities, relationships) for the selected interviews.
-4. **Stream**: Calls `generateReport()` which returns a streaming response to the client.
+3. **Build intelligence layer**: Calls `buildReportIntelligenceLayer()` which loads interviews, chunks, mentions, aliases, and relationships, resolves entity hygiene, builds an evidence ledger with provenance, and runs a GPT-4o structured synthesis to produce reusable insight blocks.
+4. **Stream**: Calls `generateReport()` with the intelligence layer, which returns a streaming response to the client.
+
+### Report Intelligence Layer
+
+**File**: `src/lib/reports/intelligence-layer.ts`
+
+The shared intelligence foundation consumed by all five report templates. Produces:
+
+| Component | Description |
+|-----------|-------------|
+| **Entity hygiene registry** | Canonical names, alias rollups, hygiene confidence (`high`/`medium`/`low`), `needs_review` flags |
+| **Evidence ledger** | Up to 30 provenance-traced evidence records with interview ID, speaker, timestamp, chunk excerpt |
+| **Reusable insight blocks** | Typed blocks (`key_finding`, `evidence_backed_claim`, `contradiction`, `actor_relationship`, `recommendation`, `watch_item`) with confidence, support metadata, and uncertainty flags |
+| **Executive brief** | What we know, why it matters, what to do, overall confidence |
+| **Reporting warnings** | Data quality or coverage issues to surface in the report |
+
+Each insight block carries:
+- `supportingEvidenceIds` — references into the evidence ledger
+- `support.evidenceCount`, `support.interviewIds`, `support.entityNames`
+- `flaggedUncertainty` — explicit note when entity hygiene is low or evidence is thin
 
 ### AI Module
 
@@ -76,11 +99,11 @@ Each template defines a `label`, `description`, and `sections` array that struct
 | Output format | Markdown |
 
 The `buildReportPrompt()` function constructs a system prompt that includes:
+- The intelligence layer's executive brief, entity hygiene registry, insight blocks, and evidence ledger
 - The selected template's section structure
-- Interview summaries and key findings
-- Entity mentions with types and descriptions
-- Entity relationships with confidence and evidence
-- Instructions for Markdown formatting and citation
+- Non-negotiable writing rules requiring every substantive subsection to include support metadata (confidence, evidence count, interview references, evidence excerpts)
+- Instructions to surface contradictions and flag low-confidence entities as provisional
+- A required `## Source Trace` section at the end listing evidence references
 
 **Lifecycle callbacks**:
 - `onFinish`: Updates the report row with `content`, `summary` (first paragraph), and `status: "completed"`.
@@ -220,6 +243,7 @@ Displays all reports with:
 
 | Responsibility | File Path |
 |----------------|-----------|
+| Report intelligence layer | `src/lib/reports/intelligence-layer.ts` |
 | Report generation AI | `src/lib/ai/report-generation.ts` |
 | Report templates/constants | `src/lib/constants.ts` |
 | Reports API (create + stream) | `src/app/api/reports/route.ts` |

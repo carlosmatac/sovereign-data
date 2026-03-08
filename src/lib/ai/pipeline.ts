@@ -9,10 +9,14 @@ import { extractIntelligence } from "./extraction";
 import { chunkTranscript, chunkPlainText } from "./chunking";
 import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
-import type { InterviewStatus } from "@/types/database";
+import type { ChunkMetadata, InterviewStatus } from "@/types/database";
 import { normalizeEntityName } from "@/lib/entities/normalize";
 import { matchOrCreateEntity } from "@/lib/entities/match";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
+import {
+  normalizeChunkWithAnchors,
+  buildNormalizedChunkMetadata,
+} from "@/lib/chunks/anchor-normalization";
 
 /**
  * Update interview status in the database.
@@ -174,25 +178,65 @@ export async function processTranscription(
         )
       : chunkPlainText(transcription.text);
 
+    // ── Step 3b: Anchor-aware chunk normalization ────────────────
+    // Raw evidence stays in interview_chunks.content (immutable).
+    // A retrieval-grade normalized version is stored in metadata
+    // and used for embedding generation so vector search benefits
+    // from canonical anchor names instead of ASR variants.
+    const chunkAnchors = {
+      intervieweeName: interview?.interviewee_name ?? null,
+      intervieweeOrg: interview?.interviewee_org ?? null,
+    };
+
+    const baseMetadata: Partial<ChunkMetadata> = {
+      country,
+      topics: extraction.topics,
+      entities: extraction.entities.map((e) => e.name),
+    };
+
+    const enrichedChunks = chunks.map((chunk) => {
+      const normResult = normalizeChunkWithAnchors(
+        chunk.content,
+        chunkAnchors,
+        formattedTranscript
+      );
+      const metadata = buildNormalizedChunkMetadata(
+        baseMetadata,
+        normResult,
+        chunkAnchors
+      );
+      return { chunk, metadata, normResult };
+    });
+
     // ── Step 4: Generate embeddings ──────────────────────────────
-    const chunkTexts = chunks.map((c) => c.content);
-    const embeddings = await generateEmbeddings(chunkTexts);
+    // Use normalized content for embedding when available — this is
+    // the retrieval-grade intelligence layer, not the raw evidence.
+    const embeddingTexts = enrichedChunks.map((ec) =>
+      ec.metadata.normalized_content ?? ec.chunk.content
+    );
+    const embeddings = await generateEmbeddings(embeddingTexts);
 
     // ── Step 5: Persist chunks ───────────────────────────────────
-    const chunkRows = chunks.map((chunk, i) => ({
+    const chunkRows = enrichedChunks.map((ec, i) => ({
       interview_id: interviewId,
-      chunk_index: chunk.chunkIndex,
-      content: chunk.content,
-      speaker: chunk.speaker,
-      start_time: chunk.startTime,
-      end_time: chunk.endTime,
+      chunk_index: ec.chunk.chunkIndex,
+      content: ec.chunk.content, // raw evidence — never mutated
+      speaker: ec.chunk.speaker,
+      start_time: ec.chunk.startTime,
+      end_time: ec.chunk.endTime,
       embedding: JSON.stringify(embeddings[i]),
-      metadata: {
-        country,
-        topics: extraction.topics,
-        entities: extraction.entities.map((e) => e.name),
-      },
+      metadata: ec.metadata,
     }));
+
+    let normAppliedCount = 0;
+    for (const ec of enrichedChunks) {
+      if (ec.normResult.normalizationApplied) normAppliedCount++;
+    }
+    if (normAppliedCount > 0) {
+      console.log(
+        `Anchor normalization applied to ${normAppliedCount}/${enrichedChunks.length} chunks for interview ${interviewId}`
+      );
+    }
 
     // Insert in batches of 50 to avoid payload limits
     for (let i = 0; i < chunkRows.length; i += 50) {
@@ -238,6 +282,48 @@ export async function processTranscription(
 
       if (needsReview) {
         await markEntityNeedsReview(supabase, entityId);
+      }
+    }
+
+    // ── Step 6b: Backfill anchor entity IDs into chunk metadata ──
+    // Now that entity matching is done, resolve the primary person
+    // and org anchors to their canonical entity IDs so chunks carry
+    // full provenance for downstream intelligence consumers.
+    const personName = interview?.interviewee_name ?? "";
+    const orgName = interview?.interviewee_org ?? "";
+    const personEntityId =
+      entityIdMap.get(personName) ??
+      entityIdMap.get(normalizeEntityName(personName)) ??
+      null;
+    const orgEntityId =
+      entityIdMap.get(orgName) ??
+      entityIdMap.get(normalizeEntityName(orgName)) ??
+      null;
+
+    if (personEntityId || orgEntityId) {
+      for (let i = 0; i < chunkRows.length; i += 50) {
+        const batch = chunkRows.slice(i, i + 50);
+        for (const row of batch) {
+          const meta = row.metadata as ChunkMetadata;
+          if (personEntityId) meta.primary_person_entity_id = personEntityId;
+          if (orgEntityId) meta.primary_org_entity_id = orgEntityId;
+        }
+      }
+
+      // Batch-update metadata with entity IDs (non-critical — log and continue)
+      for (let i = 0; i < chunkRows.length; i += 50) {
+        const batch = chunkRows.slice(i, i + 50);
+        for (const row of batch) {
+          const { error: metaError } = await supabase
+            .from("interview_chunks")
+            .update({ metadata: row.metadata })
+            .eq("interview_id", interviewId)
+            .eq("chunk_index", row.chunk_index);
+
+          if (metaError) {
+            console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
+          }
+        }
       }
     }
 

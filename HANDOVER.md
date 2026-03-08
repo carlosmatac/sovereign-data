@@ -37,12 +37,13 @@
 
 ### What's Built
 
-- Full audio ingestion pipeline (upload → transcribe → extract → chunk → embed → graph)
+- Full audio ingestion pipeline (upload → transcribe → extract → chunk → normalize → embed → graph)
+- Anchor-aware chunk normalization (retrieval-grade normalized text in metadata, raw evidence untouched)
 - Agentic RAG chat with TBY persona, Second-Order Thinking, and Tavily web search
 - Dashboard with analytics (project breakdown, topic distribution)
 - Network Explorer for entity relationships
 - Team management with role-based access (owner/editor/viewer)
-- AI report generator with 5 templates (GPT-4o streaming)
+- AI report generator with shared intelligence layer (evidence provenance, entity hygiene, insight blocks, contradiction detection) and 5 templates (GPT-4o streaming)
 - PDF export via `@react-pdf/renderer`
 - Report sharing via public links with optional password protection
 - Sales War Room (mock CRM data, ready for HubSpot integration)
