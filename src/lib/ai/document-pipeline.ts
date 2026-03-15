@@ -1,12 +1,13 @@
 // ============================================
-// ETL Pipeline Orchestrator
+// Document (PDF) Pipeline Orchestrator
 // ============================================
-// Runs after AssemblyAI webhook: Extract -> Chunk -> Embed -> Persist
+// Processes PDF/document interviews through the intelligence pipeline.
+// Enters at EXTRACTING — bypasses AssemblyAI transcription entirely.
+// Mirrors the audio pipeline structure but works on already-extracted text.
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTranscription } from "./assemblyai";
 import { extractIntelligence } from "./extraction";
-import { chunkTranscript, chunkPlainText } from "./chunking";
+import { chunkPlainText } from "./chunking";
 import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
 import type { ChunkMetadata, InterviewStatus } from "@/types/database";
@@ -40,10 +41,6 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 
-/**
- * Update interview status in the database.
- * Uses admin client (bypasses RLS) since this runs from webhooks.
- */
 async function updateInterviewStatus(
   interviewId: string,
   status: InterviewStatus,
@@ -56,7 +53,10 @@ async function updateInterviewStatus(
     .eq("id", interviewId);
 
   if (error) {
-    console.error(`Failed to update interview ${interviewId} to ${status}:`, error);
+    console.error(
+      `Failed to update interview ${interviewId} to ${status}:`,
+      error
+    );
   }
 }
 
@@ -71,7 +71,10 @@ async function markEntityNeedsReview(
     .maybeSingle<{ metadata: Record<string, unknown> | null }>();
 
   if (fetchError) {
-    console.error("Failed to fetch entity metadata for review flag:", fetchError);
+    console.error(
+      "Failed to fetch entity metadata for review flag:",
+      fetchError
+    );
     return;
   }
 
@@ -87,81 +90,59 @@ async function markEntityNeedsReview(
     .eq("id", entityId);
 
   if (updateError) {
-    console.error("Failed to update entity metadata with needs_review flag:", updateError);
+    console.error(
+      "Failed to update entity metadata with needs_review flag:",
+      updateError
+    );
   }
 }
 
 /**
- * Process a completed transcription through the full ETL pipeline.
+ * Process a PDF/document interview through the full intelligence pipeline.
+ *
+ * Enters at EXTRACTING (skips TRANSCRIBING — no audio to process).
  *
  * Flow:
- * 1. Fetch transcription from AssemblyAI
- * 2. Save raw transcript
- * 3. Extract structured intelligence (GPT-4o-mini)
- * 4. Chunk transcript (speaker-aware)
+ * 1. Save extracted text as transcript
+ * 2. Extract structured intelligence (GPT-4o-mini)
+ * 3. Chunk plain text
+ * 4. Anchor-aware normalization
  * 5. Generate embeddings
- * 6. Persist chunks + entities to database
+ * 6. Persist chunks + entities
+ * 7. Entity grounding
+ * 8. Persist relationships
+ * 9. Content snippets (non-critical)
  */
-export async function processTranscription(
+export async function processDocument(
   interviewId: string,
-  assemblyaiId: string
+  plainText: string
 ): Promise<void> {
   const supabase = createAdminClient();
 
   try {
-    // ── Step 1: Fetch transcription ──────────────────────────────
-    const transcription = await getTranscription(assemblyaiId);
-
-    if (transcription.status === "error") {
-      await updateInterviewStatus(interviewId, "FAILED", {
-        error_message: transcription.error ?? "Transcription failed",
-      });
-      return;
-    }
-
-    if (!transcription.text) {
-      await updateInterviewStatus(interviewId, "FAILED", {
-        error_message: "Empty transcription returned",
-      });
-      return;
-    }
-
-    // Build speaker map and speaker-labeled transcript from utterances
-    const speakerMap: Record<string, string> = {};
-    let formattedTranscript = transcription.text;
-
-    if (transcription.utterances && transcription.utterances.length > 0) {
-      const speakers = new Set(transcription.utterances.map((u) => u.speaker));
-      speakers.forEach((s) => {
-        speakerMap[s] = `Speaker ${s}`;
-      });
-
-      formattedTranscript = transcription.utterances
-        .map((u) => `[${speakerMap[u.speaker]}]: ${u.text}`)
-        .join("\n\n");
-    }
-
-    // Fetch interview metadata for extraction context + transcript display anchors
+    // Fetch interview metadata for extraction context + display normalization
     const { data: interview } = await supabase
       .from("interviews")
-      .select("title, project_id, interviewee_name, interviewee_org, projects(country)")
+      .select(
+        "title, project_id, interviewee_name, interviewee_org, projects(country)"
+      )
       .eq("id", interviewId)
       .single();
 
-    const country = (interview?.projects as Record<string, unknown>)?.country as string | undefined;
-    const normalizedTranscript = normalizeTranscriptDisplay(formattedTranscript, {
+    const country = (interview?.projects as Record<string, unknown>)
+      ?.country as string | undefined;
+
+    const normalizedTranscript = normalizeTranscriptDisplay(plainText, {
       intervieweeName: interview?.interviewee_name,
       intervieweeOrg: interview?.interviewee_org,
     });
 
-    // Save speaker-formatted raw transcript + cleaned display transcript
+    // Save transcript (no speaker map, no audio duration for document sources)
     await updateInterviewStatus(interviewId, "EXTRACTING", {
-      transcript_full: formattedTranscript,
+      transcript_full: plainText,
       transcript_display: normalizedTranscript.transcriptDisplay,
-      speaker_map: speakerMap,
-      audio_duration: transcription.audio_duration
-        ? Math.round(transcription.audio_duration)
-        : null,
+      speaker_map: {},
+      audio_duration: null,
     });
 
     if (normalizedTranscript.stats.replacementsApplied > 0) {
@@ -170,41 +151,26 @@ export async function processTranscription(
       );
     }
 
-    // ── Step 2: Extract intelligence ─────────────────────────────
-
+    // ── Step 1: Extract intelligence ─────────────────────────────
     const extraction = await extractIntelligence({
-      transcript: transcription.text,
+      transcript: plainText,
       interviewTitle: interview?.title ?? "Unknown Interview",
       country,
-      speakerMap,
+      speakerMap: {},
       primaryPerson: interview?.interviewee_name ?? null,
       primaryOrg: interview?.interviewee_org ?? null,
     });
 
-    // Save extraction results
     await updateInterviewStatus(interviewId, "EMBEDDING", {
       summary: extraction.summary,
       sentiment: extraction.sentiment,
       topics: extraction.topics,
     });
 
-    // ── Step 3: Chunk transcript ─────────────────────────────────
-    const chunks = transcription.utterances
-      ? chunkTranscript(
-          transcription.utterances.map((u) => ({
-            speaker: u.speaker,
-            text: u.text,
-            start: u.start,
-            end: u.end,
-          }))
-        )
-      : chunkPlainText(transcription.text);
+    // ── Step 2: Chunk plain text ──────────────────────────────────
+    const chunks = chunkPlainText(plainText);
 
-    // ── Step 3b: Anchor-aware chunk normalization ────────────────
-    // Prefer anchor enrichment over speculative text replacement.
-    // Raw evidence stays in interview_chunks.content (immutable).
-    // content_for_embedding carries the anchor-enriched text for
-    // embedding generation — raw/normalized text + primary anchors.
+    // ── Step 3: Anchor-aware chunk normalization ──────────────────
     const chunkAnchors = {
       intervieweeName: interview?.interviewee_name ?? null,
       intervieweeOrg: interview?.interviewee_org ?? null,
@@ -227,11 +193,8 @@ export async function processTranscription(
     });
 
     // ── Step 4: Generate embeddings ──────────────────────────────
-    // Prefer anchor enrichment over speculative text replacement.
-    // content_for_embedding = (high-confidence normalized text OR raw text)
-    // + structured anchor context (primary interviewee, primary institution).
-    const embeddingTexts = enrichedChunks.map((ec) =>
-      ec.metadata.content_for_embedding ?? ec.chunk.content
+    const embeddingTexts = enrichedChunks.map(
+      (ec) => ec.metadata.content_for_embedding ?? ec.chunk.content
     );
     const embeddings = await generateEmbeddings(embeddingTexts);
 
@@ -239,7 +202,7 @@ export async function processTranscription(
     const chunkRows = enrichedChunks.map((ec, i) => ({
       interview_id: interviewId,
       chunk_index: ec.chunk.chunkIndex,
-      content: ec.chunk.content, // raw evidence — never mutated
+      content: ec.chunk.content,
       speaker: ec.chunk.speaker,
       start_time: ec.chunk.startTime,
       end_time: ec.chunk.endTime,
@@ -247,17 +210,6 @@ export async function processTranscription(
       metadata: ec.metadata,
     }));
 
-    let normAppliedCount = 0;
-    for (const ec of enrichedChunks) {
-      if (ec.normResult.normalizationApplied) normAppliedCount++;
-    }
-    if (normAppliedCount > 0) {
-      console.log(
-        `Anchor normalization applied to ${normAppliedCount}/${enrichedChunks.length} chunks for interview ${interviewId}`
-      );
-    }
-
-    // Insert in batches of 50 to avoid payload limits
     for (let i = 0; i < chunkRows.length; i += 50) {
       const batch = chunkRows.slice(i, i + 50);
       const { error: chunkError } = await supabase
@@ -270,10 +222,7 @@ export async function processTranscription(
       }
     }
 
-    // ── Step 6: Entity resolution (Stage 2 of extraction pipeline) ──
-    // Raw entities from GPT carry raw_name + canonical_name.
-    // This stage resolves them against interview anchors, existing
-    // entities, and aliases — with confidence/method tracking.
+    // ── Step 6: Entity resolution ─────────────────────────────────
     const entityIdMap = new Map<string, string>();
     const projectId = interview?.project_id;
 
@@ -303,11 +252,16 @@ export async function processTranscription(
 
     for (const resolved of resolvedEntities) {
       entityIdMap.set(resolved.resolvedName, resolved.entityId);
-      entityIdMap.set(normalizeEntityName(resolved.resolvedName), resolved.entityId);
-      // Also register raw_name so relationship lookup works
+      entityIdMap.set(
+        normalizeEntityName(resolved.resolvedName),
+        resolved.entityId
+      );
       if (resolved.rawName) {
         entityIdMap.set(resolved.rawName, resolved.entityId);
-        entityIdMap.set(normalizeEntityName(resolved.rawName), resolved.entityId);
+        entityIdMap.set(
+          normalizeEntityName(resolved.rawName),
+          resolved.entityId
+        );
       }
 
       entitiesForGrounding.push({
@@ -322,20 +276,19 @@ export async function processTranscription(
     }
 
     console.log(
-      `Entity resolution: ${resolvedEntities.length} unique entities from ${rawEntities.length} raw mentions (interview ${interviewId})`
+      `Document entity resolution: ${resolvedEntities.length} unique entities from ${rawEntities.length} raw mentions (interview ${interviewId})`
     );
 
     // ── Step 6a: Ground entity mentions to chunks ─────────────────
-    // Hybrid strategy: exact → alias → anchor_context → fuzzy.
-    // Grounded mentions carry chunk_id + context evidence so chat
-    // and reports can surface exact transcript provenance.
     const { data: persistedChunks } = await supabase
       .from("interview_chunks")
       .select("id, chunk_index, content, speaker")
       .eq("interview_id", interviewId)
       .order("chunk_index");
 
-    const chunksForGrounding: ChunkForGrounding[] = (persistedChunks ?? []).map((c) => ({
+    const chunksForGrounding: ChunkForGrounding[] = (
+      persistedChunks ?? []
+    ).map((c) => ({
       id: c.id,
       chunkIndex: c.chunk_index,
       content: c.content,
@@ -353,7 +306,6 @@ export async function processTranscription(
       supabaseClient: supabase,
     });
 
-    // Persist grounded mentions (with chunk_id + context)
     const groundedEntityIds = new Set<string>();
     const mentionRows: Array<{
       entity_id: string;
@@ -376,7 +328,6 @@ export async function processTranscription(
       }
     }
 
-    // Fallback: interview-level mention for entities with no chunk grounding
     for (const entity of entitiesForGrounding) {
       if (!groundedEntityIds.has(entity.entityId)) {
         mentionRows.push({
@@ -389,7 +340,6 @@ export async function processTranscription(
       }
     }
 
-    // Batch-upsert mentions (ignore duplicates from re-processing)
     for (let i = 0; i < mentionRows.length; i += 50) {
       const batch = mentionRows.slice(i, i + 50);
       const { error: mentionError } = await supabase
@@ -401,17 +351,7 @@ export async function processTranscription(
       }
     }
 
-    if (groundedEntityIds.size > 0) {
-      const totalGrounded = mentionRows.filter((r) => r.chunk_id).length;
-      console.log(
-        `Entity grounding: ${groundedEntityIds.size}/${entitiesForGrounding.length} entities grounded to ${totalGrounded} chunk mentions for interview ${interviewId}`
-      );
-    }
-
     // ── Step 6b: Backfill anchor entity IDs into chunk metadata ──
-    // Now that entity matching is done, resolve the primary person
-    // and org anchors to their canonical entity IDs so chunks carry
-    // full provenance for downstream intelligence consumers.
     const personName = interview?.interviewee_name ?? "";
     const orgName = interview?.interviewee_org ?? "";
     const personEntityId =
@@ -433,7 +373,6 @@ export async function processTranscription(
         }
       }
 
-      // Batch-update metadata with entity IDs (non-critical — log and continue)
       for (let i = 0; i < chunkRows.length; i += 50) {
         const batch = chunkRows.slice(i, i + 50);
         for (const row of batch) {
@@ -444,7 +383,10 @@ export async function processTranscription(
             .eq("chunk_index", row.chunk_index);
 
           if (metaError) {
-            console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
+            console.error(
+              "Failed to backfill anchor entity ID in chunk metadata:",
+              metaError
+            );
           }
         }
       }
@@ -487,10 +429,10 @@ export async function processTranscription(
     await updateInterviewStatus(interviewId, "COMPLETED");
 
     console.log(
-      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${extraction.entities.length} raw), ${extraction.relationships.length} relationships`
+      `Document pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${extraction.entities.length} raw), ${extraction.relationships.length} relationships`
     );
 
-    // ── Step 8: Content generation (non-critical) ────────────────
+    // ── Step 8: Content generation (non-critical) ─────────────────
     try {
       const keyQuotes = extraction.sentiment.highlights.map((h) => h.text);
       await generateContentSnippets({
@@ -508,7 +450,10 @@ export async function processTranscription(
       );
     }
   } catch (error) {
-    console.error(`Pipeline failed for interview ${interviewId}:`, error);
+    console.error(
+      `Document pipeline failed for interview ${interviewId}:`,
+      error
+    );
     await updateInterviewStatus(interviewId, "FAILED", {
       error_message: toErrorMessage(error),
     });

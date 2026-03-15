@@ -7,7 +7,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Mic, Clock, FolderKanban } from "lucide-react";
+import { Plus, Mic, Clock, FolderKanban, FileText } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
 import { IconWrapper } from "@/components/ui/icon-wrapper";
@@ -131,7 +131,11 @@ export default async function InterviewsPage({
                     className="flex min-w-0 flex-1 items-center gap-4"
                   >
                     <IconWrapper color="indigo" size="md">
-                      <Mic className="h-5 w-5" />
+                      {interview.source_type === "document" ? (
+                        <FileText className="h-5 w-5" />
+                      ) : (
+                        <Mic className="h-5 w-5" />
+                      )}
                     </IconWrapper>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">
@@ -146,11 +150,17 @@ export default async function InterviewsPage({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      {interview.audio_duration && (
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5" />
-                          {formatDuration(interview.audio_duration)}
+                      {interview.source_type === "document" ? (
+                        <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                          PDF
                         </span>
+                      ) : (
+                        interview.audio_duration && (
+                          <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            {formatDuration(interview.audio_duration)}
+                          </span>
+                        )
                       )}
                       <Badge variant={statusInfo.variant}>
                         {statusInfo.label}

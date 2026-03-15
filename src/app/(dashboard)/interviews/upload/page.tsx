@@ -23,16 +23,28 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Loader2, FileAudio, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Upload,
+  Loader2,
+  FileAudio,
+  FileText,
+  X,
+  Mic,
+} from "lucide-react";
 import Link from "next/link";
 import {
   SUPPORTED_AUDIO_FORMATS,
   MAX_AUDIO_SIZE_MB,
   MAX_AUDIO_SIZE_BYTES,
+  MAX_PDF_SIZE_MB,
+  MAX_PDF_SIZE_BYTES,
   MIN_EXPECTED_SPEAKERS,
   MAX_EXPECTED_SPEAKERS,
 } from "@/lib/constants";
 import type { Project } from "@/types/database";
+
+type SourceType = "audio" | "document";
 
 export default function UploadInterviewPage() {
   const router = useRouter();
@@ -43,17 +55,24 @@ export default function UploadInterviewPage() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [step, setStep] = useState<"form" | "uploading" | "processing">("form");
+  const [sourceType, setSourceType] = useState<SourceType>("audio");
 
-  // Form state — pre-select project from URL if provided
+  // Shared form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState(searchParams.get("project") ?? "");
   const [language, setLanguage] = useState("en");
-  const [expectedSpeakers, setExpectedSpeakers] = useState<string>("auto");
   const [intervieweeName, setIntervieweeName] = useState("");
   const [intervieweeOrg, setIntervieweeOrg] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+
+  // Audio-specific state
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [expectedSpeakers, setExpectedSpeakers] = useState<string>("auto");
+  const [audioDragActive, setAudioDragActive] = useState(false);
+
+  // PDF-specific state
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfDragActive, setPdfDragActive] = useState(false);
 
   // Load only projects where user has upload permission (editor/owner)
   useEffect(() => {
@@ -78,8 +97,20 @@ export default function UploadInterviewPage() {
     loadProjects();
   }, [supabase]);
 
-  const handleFileSelect = useCallback((selectedFile: File) => {
-    if (!SUPPORTED_AUDIO_FORMATS.includes(selectedFile.type as typeof SUPPORTED_AUDIO_FORMATS[number])) {
+  // Clear the file when switching source types
+  const handleSourceTypeChange = (type: SourceType) => {
+    setSourceType(type);
+    setAudioFile(null);
+    setPdfFile(null);
+  };
+
+  // ── Audio file handling ──────────────────────────────────────────
+  const handleAudioFileSelect = useCallback((selectedFile: File) => {
+    if (
+      !SUPPORTED_AUDIO_FORMATS.includes(
+        selectedFile.type as (typeof SUPPORTED_AUDIO_FORMATS)[number]
+      )
+    ) {
       toast.error("Unsupported format", {
         description: "Please upload MP3, M4A, WAV, WebM, or OGG files.",
       });
@@ -93,36 +124,76 @@ export default function UploadInterviewPage() {
       return;
     }
 
-    setFile(selectedFile);
+    setAudioFile(selectedFile);
   }, []);
 
-  const handleDrop = useCallback(
+  const handleAudioDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      setDragActive(false);
+      setAudioDragActive(false);
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile) handleFileSelect(droppedFile);
+      if (droppedFile) handleAudioFileSelect(droppedFile);
     },
-    [handleFileSelect]
+    [handleAudioFileSelect]
   );
 
+  // ── PDF file handling ────────────────────────────────────────────
+  const handlePdfFileSelect = useCallback((selectedFile: File) => {
+    if (selectedFile.type !== "application/pdf") {
+      toast.error("Unsupported format", {
+        description: "Please upload a PDF file.",
+      });
+      return;
+    }
+
+    if (selectedFile.size > MAX_PDF_SIZE_BYTES) {
+      toast.error("File too large", {
+        description: `Maximum PDF size is ${MAX_PDF_SIZE_MB}MB.`,
+      });
+      return;
+    }
+
+    setPdfFile(selectedFile);
+  }, []);
+
+  const handlePdfDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setPdfDragActive(false);
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile) handlePdfFileSelect(droppedFile);
+    },
+    [handlePdfFileSelect]
+  );
+
+  // ── Form submission ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!file || !title.trim() || !projectId) {
+    const currentFile = sourceType === "audio" ? audioFile : pdfFile;
+
+    if (!currentFile || !title.trim() || !projectId) {
       toast.error("Please fill in all required fields and select a file");
       return;
     }
 
     setLoading(true);
+
+    if (sourceType === "audio") {
+      await handleAudioSubmit(currentFile as File);
+    } else {
+      await handlePdfSubmit(currentFile as File);
+    }
+  };
+
+  const handleAudioSubmit = async (file: File) => {
     setStep("uploading");
 
     try {
-      // ── Step 1: Upload audio to Supabase Storage ────────────────
+      // Upload audio to Supabase Storage
       const fileExt = file.name.split(".").pop();
       const filePath = `${projectId}/${crypto.randomUUID()}.${fileExt}`;
 
-      // Simulate progress since Supabase JS doesn't expose upload progress
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => Math.min(prev + 5, 90));
       }, 200);
@@ -141,12 +212,10 @@ export default function UploadInterviewPage() {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      // Get the public URL for AssemblyAI
       const { data: urlData } = supabase.storage
         .from("interview-audio")
         .getPublicUrl(filePath);
 
-      // ── Step 2: Create interview + trigger pipeline ──────────────
       setStep("processing");
 
       const response = await fetch("/api/interviews", {
@@ -158,7 +227,10 @@ export default function UploadInterviewPage() {
           project_id: projectId,
           audio_url: urlData.publicUrl,
           language,
-          expectedSpeakers: expectedSpeakers === "auto" ? undefined : parseInt(expectedSpeakers, 10),
+          expectedSpeakers:
+            expectedSpeakers === "auto"
+              ? undefined
+              : parseInt(expectedSpeakers, 10),
           interviewee_name: intervieweeName.trim() || undefined,
           interviewee_org: intervieweeOrg.trim() || undefined,
         }),
@@ -178,7 +250,7 @@ export default function UploadInterviewPage() {
 
       router.push(`/interviews/${interview.id}`);
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Audio upload error:", error);
       toast.error("Upload failed", {
         description:
           error instanceof Error ? error.message : "Unknown error occurred",
@@ -190,10 +262,57 @@ export default function UploadInterviewPage() {
     }
   };
 
+  const handlePdfSubmit = async (file: File) => {
+    setStep("processing");
+
+    try {
+      const formData = new FormData();
+      formData.append("pdf", file);
+      formData.append("title", title.trim());
+      formData.append("project_id", projectId);
+      formData.append("language", language);
+      if (intervieweeName.trim())
+        formData.append("interviewee_name", intervieweeName.trim());
+      if (intervieweeOrg.trim())
+        formData.append("interviewee_org", intervieweeOrg.trim());
+
+      const response = await fetch("/api/interviews/from-pdf", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create interview");
+      }
+
+      const interview = await response.json();
+
+      toast.success("PDF interview submitted for processing", {
+        description:
+          "Text has been extracted and intelligence extraction has started.",
+      });
+
+      router.push(`/interviews/${interview.id}`);
+    } catch (error) {
+      console.error("PDF upload error:", error);
+      toast.error("Upload failed", {
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      });
+      setStep("form");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const currentFile = sourceType === "audio" ? audioFile : pdfFile;
+  const isFormReady = !!currentFile && !!title.trim() && !!projectId;
 
   return (
     <div className="p-6">
@@ -211,9 +330,8 @@ export default function UploadInterviewPage() {
         <CardHeader>
           <CardTitle>Upload Interview</CardTitle>
           <CardDescription>
-            Upload an audio interview to start the intelligence extraction
-            pipeline. The system will automatically transcribe, extract entities,
-            and index the content for search.
+            Upload an audio recording or a PDF transcript to start the
+            intelligence extraction pipeline.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -227,12 +345,16 @@ export default function UploadInterviewPage() {
                   <p className="font-medium">
                     {step === "uploading"
                       ? "Uploading audio..."
-                      : "Submitting for processing..."}
+                      : sourceType === "document"
+                        ? "Extracting text and submitting for processing..."
+                        : "Submitting for processing..."}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {step === "uploading"
                       ? "Securely transferring to encrypted storage"
-                      : "Starting AI transcription pipeline"}
+                      : sourceType === "document"
+                        ? "Starting AI intelligence pipeline"
+                        : "Starting AI transcription pipeline"}
                   </p>
                 </div>
               </div>
@@ -242,65 +364,169 @@ export default function UploadInterviewPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Audio File Drop Zone */}
+              {/* Source type toggle */}
               <div className="space-y-2">
-                <Label>Audio File *</Label>
-                {file ? (
-                  <div className="flex items-center gap-3 rounded-lg border p-3">
-                    <FileAudio className="h-8 w-8 shrink-0 text-primary" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {file.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFile(null)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div
-                    className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 transition-colors ${
-                      dragActive
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/25 hover:border-primary/50"
+                <Label>Interview Source</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSourceTypeChange("audio")}
+                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+                      sourceType === "audio"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50"
                     }`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragActive(true);
-                    }}
-                    onDragLeave={() => setDragActive(false)}
-                    onDrop={handleDrop}
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = SUPPORTED_AUDIO_FORMATS.join(",");
-                      input.onchange = (e) => {
-                        const f = (e.target as HTMLInputElement).files?.[0];
-                        if (f) handleFileSelect(f);
-                      };
-                      input.click();
-                    }}
+                    disabled={loading}
                   >
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">
-                        Drop audio file here or click to browse
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        MP3, M4A, WAV, WebM, OGG — max {MAX_AUDIO_SIZE_MB}MB
-                      </p>
-                    </div>
-                  </div>
+                    <Mic className="h-4 w-4" />
+                    Audio Recording
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSourceTypeChange("document")}
+                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+                      sourceType === "document"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50"
+                    }`}
+                    disabled={loading}
+                  >
+                    <FileText className="h-4 w-4" />
+                    PDF Transcript
+                  </button>
+                </div>
+                {sourceType === "document" && (
+                  <p className="text-xs text-muted-foreground">
+                    For archived interviews where only a transcript PDF exists.
+                    Audio features will not be available.
+                  </p>
                 )}
               </div>
+
+              {/* Audio File Drop Zone */}
+              {sourceType === "audio" && (
+                <div className="space-y-2">
+                  <Label>Audio File *</Label>
+                  {audioFile ? (
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <FileAudio className="h-8 w-8 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {audioFile.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(audioFile.size)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAudioFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 transition-colors ${
+                        audioDragActive
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 hover:border-primary/50"
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setAudioDragActive(true);
+                      }}
+                      onDragLeave={() => setAudioDragActive(false)}
+                      onDrop={handleAudioDrop}
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = SUPPORTED_AUDIO_FORMATS.join(",");
+                        input.onchange = (e) => {
+                          const f = (e.target as HTMLInputElement).files?.[0];
+                          if (f) handleAudioFileSelect(f);
+                        };
+                        input.click();
+                      }}
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium">
+                          Drop audio file here or click to browse
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          MP3, M4A, WAV, WebM, OGG — max {MAX_AUDIO_SIZE_MB}MB
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PDF File Drop Zone */}
+              {sourceType === "document" && (
+                <div className="space-y-2">
+                  <Label>PDF Transcript *</Label>
+                  {pdfFile ? (
+                    <div className="flex items-center gap-3 rounded-lg border p-3">
+                      <FileText className="h-8 w-8 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {pdfFile.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(pdfFile.size)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPdfFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 transition-colors ${
+                        pdfDragActive
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 hover:border-primary/50"
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setPdfDragActive(true);
+                      }}
+                      onDragLeave={() => setPdfDragActive(false)}
+                      onDrop={handlePdfDrop}
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "application/pdf";
+                        input.onchange = (e) => {
+                          const f = (e.target as HTMLInputElement).files?.[0];
+                          if (f) handlePdfFileSelect(f);
+                        };
+                        input.click();
+                      }}
+                    >
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium">
+                          Drop PDF file here or click to browse
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          PDF only — max {MAX_PDF_SIZE_MB}MB. Must contain
+                          selectable text (not scanned images).
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Interview Title */}
               <div className="space-y-2">
@@ -329,7 +555,9 @@ export default function UploadInterviewPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="interviewee-org">Organization / Company</Label>
+                  <Label htmlFor="interviewee-org">
+                    Organization / Company
+                  </Label>
                   <Input
                     id="interviewee-org"
                     placeholder="e.g., CENORED"
@@ -367,7 +595,7 @@ export default function UploadInterviewPage() {
                 )}
               </div>
 
-              {/* Description + Language */}
+              {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -380,6 +608,7 @@ export default function UploadInterviewPage() {
                 />
               </div>
 
+              {/* Language */}
               <div className="space-y-2">
                 <Label>Language</Label>
                 <Select value={language} onValueChange={setLanguage}>
@@ -396,37 +625,42 @@ export default function UploadInterviewPage() {
                 </Select>
               </div>
 
-              {/* Expected Speakers — mitigates diarization over-segmentation */}
-              <div className="space-y-2">
-                <Label htmlFor="expected-speakers">
-                  How many people participated in the interview?
-                </Label>
-                <Select
-                  value={expectedSpeakers}
-                  onValueChange={setExpectedSpeakers}
-                >
-                  <SelectTrigger id="expected-speakers" disabled={loading}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto</SelectItem>
-                    {Array.from(
-                      { length: MAX_EXPECTED_SPEAKERS - MIN_EXPECTED_SPEAKERS + 1 },
-                      (_, i) => {
-                        const n = MIN_EXPECTED_SPEAKERS + i;
-                        return (
-                          <SelectItem key={n} value={String(n)}>
-                            {n}
-                          </SelectItem>
-                        );
-                      }
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Recommended: improves speaker identification accuracy.
-                </p>
-              </div>
+              {/* Expected Speakers — audio only */}
+              {sourceType === "audio" && (
+                <div className="space-y-2">
+                  <Label htmlFor="expected-speakers">
+                    How many people participated in the interview?
+                  </Label>
+                  <Select
+                    value={expectedSpeakers}
+                    onValueChange={setExpectedSpeakers}
+                  >
+                    <SelectTrigger id="expected-speakers" disabled={loading}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      {Array.from(
+                        {
+                          length:
+                            MAX_EXPECTED_SPEAKERS - MIN_EXPECTED_SPEAKERS + 1,
+                        },
+                        (_, i) => {
+                          const n = MIN_EXPECTED_SPEAKERS + i;
+                          return (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}
+                            </SelectItem>
+                          );
+                        }
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Recommended: improves speaker identification accuracy.
+                  </p>
+                </div>
+              )}
 
               {/* Submit */}
               <div className="flex justify-end gap-3">
@@ -435,10 +669,19 @@ export default function UploadInterviewPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading || !file || !title.trim() || !projectId}
+                  disabled={loading || !isFormReady}
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload & Process
+                  {sourceType === "audio" ? (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload & Process
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Process PDF
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

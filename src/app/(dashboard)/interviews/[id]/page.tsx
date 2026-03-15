@@ -23,6 +23,7 @@ import {
   MapPin,
   FileText,
   Newspaper,
+  FileIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
@@ -186,17 +187,26 @@ export default async function InterviewDetailPage({
                   {project.country}
                 </span>
               )}
-              {interview.audio_duration && (
+              {interview.source_type === "document" ? (
                 <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {formatDuration(interview.audio_duration)}
+                  <FileIcon className="h-3.5 w-3.5" />
+                  PDF Document
                 </span>
-              )}
-              {interview.expected_speakers != null && (
-                <span className="flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" />
-                  {interview.expected_speakers} speakers (expected)
-                </span>
+              ) : (
+                <>
+                  {interview.audio_duration && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatDuration(interview.audio_duration)}
+                    </span>
+                  )}
+                  {interview.expected_speakers != null && (
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" />
+                      {interview.expected_speakers} speakers (expected)
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -215,8 +225,8 @@ export default async function InterviewDetailPage({
         )}
       </div>
 
-      {/* Audio Player */}
-      {interview.audio_url && (
+      {/* Audio Player — only for audio source interviews */}
+      {interview.source_type !== "document" && interview.audio_url && (
         <div className="mb-6">
           <AudioPlayer src={interview.audio_url} title={interview.title} />
         </div>
@@ -228,6 +238,7 @@ export default async function InterviewDetailPage({
           interviewId={interview.id}
           currentStatus={interview.status}
           errorMessage={interview.error_message}
+          sourceType={interview.source_type}
         />
       )}
 
@@ -477,8 +488,9 @@ export default async function InterviewDetailPage({
               </Card>
             )}
 
-            {/* Speaker Map */}
-            {interview.speaker_map &&
+            {/* Speaker Map — only for audio interviews with diarization data */}
+            {interview.source_type !== "document" &&
+              interview.speaker_map &&
               Object.keys(interview.speaker_map).length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">

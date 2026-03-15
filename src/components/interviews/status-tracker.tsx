@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { InterviewStatus } from "@/types/database";
+import type { InterviewStatus, SourceType } from "@/types/database";
 
-const PIPELINE_STEPS: Array<{
+const AUDIO_PIPELINE_STEPS: Array<{
   status: InterviewStatus;
   label: string;
   description: string;
@@ -49,6 +49,33 @@ const PIPELINE_STEPS: Array<{
   },
 ];
 
+const DOCUMENT_PIPELINE_STEPS: Array<{
+  status: InterviewStatus;
+  label: string;
+  description: string;
+}> = [
+  {
+    status: "PROCESSING",
+    label: "Queued",
+    description: "Waiting for processing slot",
+  },
+  {
+    status: "EXTRACTING",
+    label: "Intelligence Extraction",
+    description: "Extracting entities, risks & opportunities via GPT-4o-mini",
+  },
+  {
+    status: "EMBEDDING",
+    label: "Indexing",
+    description: "Generating semantic embeddings for search",
+  },
+  {
+    status: "COMPLETED",
+    label: "Ready",
+    description: "Interview fully processed and searchable",
+  },
+];
+
 /** How often to poll the status endpoint (ms) */
 const POLL_INTERVAL_MS = 10_000;
 
@@ -56,13 +83,17 @@ interface StatusTrackerProps {
   interviewId: string;
   currentStatus: InterviewStatus;
   errorMessage?: string | null;
+  sourceType?: SourceType | null;
 }
 
 export function InterviewStatusTracker({
   interviewId,
   currentStatus: initialStatus,
   errorMessage: initialError,
+  sourceType,
 }: StatusTrackerProps) {
+  const PIPELINE_STEPS =
+    sourceType === "document" ? DOCUMENT_PIPELINE_STEPS : AUDIO_PIPELINE_STEPS;
   const router = useRouter();
   const [currentStatus, setCurrentStatus] =
     useState<InterviewStatus>(initialStatus);

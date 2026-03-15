@@ -239,17 +239,6 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cyReady, setCyReady] = useState(false);
 
-  // Debug state — on-screen readout; remove once rendering is confirmed
-  const [debugInfo, setDebugInfo] = useState<{
-    containerW: number;
-    containerH: number;
-    rawNodes: number;
-    rawEdges: number;
-    filteredNodes: number;
-    filteredEdges: number;
-    cyElements: number;
-  } | null>(null);
-
   // ── Init Cytoscape (once) ──────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return;
@@ -258,16 +247,8 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
     void import("cytoscape").then(({ default: Cytoscape }) => {
       if (destroyed || !containerRef.current) return;
 
-      const el = containerRef.current;
-      console.log("[Cytoscape] Container dimensions at init:", {
-        clientWidth: el.clientWidth,
-        clientHeight: el.clientHeight,
-        offsetWidth: el.offsetWidth,
-        offsetHeight: el.offsetHeight,
-      });
-
       const cy = Cytoscape({
-        container: el,
+        container: containerRef.current,
         elements: [],
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         style: STYLESHEET as any,
@@ -375,17 +356,6 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
         nodeSet.has(resolveId(e.source)) && nodeSet.has(resolveId(e.target))
     );
 
-    // ── Debug log (remove once graph is confirmed working) ────
-    console.log("[Graph] Filter result:", {
-      rawNodes: rawData.nodes.length,
-      rawEdges: rawData.edges.length,
-      afterTypeFilter: typeVisibleNodes.length,
-      hiddenTypes: Array.from(hiddenTypes),
-      hideIsolated,
-      finalNodes: nodes.length,
-      finalEdges: edges.length,
-    });
-
     return { nodes, edges };
   }, [rawData, hiddenTypes, hideIsolated]);
 
@@ -437,32 +407,6 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
       ]);
     });
 
-    console.log("[Graph] Loading into Cytoscape:", {
-      nodes: filteredData.nodes.length,
-      edges: filteredData.edges.length,
-      cyReady,
-    });
-
-    // Verify elements actually landed in Cytoscape
-    const cyNodeCount = cy.nodes().length;
-    const cyEdgeCount = cy.edges().length;
-    console.log("[Cytoscape] After cy.add():", {
-      cyNodes: cyNodeCount,
-      cyEdges: cyEdgeCount,
-      containerW: containerRef.current?.clientWidth,
-      containerH: containerRef.current?.clientHeight,
-    });
-
-    setDebugInfo({
-      containerW: containerRef.current?.clientWidth ?? 0,
-      containerH: containerRef.current?.clientHeight ?? 0,
-      rawNodes: rawData?.nodes.length ?? 0,
-      rawEdges: rawData?.edges.length ?? 0,
-      filteredNodes: filteredData.nodes.length,
-      filteredEdges: filteredData.edges.length,
-      cyElements: cyNodeCount + cyEdgeCount,
-    });
-
     // Run force layout; fit viewport when animation finishes
     const layout = cy.layout(LAYOUT_OPTIONS);
     layout.on("layoutstop", () => {
@@ -472,7 +416,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
     // Reset selection
     setFocusedNodeId(null);
-  }, [filteredData, cyReady, rawData]);
+  }, [filteredData, cyReady]);
 
   // ── Info panel data (from rawData, not filtered) ───────────
   const focusedNode = focusedNodeId
@@ -833,17 +777,6 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
           </p>
         )}
 
-        {/* ── DEBUG BOX (remove once rendering confirmed working) ── */}
-        <div className="absolute left-3 top-3 z-30 rounded-lg border border-emerald-500/20 bg-black/80 px-3 py-2 font-mono text-[10px] leading-5 text-emerald-400 backdrop-blur">
-          <p className="font-semibold text-emerald-300">⬡ graph debug</p>
-          <p>container: {debugInfo ? `${debugInfo.containerW}×${debugInfo.containerH}` : cyReady ? "cy ready, no data yet" : "not init"}</p>
-          <p>raw nodes: {debugInfo?.rawNodes ?? rawData?.nodes.length ?? "?"}</p>
-          <p>raw edges: {debugInfo?.rawEdges ?? rawData?.edges.length ?? "?"}</p>
-          <p>filtered nodes: {debugInfo?.filteredNodes ?? filteredData?.nodes.length ?? "?"}</p>
-          <p>filtered edges: {debugInfo?.filteredEdges ?? filteredData?.edges.length ?? "?"}</p>
-          <p>cy initialized: {cyReady ? "YES" : "NO"}</p>
-          <p>cy elements: {debugInfo?.cyElements ?? "?"}</p>
-        </div>
       </div>
     </div>
   );

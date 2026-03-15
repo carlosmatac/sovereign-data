@@ -349,8 +349,24 @@ async function createProjectCanonicalEntity(args: {
     .select("id")
     .single<{ id: string }>();
 
-  if (error) throw error;
-  return data.id;
+  if (!error) return data.id;
+
+  // Unique constraint violation: an entity with the same (name, type) already
+  // exists in another scope (e.g., another project or global). The DB constraint
+  // doesn't include project_id, so we recover by returning the existing entity.
+  if (error.code === "23505") {
+    const { data: existing } = await supabaseClient
+      .from("entities")
+      .select("id")
+      .eq("normalized_name", normalized)
+      .eq("type", type)
+      .is("canonical_entity_id", null)
+      .maybeSingle<{ id: string }>();
+
+    if (existing) return existing.id;
+  }
+
+  throw error;
 }
 
 async function resolveCanonicalEntityId(

@@ -48,43 +48,86 @@ export function TranscriptViewer({
       ? transcriptDisplay ?? transcriptRaw
       : transcriptRaw;
 
-  // Parse transcript into speaker segments
+  // Parse transcript into speaker segments.
+  // Supports three formats (in priority order):
+  //   1. [Speaker A]: text   → audio/diarized (bracketed)
+  //   2. Speaker Name: text  → PDF/document (unbracketed, at line start)
+  //   3. Plain paragraphs    → unstructured PDF fallback
   const segments = useMemo(() => {
-    const speakerRegex = /\[([^\]]+)\]:\s*/g;
-    const parts: Array<{ speaker: string | null; text: string }> = [];
+    type Label = { speaker: string; start: number; contentStart: number };
 
-    // Collect all label positions in one pass
-    const labels: Array<{ speaker: string; start: number; contentStart: number }> = [];
+    function buildSegments(
+      text: string,
+      labels: Label[],
+      nameMap?: Record<string, string>
+    ): Array<{ speaker: string | null; text: string }> {
+      const parts: Array<{ speaker: string | null; text: string }> = [];
+
+      // Text before the first label
+      if (labels[0].start > 0) {
+        const before = text.slice(0, labels[0].start).trim();
+        if (before) parts.push({ speaker: null, text: before });
+      }
+
+      for (let i = 0; i < labels.length; i++) {
+        const endIndex =
+          i + 1 < labels.length ? labels[i + 1].start : text.length;
+        const speakerName =
+          nameMap?.[labels[i].speaker] ?? labels[i].speaker;
+        const chunk = text.slice(labels[i].contentStart, endIndex).trim();
+        if (chunk) parts.push({ speaker: speakerName, text: chunk });
+      }
+
+      return parts;
+    }
+
+    // ── Format 1: [Speaker A]: text ─────────────────────────────
+    const bracketRegex = /\[([^\]]+)\]:\s*/g;
+    const bracketLabels: Label[] = [];
     let m: RegExpExecArray | null;
-    while ((m = speakerRegex.exec(activeTranscript)) !== null) {
-      labels.push({
+    while ((m = bracketRegex.exec(activeTranscript)) !== null) {
+      bracketLabels.push({
         speaker: m[1],
         start: m.index,
         contentStart: m.index + m[0].length,
       });
     }
-
-    if (labels.length === 0) {
-      return [{ speaker: null, text: activeTranscript }];
+    if (bracketLabels.length > 0) {
+      return buildSegments(activeTranscript, bracketLabels, speakerMap);
     }
 
-    // Text before first label
-    if (labels[0].start > 0) {
-      const before = activeTranscript.slice(0, labels[0].start).trim();
-      if (before) parts.push({ speaker: null, text: before });
+    // ── Format 2: Speaker Name: text (unbracketed, line-start) ──
+    // Matches e.g. "MINISTER KOFI: ...", "Interviewer: ...", "Q: ..."
+    // Requires: capitalised start, ≤ 5 words before colon, followed by
+    // a letter/quote so we don't match "Section 1: notes" etc.
+    const lineRegex =
+      /^([A-Z][A-Za-z\u00C0-\u017E]*(?:[ \t]+[A-Za-z\u00C0-\u017E.'-]+){0,4}):\s+(?=[A-Za-z\u00C0-\u017E"'\u201C\u2018])/gm;
+    const lineLabels: Label[] = [];
+    while ((m = lineRegex.exec(activeTranscript)) !== null) {
+      lineLabels.push({
+        speaker: m[1].trim(),
+        start: m.index,
+        contentStart: m.index + m[0].length,
+      });
     }
 
-    // Build segments from label positions
-    for (let i = 0; i < labels.length; i++) {
-      const endIndex = i + 1 < labels.length ? labels[i + 1].start : activeTranscript.length;
-      const speakerName = speakerMap?.[labels[i].speaker] ?? labels[i].speaker;
-      const text = activeTranscript.slice(labels[i].contentStart, endIndex).trim();
-      if (text) {
-        parts.push({ speaker: speakerName, text });
-      }
+    // Only accept as speaker format if ≥ 3 turns with ≥ 2 distinct speakers
+    const distinctSpeakers = new Set(lineLabels.map((l) => l.speaker));
+    if (lineLabels.length >= 3 && distinctSpeakers.size >= 2) {
+      return buildSegments(activeTranscript, lineLabels);
     }
 
-    return parts;
+    // ── Format 3: paragraph-based fallback ───────────────────────
+    // Splits on blank lines; each paragraph becomes its own block.
+    const paragraphs = activeTranscript
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (paragraphs.length > 1) {
+      return paragraphs.map((text) => ({ speaker: null, text }));
+    }
+
+    return [{ speaker: null, text: activeTranscript }];
   }, [activeTranscript, speakerMap]);
 
   // Build speaker -> style map

@@ -220,6 +220,11 @@ export const SUPPORTED_AUDIO_FORMATS = [
 export const MAX_AUDIO_SIZE_MB = 500;
 export const MAX_AUDIO_SIZE_BYTES = MAX_AUDIO_SIZE_MB * 1024 * 1024;
 
+// PDF document interview limits
+export const MAX_PDF_SIZE_MB = 50;
+export const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
+export const MIN_PDF_TEXT_LENGTH = 100;
+
 // Report templates
 export const REPORT_TEMPLATES = {
   country_risk: {
