@@ -677,6 +677,7 @@ export interface Database {
         Args: {
           query_embedding: string;
           filter_project_ids?: string[] | null;
+          filter_interview_ids?: string[] | null;
           filter_country?: string | null;
           filter_topics?: string[] | null;
           match_threshold?: number;

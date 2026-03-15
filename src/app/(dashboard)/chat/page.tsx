@@ -30,14 +30,18 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const projectId = searchParams.get("project");
+  const interviewId = searchParams.get("interview");
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        body: projectId ? { projectId } : undefined,
+        body: {
+          ...(projectId ? { projectId } : {}),
+          ...(interviewId ? { interviewId } : {}),
+        },
       }),
-    [projectId]
+    [projectId, interviewId]
   );
 
   const { messages, sendMessage, status, error } = useChat({ transport });

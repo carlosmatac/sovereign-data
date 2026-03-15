@@ -48,6 +48,20 @@ export interface ResolutionAnchors {
 // ── Configuration ───────────────────────────────────────────────────
 
 const ANCHOR_SIMILARITY_THRESHOLD = 0.55;
+const PRIMARY_PERSON_FULL_THRESHOLD = 0.35;
+const PRIMARY_PERSON_TOKEN_THRESHOLD = 0.45;
+const PRIMARY_PERSON_SURNAME_THRESHOLD = 0.4;
+
+const HONORIFICS = new Set([
+  "mr", "mrs", "ms", "miss", "dr", "prof", "professor",
+  "sir", "madam", "dame", "lord", "lady",
+  "minister", "director", "chairman", "chairwoman",
+  "president", "ceo", "cfo", "coo", "cto",
+  "general", "colonel", "captain", "major",
+  "hon", "honorable", "honourable",
+  "excellency", "ambassador", "senator", "governor",
+  "sheikh", "imam", "mullah",
+]);
 
 // ── Main entry point ────────────────────────────────────────────────
 
@@ -178,12 +192,23 @@ interface AnchorMatchResult {
   method: ResolutionMethod;
 }
 
+function stripHonorifics(normalized: string): string {
+  const tokens = normalized.split(/\s+/);
+  const filtered = tokens.filter((t) => !HONORIFICS.has(t));
+  return filtered.length > 0 ? filtered.join(" ") : normalized;
+}
+
+function extractSurname(normalized: string): string | null {
+  const tokens = normalized.split(/\s+/).filter((t) => t.length >= 2);
+  if (tokens.length === 0) return null;
+  return tokens[tokens.length - 1];
+}
+
 /**
  * Check if a raw entity mention likely refers to an interview anchor
- * (primary interviewee or institution). Uses multiple signals:
- * - exact normalized match
- * - GPT canonical_name match
- * - fuzzy similarity on name tokens
+ * (primary interviewee or institution). The primary person anchor uses
+ * much more aggressive matching because we KNOW this person is in the
+ * interview — false positives are nearly impossible.
  */
 function matchAgainstAnchors(
   raw: RawExtractedEntity,
@@ -192,18 +217,98 @@ function matchAgainstAnchors(
   const personAnchor = anchors.intervieweeName;
   const orgAnchor = anchors.intervieweeOrg;
 
-  // Try person anchor
+  // Primary person anchor — aggressive matching
   if (personAnchor && isPersonType(raw.type)) {
-    const match = tryAnchorMatch(raw, personAnchor);
+    const match = tryPrimaryPersonAnchorMatch(raw, personAnchor);
     if (match) return match;
   }
 
-  // Try org anchor
+  // Org anchor — standard matching
   if (orgAnchor && isOrgType(raw.type)) {
     const match = tryAnchorMatch(raw, orgAnchor);
     if (match) return match;
   }
 
+  return null;
+}
+
+/**
+ * Aggressive matching for the primary interviewee. Uses honorific
+ * stripping, lower thresholds, and surname-focused comparison.
+ * Rationale: we KNOW this person was interviewed. Any PERSON entity
+ * that fuzzy-matches the anchor name almost certainly IS the interviewee.
+ */
+function tryPrimaryPersonAnchorMatch(
+  raw: RawExtractedEntity,
+  anchorName: string
+): AnchorMatchResult | null {
+  const anchorNorm = normalizeEntityName(anchorName);
+  const rawNorm = normalizeEntityName(raw.raw_name);
+  const canonicalNorm = normalizeEntityName(raw.canonical_name);
+
+  // Exact match on either raw or canonical
+  if (rawNorm === anchorNorm || canonicalNorm === anchorNorm) {
+    console.log(`[anchor-resolve] EXACT match: "${raw.raw_name}" → "${anchorName}"`);
+    return { anchorName, method: "exact" };
+  }
+
+  // Strip honorifics and try again (handles "Mr. Raji" → "Raji")
+  const rawStripped = stripHonorifics(rawNorm);
+  const canonicalStripped = stripHonorifics(canonicalNorm);
+  const anchorStripped = stripHonorifics(anchorNorm);
+
+  if (rawStripped === anchorStripped || canonicalStripped === anchorStripped) {
+    console.log(`[anchor-resolve] EXACT (after honorific strip): "${raw.raw_name}" → "${anchorName}"`);
+    return { anchorName, method: "exact" };
+  }
+
+  // Surname-focused match: compare just the last tokens
+  const anchorSurname = extractSurname(anchorStripped);
+  const rawSurname = extractSurname(rawStripped);
+  const canonicalSurname = extractSurname(canonicalStripped);
+
+  if (anchorSurname) {
+    for (const candidateSurname of [rawSurname, canonicalSurname]) {
+      if (!candidateSurname) continue;
+      if (candidateSurname === anchorSurname) {
+        console.log(`[anchor-resolve] SURNAME exact: "${raw.raw_name}" surname "${candidateSurname}" = anchor surname "${anchorSurname}" → "${anchorName}"`);
+        return { anchorName, method: "anchor_inferred" };
+      }
+      const surnameSim = trigramSimilarity(candidateSurname, anchorSurname);
+      if (surnameSim >= PRIMARY_PERSON_SURNAME_THRESHOLD) {
+        console.log(`[anchor-resolve] SURNAME fuzzy: "${raw.raw_name}" surname "${candidateSurname}" ~ anchor surname "${anchorSurname}" (sim=${surnameSim.toFixed(3)}) → "${anchorName}"`);
+        return { anchorName, method: "anchor_inferred" };
+      }
+    }
+  }
+
+  // Full-name fuzzy with lower threshold (after honorific stripping)
+  for (const candidate of [rawStripped, canonicalStripped]) {
+    if (!candidate) continue;
+    const fullSim = trigramSimilarity(candidate, anchorStripped);
+    if (fullSim >= PRIMARY_PERSON_FULL_THRESHOLD) {
+      console.log(`[anchor-resolve] FULL fuzzy: "${raw.raw_name}" ~ "${anchorName}" (sim=${fullSim.toFixed(3)}) → matched`);
+      return { anchorName, method: "anchor_inferred" };
+    }
+  }
+
+  // Token-level with lower threshold
+  const anchorTokens = anchorStripped.split(/\s+/).filter((t) => t.length >= 3);
+  for (const candidate of [rawStripped, canonicalStripped]) {
+    if (!candidate) continue;
+    const candidateTokens = candidate.split(/\s+/).filter((t) => t.length >= 2);
+    for (const at of anchorTokens) {
+      for (const ct of candidateTokens) {
+        const tokenSim = trigramSimilarity(at, ct);
+        if (tokenSim >= PRIMARY_PERSON_TOKEN_THRESHOLD) {
+          console.log(`[anchor-resolve] TOKEN fuzzy: "${raw.raw_name}" token "${ct}" ~ anchor token "${at}" (sim=${tokenSim.toFixed(3)}) → "${anchorName}"`);
+          return { anchorName, method: "anchor_inferred" };
+        }
+      }
+    }
+  }
+
+  console.log(`[anchor-resolve] NO MATCH for PERSON "${raw.raw_name}" (canonical="${raw.canonical_name}") against anchor "${anchorName}"`);
   return null;
 }
 
@@ -215,18 +320,10 @@ function tryAnchorMatch(
   const rawNorm = normalizeEntityName(raw.raw_name);
   const canonicalNorm = normalizeEntityName(raw.canonical_name);
 
-  // Exact match on either raw or canonical
   if (rawNorm === anchorNorm || canonicalNorm === anchorNorm) {
     return { anchorName, method: "exact" };
   }
 
-  // GPT canonical matches anchor (GPT figured it out)
-  if (canonicalNorm && anchorNorm && canonicalNorm === anchorNorm) {
-    return { anchorName, method: "alias" };
-  }
-
-  // Fuzzy: check if raw_name or canonical_name shares significant tokens
-  // with the anchor, suggesting GPT recognized the misspelled name
   if (
     fuzzyAnchorMatch(rawNorm, anchorNorm) ||
     fuzzyAnchorMatch(canonicalNorm, anchorNorm)
@@ -243,11 +340,9 @@ function fuzzyAnchorMatch(
 ): boolean {
   if (!candidateNorm || !anchorNorm) return false;
 
-  // Full-name similarity
   const fullSim = trigramSimilarity(candidateNorm, anchorNorm);
   if (fullSim >= ANCHOR_SIMILARITY_THRESHOLD) return true;
 
-  // Token-level: if any significant token from anchor appears in candidate
   const anchorTokens = anchorNorm
     .split(/\s+/)
     .filter((t) => t.length >= 4);

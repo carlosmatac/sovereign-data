@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const messages: UIMessage[] = body.messages ?? [];
   const projectId: string | null = body.projectId ?? null;
+  const explicitInterviewId: string | null = body.interviewId ?? null;
 
   if (messages.length === 0) {
     return new Response("No messages provided", { status: 400 });
@@ -125,18 +126,42 @@ export async function POST(request: NextRequest) {
     return new Response("Empty query", { status: 400 });
   }
 
-  // ── RAG Retrieval (project-scoped when available) ─────────────
+  // ── Scope detection ─────────────────────────────────────────────
   const admin = createAdminClient();
+  const scopeIntent = detectScopeIntent(queryText);
+  const effectiveInterviewId = explicitInterviewId ?? null;
 
+  let interviewMeta: { title: string; interviewee_name: string | null; interviewee_org: string | null } | null = null;
+  if (effectiveInterviewId) {
+    const { data } = await admin
+      .from("interviews")
+      .select("title, interviewee_name, interviewee_org")
+      .eq("id", effectiveInterviewId)
+      .maybeSingle();
+    interviewMeta = data;
+  }
+
+  const scopedToInterview = scopeIntent === "this_interview" && !!effectiveInterviewId;
+  const scopeWarning =
+    scopeIntent === "this_interview" && !effectiveInterviewId
+      ? "The user said \"this interview\" but no specific interview is selected. Answer using all available evidence but tell the user to open chat from a specific interview page for interview-scoped questions."
+      : null;
+
+  console.log(
+    `[chat-scope] intent=${scopeIntent} explicitInterview=${effectiveInterviewId ?? "none"} scopedToInterview=${scopedToInterview}`
+  );
+
+  // ── RAG Retrieval ───────────────────────────────────────────────
   const [queryEmbedding] = await generateEmbeddings([queryText]);
 
   const { data: chunks } = await admin.rpc("hybrid_search", {
     query_embedding: JSON.stringify(queryEmbedding),
     filter_project_ids: projectId ? [projectId] : null,
+    filter_interview_ids: scopedToInterview ? [effectiveInterviewId!] : null,
     filter_country: null,
     filter_topics: null,
     match_threshold: AI_CONFIG.similarityThreshold,
-    match_count: 20,
+    match_count: scopedToInterview ? 30 : 20,
   });
 
   const ragChunks = (chunks ?? []) as RagChunk[];
@@ -205,6 +230,8 @@ CITATION RULES:
 - Transcript chunks: cite as [1], [2], etc.
 - Entity tool results: cite as "According to our entity database: …"
 - Web results: cite as inline markdown links. List in a separate "Web Sources" section.
+
+${buildScopeBlock(scopedToInterview, interviewMeta, scopeWarning)}
 
 ${
   contextBlock
@@ -344,12 +371,56 @@ ${
     async onFinish({ text }) {
       const citationsUsed = (text.match(/\[\d+\]/g) ?? []).length;
       console.log(
-        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"}`
+        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent}`
       );
     },
   });
 
   return result.toUIMessageStreamResponse();
+}
+
+// ── Scope detection ─────────────────────────────────────────────────
+
+type ScopeIntent = "this_interview" | "this_project" | "global";
+
+const THIS_INTERVIEW_PATTERNS = [
+  /\bthis\s+interview\b/i,
+  /\bin\s+the\s+interview\b/i,
+  /\bfrom\s+this\s+interview\b/i,
+  /\bthis\s+transcript\b/i,
+  /\bin\s+this\s+conversation\b/i,
+  /\bwhat\s+did\s+(he|she|they|the\s+interviewee)\s+say\b/i,
+  /\bwhat\s+was\s+said\s+about\b/i,
+  /\baccording\s+to\s+this\s+interview\b/i,
+];
+
+function detectScopeIntent(query: string): ScopeIntent {
+  for (const pattern of THIS_INTERVIEW_PATTERNS) {
+    if (pattern.test(query)) return "this_interview";
+  }
+  if (/\bthis\s+project\b/i.test(query) || /\bacross\s+(all\s+)?interviews\b/i.test(query)) {
+    return "this_project";
+  }
+  return "global";
+}
+
+function buildScopeBlock(
+  scopedToInterview: boolean,
+  interviewMeta: { title: string; interviewee_name: string | null; interviewee_org: string | null } | null,
+  scopeWarning: string | null
+): string {
+  if (scopeWarning) {
+    return `\n═══════════════════════════════════════════════════════\nSCOPE WARNING\n═══════════════════════════════════════════════════════\n${scopeWarning}\n`;
+  }
+
+  if (scopedToInterview && interviewMeta) {
+    const interviewee = [interviewMeta.interviewee_name, interviewMeta.interviewee_org]
+      .filter(Boolean)
+      .join(" — ");
+    return `\n═══════════════════════════════════════════════════════\nSCOPE: SINGLE INTERVIEW\n═══════════════════════════════════════════════════════\nThe user is asking about a SPECIFIC interview. ALL evidence below comes ONLY from this interview:\n- Title: "${interviewMeta.title}"\n${interviewee ? `- Interviewee: ${interviewee}\n` : ""}\nCRITICAL: Do NOT use general knowledge, web search, or information from other interviews to answer this question. If the answer is not in the retrieved context below, say "This was not discussed in this interview" rather than supplementing from other sources.\n`;
+  }
+
+  return "";
 }
 
 function formatTime(seconds: number): string {
