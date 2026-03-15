@@ -27,7 +27,6 @@ import {
   Mic,
   MessageSquare,
   Network,
-  FileText,
   Settings,
   LogOut,
   ChevronUp,
@@ -63,11 +62,7 @@ const navItems = [
     href: "/network",
     icon: Network,
   },
-  {
-    title: "Reports",
-    href: "/reports",
-    icon: FileText,
-  },
+  // Reports hidden for demo — route still exists, remove comment to restore
 ];
 
 const bottomItems = [

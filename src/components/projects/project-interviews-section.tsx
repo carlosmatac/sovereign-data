@@ -46,10 +46,14 @@ export function ProjectInterviewsSection({
   const hasMore = filteredInterviews.length > visibleCount;
 
   const formatDuration = (seconds: number | null) => {
-    if (!seconds) return "—";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    if (!seconds || seconds <= 0) return "—";
+    const total = Math.round(seconds);
+    const hrs = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (hrs > 0)
+      return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   const formatCreatedAt = (value: string) =>

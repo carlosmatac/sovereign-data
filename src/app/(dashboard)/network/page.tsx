@@ -1,6 +1,6 @@
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { NetworkExplorer } from "@/components/network/network-explorer";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { EntityGraph } from "@/components/network/entity-graph";
 
 export default async function NetworkPage() {
   const supabase = await createClient();
@@ -12,58 +12,38 @@ export default async function NetworkPage() {
 
   const admin = createAdminClient();
 
-  const [entitiesResult, relationshipsResult, mentionsResult] =
-    await Promise.all([
-      admin.from("entities").select("id, name, type, description"),
-      admin
-        .from("entity_relationships")
-        .select("id, source_entity_id, target_entity_id, relation_type, confidence, evidence_text, interview_id"),
-      admin
-        .from("entity_mentions")
-        .select("entity_id, interview_id, sentiment")
-    ]);
+  // Fetch projects this user is a member of
+  const { data: memberships } = await admin
+    .from("project_members")
+    .select("project_id, projects(id, name)")
+    .eq("user_id", user.id);
 
-  const entities = entitiesResult.data ?? [];
-  const relationships = relationshipsResult.data ?? [];
-  const mentions = mentionsResult.data ?? [];
-
-  // Compute mention counts per entity
-  const mentionCounts: Record<string, number> = {};
-  mentions.forEach((m) => {
-    mentionCounts[m.entity_id] = (mentionCounts[m.entity_id] ?? 0) + 1;
-  });
-
-  // Build connection counts per entity from relationships
-  const connectionCounts: Record<string, number> = {};
-  relationships.forEach((r) => {
-    connectionCounts[r.source_entity_id] =
-      (connectionCounts[r.source_entity_id] ?? 0) + 1;
-    connectionCounts[r.target_entity_id] =
-      (connectionCounts[r.target_entity_id] ?? 0) + 1;
-  });
-
-  const enrichedEntities = entities.map((e) => ({
-    ...e,
-    mentionCount: mentionCounts[e.id] ?? 0,
-    connectionCount: connectionCounts[e.id] ?? 0,
-  }));
+  const projects = (memberships ?? [])
+    .map((m) => {
+      const p = m.projects as unknown as { id: string; name: string } | null;
+      return p ? { id: p.id, name: p.name } : null;
+    })
+    .filter((p): p is { id: string; name: string } => p !== null);
 
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Network Explorer
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Network Explorer</h1>
         <p className="mt-1 text-muted-foreground">
-          Explore entity relationships extracted from your interviews. Select an
-          entity to see its connections.
+          Visualise entity relationships extracted from your interviews. Click a
+          node to explore its connections.
         </p>
       </div>
 
-      <NetworkExplorer
-        entities={enrichedEntities}
-        relationships={relationships}
-      />
+      {projects.length === 0 ? (
+        <div className="rounded-lg border border-dashed py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            You are not a member of any projects yet.
+          </p>
+        </div>
+      ) : (
+        <EntityGraph projects={projects} initialProjectId={projects[0]?.id} />
+      )}
     </div>
   );
 }

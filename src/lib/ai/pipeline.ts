@@ -146,7 +146,7 @@ export async function processTranscription(
       transcript_display: normalizedTranscript.transcriptDisplay,
       speaker_map: speakerMap,
       audio_duration: transcription.audio_duration
-        ? Math.round(transcription.audio_duration / 1000)
+        ? Math.round(transcription.audio_duration)
         : null,
     });
 

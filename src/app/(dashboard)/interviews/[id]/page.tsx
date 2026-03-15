@@ -31,6 +31,7 @@ import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
 import { RecomputeCleanedTranscriptButton } from "@/components/interviews/recompute-cleaned-transcript-button";
+import { AudioPlayer } from "@/components/interviews/audio-player";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 
 export default async function InterviewDetailPage({
@@ -213,6 +214,13 @@ export default async function InterviewDetailPage({
           <p className="mt-3 text-muted-foreground">{interview.description}</p>
         )}
       </div>
+
+      {/* Audio Player */}
+      {interview.audio_url && (
+        <div className="mb-6">
+          <AudioPlayer src={interview.audio_url} title={interview.title} />
+        </div>
+      )}
 
       {/* Pipeline Status Tracker */}
       {interview.status !== "COMPLETED" && (
