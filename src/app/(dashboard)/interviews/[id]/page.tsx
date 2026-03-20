@@ -26,6 +26,7 @@ import {
   FileIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
@@ -345,11 +346,22 @@ export default async function InterviewDetailPage({
                   transcriptNormalizationStats?.replacementsApplied
                 }
                 actions={
-                  isOwner ? (
-                    <RecomputeCleanedTranscriptButton
-                      interviewId={interview.id}
-                    />
-                  ) : null
+                  <>
+                    {canEdit &&
+                      (interview.status === "COMPLETED" ||
+                        interview.status === "FAILED") && (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/interviews/${interview.id}/review`}>
+                            Transcript review
+                          </Link>
+                        </Button>
+                      )}
+                    {isOwner ? (
+                      <RecomputeCleanedTranscriptButton
+                        interviewId={interview.id}
+                      />
+                    ) : null}
+                  </>
                 }
                 speakerMap={
                   interview.speaker_map as Record<string, string>

@@ -92,4 +92,8 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 | Shared intel path + reviewed reprocess | `src/lib/ai/pipeline.ts` — `runIntelPipelineFromTranscriptInput` (internal), `reprocessInterviewFromReview`, `processTranscription` |
 | Extraction seeds | `src/lib/ai/extraction.ts` — `reviewerSeedEntities` |
 | Forced entity resolution | `src/lib/entities/resolve.ts` — `RawExtractedEntity.forcedEntityId` |
-| Review UI, save draft, reprocess API | _Not started (next phases)_ |
+| Review UI + save draft + seeds | `src/app/(dashboard)/interviews/[id]/review/page.tsx`, `src/components/interviews/transcript-review-editor.tsx` |
+| Entity search API | `src/app/api/projects/[projectId]/entities/search/route.ts` |
+| Server actions | `src/app/actions/interview-review.ts` |
+| Parse `transcript_full` → initial utterances | `src/lib/interviews/transcript-utterances-from-full.ts` |
+| Reprocess API / button | _Phase 4_ |

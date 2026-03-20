@@ -306,7 +306,7 @@
 |------|--------|--------|
 | 1 | Docs (roadmap, ingestion, schema, feature doc, README, HITL cross-link) | Done |
 | 2 | Migration + `database.ts` + pipeline entrypoint (`runIntelPipelineFromTranscriptInput` / `reprocessInterviewFromReview`) | Done |
-| 3 | Review UI (utterance editor, entity combobox, save draft) | Not started |
+| 3 | Review UI (utterance editor, entity combobox, save draft, mark ready) | Done |
 | 4 | Reprocess endpoint + transactional swap | Not started |
 
 ### Phase 3.6 completion criteria (target)
