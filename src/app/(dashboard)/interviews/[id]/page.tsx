@@ -34,6 +34,7 @@ import { EntityMentionsList } from "@/components/interviews/entity-mentions-list
 import { RecomputeCleanedTranscriptButton } from "@/components/interviews/recompute-cleaned-transcript-button";
 import { AudioPlayer } from "@/components/interviews/audio-player";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
+import { FEATURE_FLAGS } from "@/lib/feature-flags";
 
 export default async function InterviewDetailPage({
   params,
@@ -70,12 +71,14 @@ export default async function InterviewDetailPage({
     .select("*")
     .eq("interview_id", id);
 
-  // Fetch content snippets for this interview
-  const { data: snippets } = await supabase
-    .from("content_snippets")
-    .select("*")
-    .eq("interview_id", id)
-    .order("platform");
+  // Marketing snippets (optional UI — see FEATURE_FLAGS + docs/features/interview-ui-visibility.md)
+  const { data: snippets } = FEATURE_FLAGS.interviewMarketingAssetsUi
+    ? await supabase
+        .from("content_snippets")
+        .select("*")
+        .eq("interview_id", id)
+        .order("platform")
+    : { data: null };
 
   const allMentions =
     mentions
@@ -284,8 +287,10 @@ export default async function InterviewDetailPage({
               </Card>
             )}
 
-            {/* Marketing Assets */}
-            {snippets && snippets.length > 0 && (
+            {/* Marketing Assets — gated for demo; backend generation unchanged */}
+            {FEATURE_FLAGS.interviewMarketingAssetsUi &&
+              snippets &&
+              snippets.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">

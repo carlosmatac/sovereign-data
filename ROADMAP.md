@@ -123,7 +123,7 @@
 | Relationship persistence in ETL | Done | `src/lib/ai/pipeline.ts` | Step 7: entity name→ID map, upsert to `entity_relationships` |
 | Marketing content generation module | Done | `src/lib/ai/content-generation.ts` | GPT-4o-mini generates LinkedIn, Twitter, Newsletter, Executive Summary per interview |
 | Content generation in ETL pipeline | Done | `src/lib/ai/pipeline.ts` | Step 8: runs after COMPLETED, non-critical (failures don't affect pipeline status) |
-| Interview detail: Marketing Assets section | Done | `src/app/(dashboard)/interviews/[id]/page.tsx` | Platform icons, status badges, copy-to-clipboard per snippet |
+| Interview detail: Marketing Assets section | Done (UI gated) | `src/app/(dashboard)/interviews/[id]/page.tsx`, `src/lib/feature-flags.ts` | Implemented; **hidden for demo** via `FEATURE_FLAGS.interviewMarketingAssetsUi` — set `true` to show. See `docs/features/interview-ui-visibility.md` |
 | Interview detail: Relationships section | Done | `src/app/(dashboard)/interviews/[id]/page.tsx` | Source→Target with relation type, confidence %, evidence quotes |
 | Copy-to-clipboard component | Done | `src/components/interviews/copy-button.tsx` | Client component with visual feedback |
 | RLS for new tables | Done | `supabase/migrations/00004_graph_and_content.sql` | Reuses `is_project_member` + `get_interview_project` SECURITY DEFINER helpers |

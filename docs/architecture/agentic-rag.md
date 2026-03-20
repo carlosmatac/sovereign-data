@@ -241,6 +241,14 @@ const { messages, sendMessage, status, error } = useChat({ transport });
 
 Messages use the AI SDK v6 `.parts` format (not legacy `.content`). The client renders parts via `react-markdown`.
 
+### Loading / activity UI (no chain-of-thought)
+
+While a reply is in progress, the chat shows **`IntelligenceActivityStatus`** (`src/components/chat/intelligence-activity-status.tsx`): a short, user-facing checklist (e.g. searching interviews, entities, relationships, evidence, public sources, then drafting). The labels are **product copy**, not live step-by-step telemetry from the model or tools — they exist to make the wait feel intentional and premium without exposing internal reasoning.
+
+The page keeps this panel visible if the last message is an **assistant** row with **empty text** (common right when streaming starts) so the UI does not flash blank between “send” and the first token. The chat parent remounts this component with `key={lastUserMessage.id}` so step progression resets on each send.
+
+Assistant message bodies are rendered with **`IntelligenceBriefMarkdown`** (`src/components/chat/intelligence-brief-markdown.tsx`): editorial typography (headings, lists, blockquotes for evidence tone, horizontal rules, links) on the same **light** surface as the rest of the app (`background` / `foreground` tokens) — **not** wrapped in a card bubble; **UI only**; it does not change model output.
+
 ---
 
 ## Citation Format
@@ -259,6 +267,8 @@ Messages use the AI SDK v6 `.parts` format (not legacy `.content`). The client r
 |----------------|-----------|
 | Chat API route | `src/app/api/chat/route.ts` |
 | Chat UI page | `src/app/(dashboard)/chat/page.tsx` |
+| Chat loading / activity panel | `src/components/chat/intelligence-activity-status.tsx` |
+| Assistant markdown (brief styling) | `src/components/chat/intelligence-brief-markdown.tsx` |
 | Embedding generation | `src/lib/ai/embeddings.ts` |
 | Entity lookup (tools) | `src/lib/ai/entity-lookup.ts` |
 | Entity normalization | `src/lib/entities/normalize.ts` |

@@ -6,24 +6,9 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Send,
-  Loader2,
-  Bot,
-  User,
-  Sparkles,
-  MessageSquare,
-  Shield,
-} from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { Send, Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
+import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
+import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
 
 export default function ChatPage() {
   const [input, setInput] = useState("");
@@ -48,12 +33,11 @@ export default function ChatPage() {
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading, status]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +54,6 @@ export default function ChatPage() {
     }
   };
 
-  /** Extract plain text from a UIMessage's parts */
   const getMessageText = (
     parts: Array<{ type: string; text?: string; [key: string]: unknown }>
   ): string => {
@@ -80,104 +63,113 @@ export default function ChatPage() {
       .join("");
   };
 
+  const lastMessage = messages[messages.length - 1];
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((m) => m.role === "user");
+  const assistantPendingEmpty =
+    lastMessage?.role === "assistant" &&
+    getMessageText(lastMessage.parts).trim() === "";
+  const showIntelligenceActivity =
+    isLoading &&
+    messages.length > 0 &&
+    (lastMessage?.role === "user" || assistantPendingEmpty);
+
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col p-6">
-      {/* Header */}
-      <div className="mb-4 shrink-0">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Intelligence Chat
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Conversational AI grounded in your interview transcripts. Every answer
-          is sourced and verifiable.
-        </p>
-      </div>
-
-      {/* Chat Area */}
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto rounded-lg border bg-muted/20 p-4"
-        >
-          {messages.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="space-y-6">
-              {messages.map((message) => {
-                const text = getMessageText(message.parts);
-                if (!text) return null;
-
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.role === "user" ? "justify-end" : ""
-                    }`}
-                  >
-                    {message.role === "assistant" && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-background border shadow-sm"
-                      }`}
-                    >
-                      {message.role === "assistant" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none [&_a]:text-primary [&_a]:underline">
-                          <ReactMarkdown>{text}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <p className="text-sm">{text}</p>
-                      )}
-                    </div>
-                    {message.role === "user" && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <User className="h-4 w-4" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {isLoading &&
-                messages.length > 0 &&
-                messages[messages.length - 1]?.role === "user" && (
-                  <div className="flex gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div className="rounded-lg border bg-background px-4 py-3 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          Searching interviews & generating response...
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+    <div className="flex min-h-[calc(100dvh-2.5rem)] w-full flex-col bg-background text-foreground">
+      <header className="shrink-0 border-b border-border px-6 py-6 md:px-10 md:py-7">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Intelligence workspace
+          </p>
+          <h1 className="mt-1.5 text-xl font-semibold tracking-tight md:text-2xl">
+            Intelligence Chat
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Grounded answers from your interview corpus. Citations and sources
+            are shown in the response — verify every claim against the record.
+          </p>
+          {(projectId || interviewId) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {projectId && (
+                <span className="rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shadow-sm">
+                  Project scope
+                </span>
+              )}
+              {interviewId && (
+                <span className="rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shadow-sm">
+                  Single interview
+                </span>
+              )}
             </div>
           )}
         </div>
+      </header>
 
-        {/* Input Area */}
-        <form onSubmit={onSubmit} className="mt-3 flex gap-2">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto px-6 py-9 md:px-10 md:py-11"
+      >
+        {messages.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 md:gap-[4.5rem]">
+            {messages.map((message) => {
+              const text = getMessageText(message.parts);
+              if (!text) return null;
+
+              if (message.role === "user") {
+                return (
+                  <div key={message.id} className="flex justify-end">
+                    <div className="max-w-md rounded-3xl border border-border/80 bg-primary px-5 py-4 text-[14px] leading-relaxed text-primary-foreground shadow-md md:px-6 md:py-[1.125rem]">
+                      {text}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <article
+                  key={message.id}
+                  className="w-full max-w-[40rem] text-foreground"
+                >
+                  <IntelligenceBriefMarkdown>{text}</IntelligenceBriefMarkdown>
+                </article>
+              );
+            })}
+
+            {showIntelligenceActivity && (
+              <div className="w-full max-w-[40rem]">
+                <IntelligenceActivityStatus
+                  key={lastUserMessage?.id ?? "none"}
+                  phase={
+                    status === "streaming" ? "streaming" : "submitted"
+                  }
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <footer className="shrink-0 rounded-t-3xl border-t border-border bg-card/80 px-6 py-5 backdrop-blur-sm md:px-10 md:py-6">
+        <form
+          onSubmit={onSubmit}
+          className="mx-auto flex max-w-3xl items-end gap-3 md:gap-4"
+        >
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your interviews... (Enter to send, Shift+Enter for new line)"
-            className="min-h-[52px] max-h-[120px] resize-none"
+            placeholder="Pose a question… (Enter to send, Shift+Enter for line break)"
+            className="min-h-[56px] max-h-[160px] resize-none rounded-2xl border-[1.5px] border-input bg-background px-4 py-3.5 text-[15px] leading-snug shadow-sm placeholder:text-muted-foreground focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/20"
             rows={1}
             disabled={isLoading}
           />
           <Button
             type="submit"
             size="icon"
-            className="h-[52px] w-[52px] shrink-0"
+            className="h-14 w-14 shrink-0 rounded-2xl shadow-sm"
             disabled={!input.trim() || isLoading}
           >
             {isLoading ? (
@@ -187,37 +179,38 @@ export default function ChatPage() {
             )}
           </Button>
         </form>
-
         {error && (
-          <p className="mt-2 text-sm text-destructive">
-            Error: {error.message}
+          <p className="mx-auto mt-4 max-w-3xl rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error.message}
           </p>
         )}
-      </div>
+      </footer>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="max-w-md text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Sparkles className="h-8 w-8 text-primary" />
+    <div className="flex min-h-[min(420px,50vh)] items-center justify-center px-2">
+      <div className="mx-auto max-w-md text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+          <Sparkles
+            className="h-7 w-7 text-primary"
+            strokeWidth={1.5}
+          />
         </div>
-        <h2 className="mb-2 text-lg font-semibold">
-          Intelligence at your fingertips
+        <h2 className="text-lg font-semibold tracking-tight">
+          Research copilot
         </h2>
-        <p className="mb-6 text-sm text-muted-foreground">
-          Ask questions about your interviews and get AI-powered answers
-          grounded in real transcript data. Every response includes citations you
-          can verify.
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Ask analytical questions; responses read as structured briefs with
+          transcript-backed context. Start with a focused question below.
         </p>
-        <div className="grid gap-2 text-left">
+        <div className="mt-8 grid gap-2.5 text-left">
           {[
             {
               icon: ({ className }: { className?: string }) => (
-                <img src="/SD.svg" alt="SD" className={className} />
+                <img src="/SD.svg" alt="" className={className} aria-hidden />
               ),
               text: "What are the key risks in Mozambique's energy sector?",
             },
@@ -227,14 +220,14 @@ function EmptyState() {
             },
             {
               icon: MessageSquare,
-              text: "Summarize the interview findings on infrastructure",
+              text: "Summarize interview findings on infrastructure investment.",
             },
           ].map((example) => (
             <div
               key={example.text}
-              className="flex items-start gap-2 rounded-lg border p-3 text-xs text-muted-foreground"
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] leading-snug text-muted-foreground shadow-sm"
             >
-              <example.icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <example.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <span>{example.text}</span>
             </div>
           ))}

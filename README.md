@@ -65,6 +65,7 @@ Deep technical documentation lives in the `docs/` directory. Each file is self-c
 |----------|-------------|
 | [Human-in-the-Loop](./docs/features/human-in-the-loop.md) | Entity Editor: rename vs. merge flows, alias learning, downstream effects |
 | [Report Generation](./docs/features/report-generation.md) | GPT-4o streaming reports, PDF export, password-protected sharing |
+| [Interview UI visibility](./docs/features/interview-ui-visibility.md) | Demo toggles (e.g. Marketing Assets on interview detail) |
 
 ### Root Files
 
