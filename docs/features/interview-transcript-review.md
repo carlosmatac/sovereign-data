@@ -19,7 +19,7 @@ This document describes **Phase 3.6**: the transcript review UI, the `interview_
 | Layer | Where it lives | Purpose |
 |-------|----------------|---------|
 | **Raw** | `interviews.transcript_full` | Immutable speaker-labeled AssemblyAI output. Never overwritten for audit. |
-| **Auto display** | `interviews.transcript_display` | Deterministic anchor normalization for reading (`normalizeTranscriptDisplay`). Not the reviewed artifact. |
+| **Auto display** | `interviews.transcript_display` | Still populated on ingest (`normalizeTranscriptDisplay`). The interview **detail** transcript card shows **raw** only; editors fix text via **Transcript review**. |
 | **Reviewed** | `interviews.reviewed_utterances` | Editor-owned JSON array of utterances (`speaker`, `text`, `start`, `end`). **Only** this layer feeds reviewed reprocessing. |
 
 ---

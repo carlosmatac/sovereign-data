@@ -7,16 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, MessageSquareText } from "lucide-react";
 
 interface TranscriptViewerProps {
   transcriptRaw: string;
-  transcriptDisplay?: string | null;
   speakerMap?: Record<string, string>;
-  replacementsApplied?: number;
   actions?: ReactNode;
 }
 
@@ -29,30 +26,17 @@ const SPEAKER_STYLES = [
   { badge: "text-cyan-700 bg-cyan-50 border-cyan-200", bar: "bg-cyan-400" },
 ];
 
+/**
+ * Read-only transcript with search. Uses raw stored transcript (`transcript_full`).
+ * For anchor/name fixes, editors use Transcript review → human reprocessing.
+ */
 export function TranscriptViewer({
   transcriptRaw,
-  transcriptDisplay,
   speakerMap,
-  replacementsApplied,
   actions,
 }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const hasCleanedTranscript =
-    Boolean(transcriptDisplay?.trim()) &&
-    transcriptDisplay?.trim() !== transcriptRaw.trim();
-  const [viewMode, setViewMode] = useState<"cleaned" | "original">(
-    hasCleanedTranscript ? "cleaned" : "original"
-  );
-  const activeTranscript =
-    hasCleanedTranscript && viewMode === "cleaned"
-      ? transcriptDisplay ?? transcriptRaw
-      : transcriptRaw;
 
-  // Parse transcript into speaker segments.
-  // Supports three formats (in priority order):
-  //   1. [Speaker A]: text   → audio/diarized (bracketed)
-  //   2. Speaker Name: text  → PDF/document (unbracketed, at line start)
-  //   3. Plain paragraphs    → unstructured PDF fallback
   const segments = useMemo(() => {
     type Label = { speaker: string; start: number; contentStart: number };
 
@@ -63,7 +47,6 @@ export function TranscriptViewer({
     ): Array<{ speaker: string | null; text: string }> {
       const parts: Array<{ speaker: string | null; text: string }> = [];
 
-      // Text before the first label
       if (labels[0].start > 0) {
         const before = text.slice(0, labels[0].start).trim();
         if (before) parts.push({ speaker: null, text: before });
@@ -81,11 +64,10 @@ export function TranscriptViewer({
       return parts;
     }
 
-    // ── Format 1: [Speaker A]: text ─────────────────────────────
     const bracketRegex = /\[([^\]]+)\]:\s*/g;
     const bracketLabels: Label[] = [];
     let m: RegExpExecArray | null;
-    while ((m = bracketRegex.exec(activeTranscript)) !== null) {
+    while ((m = bracketRegex.exec(transcriptRaw)) !== null) {
       bracketLabels.push({
         speaker: m[1],
         start: m.index,
@@ -93,17 +75,13 @@ export function TranscriptViewer({
       });
     }
     if (bracketLabels.length > 0) {
-      return buildSegments(activeTranscript, bracketLabels, speakerMap);
+      return buildSegments(transcriptRaw, bracketLabels, speakerMap);
     }
 
-    // ── Format 2: Speaker Name: text (unbracketed, line-start) ──
-    // Matches e.g. "MINISTER KOFI: ...", "Interviewer: ...", "Q: ..."
-    // Requires: capitalised start, ≤ 5 words before colon, followed by
-    // a letter/quote so we don't match "Section 1: notes" etc.
     const lineRegex =
       /^([A-Z][A-Za-z\u00C0-\u017E]*(?:[ \t]+[A-Za-z\u00C0-\u017E.'-]+){0,4}):\s+(?=[A-Za-z\u00C0-\u017E"'\u201C\u2018])/gm;
     const lineLabels: Label[] = [];
-    while ((m = lineRegex.exec(activeTranscript)) !== null) {
+    while ((m = lineRegex.exec(transcriptRaw)) !== null) {
       lineLabels.push({
         speaker: m[1].trim(),
         start: m.index,
@@ -111,15 +89,12 @@ export function TranscriptViewer({
       });
     }
 
-    // Only accept as speaker format if ≥ 3 turns with ≥ 2 distinct speakers
     const distinctSpeakers = new Set(lineLabels.map((l) => l.speaker));
     if (lineLabels.length >= 3 && distinctSpeakers.size >= 2) {
-      return buildSegments(activeTranscript, lineLabels);
+      return buildSegments(transcriptRaw, lineLabels);
     }
 
-    // ── Format 3: paragraph-based fallback ───────────────────────
-    // Splits on blank lines; each paragraph becomes its own block.
-    const paragraphs = activeTranscript
+    const paragraphs = transcriptRaw
       .split(/\n{2,}/)
       .map((p) => p.trim())
       .filter(Boolean);
@@ -127,10 +102,9 @@ export function TranscriptViewer({
       return paragraphs.map((text) => ({ speaker: null, text }));
     }
 
-    return [{ speaker: null, text: activeTranscript }];
-  }, [activeTranscript, speakerMap]);
+    return [{ speaker: null, text: transcriptRaw }];
+  }, [transcriptRaw, speakerMap]);
 
-  // Build speaker -> style map
   const speakerStyles = useMemo(() => {
     const map = new Map<string, (typeof SPEAKER_STYLES)[0]>();
     let colorIndex = 0;
@@ -143,7 +117,6 @@ export function TranscriptViewer({
     return map;
   }, [segments]);
 
-  // Filter segments by search
   const filteredSegments = useMemo(() => {
     if (!searchQuery.trim()) return segments;
     const q = searchQuery.toLowerCase();
@@ -158,38 +131,12 @@ export function TranscriptViewer({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <MessageSquareText className="h-4 w-4 text-primary" />
             <CardTitle className="text-base">Full Transcript</CardTitle>
-            {hasCleanedTranscript && (
-              <span className="text-xs text-muted-foreground">
-                Cleaned transcript
-                {typeof replacementsApplied === "number" &&
-                replacementsApplied > 0
-                  ? `: ${replacementsApplied} replacements`
-                  : ""}
-              </span>
-            )}
-            {hasCleanedTranscript && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() =>
-                  setViewMode((prev) =>
-                    prev === "cleaned" ? "original" : "cleaned"
-                  )
-                }
-              >
-                {viewMode === "cleaned"
-                  ? "View original transcript"
-                  : "View cleaned transcript"}
-              </Button>
-            )}
             {actions}
           </div>
-          <div className="relative w-64">
+          <div className="relative w-64 shrink-0">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search transcript..."

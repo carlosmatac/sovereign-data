@@ -33,9 +33,7 @@ import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
-import { RecomputeCleanedTranscriptButton } from "@/components/interviews/recompute-cleaned-transcript-button";
 import { AudioPlayer } from "@/components/interviews/audio-player";
-import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 
 export default async function InterviewDetailPage({
@@ -59,7 +57,6 @@ export default async function InterviewDetailPage({
 
   const userRole = await getUserProjectRole(interview.project_id);
   const canEdit = userRole === "owner" || userRole === "editor";
-  const isOwner = userRole === "owner";
 
   // Fetch entities for this interview
   const { data: mentions } = await supabase
@@ -155,14 +152,6 @@ export default async function InterviewDetailPage({
     score?: number;
     highlights?: Array<{ text: string; sentiment: string }>;
   } | null;
-
-  const transcriptNormalizationStats =
-    interview.transcript_full
-      ? normalizeTranscriptDisplay(interview.transcript_full, {
-          intervieweeName: interview.interviewee_name,
-          intervieweeOrg: interview.interviewee_org,
-        }).stats
-      : null;
 
   return (
     <div className="p-6">
@@ -351,27 +340,14 @@ export default async function InterviewDetailPage({
             {interview.transcript_full && (
               <TranscriptViewer
                 transcriptRaw={interview.transcript_full}
-                transcriptDisplay={interview.transcript_display}
-                replacementsApplied={
-                  transcriptNormalizationStats?.replacementsApplied
-                }
                 actions={
-                  <>
-                    {canEdit &&
-                      (interview.status === "COMPLETED" ||
-                        interview.status === "FAILED") && (
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/interviews/${interview.id}/review`}>
-                            Transcript review
-                          </Link>
-                        </Button>
-                      )}
-                    {isOwner ? (
-                      <RecomputeCleanedTranscriptButton
-                        interviewId={interview.id}
-                      />
-                    ) : null}
-                  </>
+                  canEdit ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/interviews/${interview.id}/review`}>
+                        Transcript review
+                      </Link>
+                    </Button>
+                  ) : null
                 }
                 speakerMap={
                   interview.speaker_map as Record<string, string>
