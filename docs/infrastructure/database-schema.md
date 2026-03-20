@@ -2,7 +2,7 @@
 
 > Multi-tenant PostgreSQL with pgvector, RLS, and Knowledge Graph
 
-This document details Sovereign's database design: 10 tables across 11 migrations, multi-tenant isolation via `project_id`, Row Level Security with SECURITY DEFINER helpers, and the entity/alias canonical merge system.
+This document details Sovereign's database design: multi-tenant isolation via `project_id`, Row Level Security with SECURITY DEFINER helpers, and the entity/alias canonical merge system. **Table count**: 10 core tables in migrations `00001`–`00012`; **Phase 3.6** adds `interview_review_entities` and interview review columns (migration `00013_interview_transcript_review.sql`).
 
 ---
 
@@ -33,6 +33,7 @@ erDiagram
     interviews ||--o{ entity_mentions : "interview_id"
     interviews ||--o{ entity_relationships : "interview_id"
     interviews ||--o{ content_snippets : "interview_id"
+    interviews ||--o{ interview_review_entities : "interview_id"
     entities ||--o{ entity_mentions : "entity_id"
     entities ||--o{ entity_aliases : "entity_id"
     entities ||--o{ entity_relationships : "source_entity_id"
@@ -123,10 +124,39 @@ Audio assets with full lifecycle status tracking.
 | `created_at` | `TIMESTAMPTZ` | |
 | `updated_at` | `TIMESTAMPTZ` | |
 
+**Human review (Phase 3.6)** — additive columns on `interviews`:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `reviewed_utterances` | `JSONB` | Nullable. Array of `{ speaker, text, start, end }` aligned with chunking input; **single source of truth** for reviewed reprocessing (see [ingestion pipeline](../architecture/ingestion-pipeline.md#human-review-layer--reviewed-reprocessing)). |
+| `transcript_review_status` | `transcript_review_status` (enum) | e.g. `none`, `draft`, `ready`, `reprocessing` — exact values in migration; UI + reprocess gate. |
+| `last_intel_source` | `TEXT` | Optional audit: e.g. `assemblyai_auto` vs `human_review` to indicate which pass produced current summary/chunks. |
+
 **Status enum** (`interview_status`):
 `PROCESSING` → `TRANSCRIBING` → `EXTRACTING` → `EMBEDDING` → `COMPLETED` | `FAILED`
 
-**Migrations**: `00001`, `00004`, `00008`, `00010`, `00011`
+**Migrations**: `00001`, `00004`, `00008`, `00010`, `00011`, `00013` (Phase 3.6 review columns)
+
+### `interview_review_entities`
+
+Structured **seed entities** for transcript review (not a JSON blob on the interview row). Used as **mandatory strong inputs** during reviewed reprocessing: extraction, mention recovery, relationship inference, and graph persistence.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `interview_id` | `UUID` | FK → `interviews`, CASCADE delete |
+| `entity_id` | `UUID` | FK → `entities`, nullable until linked (new entity created at save or reprocess) |
+| `display_name` | `TEXT` | Name as confirmed by reviewer (required for extraction context) |
+| `entity_type` | `entity_type` | `PERSON`, `COMPANY`, etc. |
+| `created_by` | `UUID` | FK → `profiles` |
+| `created_at` | `TIMESTAMPTZ` | |
+| `updated_at` | `TIMESTAMPTZ` | |
+
+**Future columns** (optional later migrations): `evidence_span` JSONB (utterance index + char offsets), `notes`.
+
+**RLS**: SELECT for project members via `interview_id` → `get_interview_project`; INSERT/UPDATE/DELETE for `is_project_editor(project_id)` (same pattern as `interviews`).
+
+**Migration**: `00013_interview_transcript_review.sql` (Phase 3.6)
 
 ### `interview_chunks`
 
@@ -307,6 +337,7 @@ flowchart TD
 | `entity_mentions` | Transitive | `interview_id` → `interviews.project_id` |
 | `entity_relationships` | Transitive | `interview_id` → `interviews.project_id` |
 | `content_snippets` | Transitive | `interview_id` → `interviews.project_id` |
+| `interview_review_entities` | Transitive | `interview_id` → `interviews.project_id` |
 
 ### Access Control Flow
 
@@ -404,6 +435,7 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 | `snippet_status` | `draft`, `approved`, `published` | `00004` |
 | `report_status` | `generating`, `completed`, `failed` | `00006` |
 | `report_template` | `country_risk`, `sector_analysis`, `entity_profile`, `executive_briefing`, `custom` | `00006` |
+| `transcript_review_status` | `none`, `draft`, `ready`, `reprocessing` (exact set in `00013`) | `00013` (Phase 3.6) |
 
 ---
 
@@ -422,6 +454,8 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 | `00009_entity_normalization.sql` | `entities.project_id`, `canonical_entity_id`, `normalized_name`, `entity_aliases` table, trigram indexes |
 | `00010_interview_primary_entities.sql` | `interviews.interviewee_name`, `interviews.interviewee_org` |
 | `00011_transcript_display.sql` | `interviews.transcript_display` |
+| `00012_interview_scoped_search.sql` | Interview-scoped search RPC (if present in repo) |
+| `00013_interview_transcript_review.sql` | `reviewed_utterances`, `transcript_review_status`, `last_intel_source` on `interviews`; `interview_review_entities` + RLS |
 
 ---
 

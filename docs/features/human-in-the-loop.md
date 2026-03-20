@@ -4,6 +4,8 @@
 
 This document details Sovereign's Entity Editor, the human-in-the-loop system that allows users to correct entity names extracted by the AI pipeline. Corrections feed back into the knowledge graph as aliases, improving both future entity matching and ASR word boost accuracy.
 
+**Related (different concern)**: [Interview transcript review](./interview-transcript-review.md) — **before** or alongside graph fixes, editors can correct **`reviewed_utterances`**, add **structured seed entities** (`interview_review_entities`), and **reprocess** so chunks, embeddings, mentions, and relationships are rebuilt from reviewed text. The Entity Editor here fixes **canonical identity** (rename/merge) on entities that already exist in the graph; transcript review fixes **source text** and **strongly steers** the next extraction pass.
+
 ---
 
 ## Architecture Overview

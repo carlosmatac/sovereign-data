@@ -1,6 +1,6 @@
 # Sovereign Data — Development Roadmap
 
-**Last updated**: February 26, 2026
+**Last updated**: March 20, 2026
 **Repo**: `git@github.com:carlosmatac/sovereign-data.git`
 **Branch**: `main`
 
@@ -16,6 +16,7 @@
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | COMPLETE | 100% |
 | 3.5 | Intelligence Chat Upgrades | COMPLETE | 100% |
+| 3.6 | Human Review & Interview Reprocessing | IN PROGRESS | 0% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -283,6 +284,36 @@
 | Selectors as pure functions (not inline JSX) | `selectKpis()` and `selectPipelineHealth()` are testable, reusable, and decoupled from rendering |
 | War Room as client component (not RSC) | Needs client-side state for loading/error/retry + filter state; mock data has no server dependencies |
 | Two-column layout (War Room + Project Ops) | Revenue data is the primary concern for CMs; interview/team stats demoted to sidebar but still one click away |
+
+---
+
+## Phase 3.6 — Human Review & Interview Reprocessing (IN PROGRESS)
+
+**Goal**: Let editors correct ASR transcripts, seed entities with search/create, and **reprocess** an interview so chunks, mentions, relationships, and downstream intelligence are rebuilt from **reviewed utterances only**, with **human seed entities** as mandatory strong inputs to extraction and graph persistence — without overwriting immutable raw transcript.
+
+**Documentation**: [Interview transcript review](docs/features/interview-transcript-review.md), [Ingestion pipeline — human review layer](docs/architecture/ingestion-pipeline.md#human-review-layer--reviewed-reprocessing).
+
+### Locked architecture rules
+
+1. **Single source of truth (reviewed pass)** — For a reviewed reprocessing run, `reviewed_utterances` is the only transcript source. The pipeline derives **reviewed full text** (for LLM extraction) and **reviewed chunks** (for embeddings, grounding, relationships) from it. Raw `transcript_full` / AssemblyAI text must not be mixed into that pass.
+2. **Strong human entities** — Rows in `interview_review_entities` are not passive annotations. They must be passed into extraction and influence mention recovery, relationship extraction, and final persistence (`entity_mentions`, `entity_relationships`, entity resolution).
+3. **Failure-safe swap** — If rebuild fails before commit, derived interview data must remain unchanged. **MVP approach**: run all expensive steps (LLM, embeddings) **off-DB** or without mutating existing chunks; perform **delete old derived rows + insert new rows** inside **one PostgreSQL transaction** so a failure rolls back to the previous graph/chunks.
+4. **Structured seed table** — Prefer `interview_review_entities` (relational table) over JSON-only blobs for auditability and future fields (e.g. spans, provenance).
+
+### Implementation order
+
+| Step | Scope | Status |
+|------|--------|--------|
+| 1 | Docs (roadmap, ingestion, schema, feature doc, README, HITL cross-link) | Done |
+| 2 | Migration + `database.ts` + pipeline entrypoint (`runExtractionPipeline` / reviewed path) | Not started |
+| 3 | Review UI (utterance editor, entity combobox, save draft) | Not started |
+| 4 | Reprocess endpoint + transactional swap | Not started |
+
+### Phase 3.6 completion criteria (target)
+
+1. Editor can open transcript review, edit reviewed utterances, manage seed entities (search + create), save draft.
+2. Reprocess completes from reviewed data only; search/chat see new chunks after success.
+3. Failed reprocess leaves prior `COMPLETED` derived data intact (transactional swap).
 
 ---
 

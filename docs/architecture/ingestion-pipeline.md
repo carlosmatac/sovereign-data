@@ -267,6 +267,63 @@ Additional metadata stored per chunk:
 
 ---
 
+## Human review layer & reviewed reprocessing
+
+Sovereign distinguishes three transcript layers for an interview:
+
+| Layer | Storage (conceptual) | Mutable? | Role |
+|-------|----------------------|----------|------|
+| **Raw transcript** | `interviews.transcript_full` (+ AssemblyAI `assemblyai_id`) | **No** after ingest | Immutable ASR output with speaker labels; audit and diff baseline. |
+| **Auto display transcript** | `interviews.transcript_display` | Overwritten only by automatic normalization | Deterministic anchor cleanup for reading (see `normalizeTranscriptDisplay`). Not a human review artifact. |
+| **Reviewed working transcript** | `interviews.reviewed_utterances` (JSONB) | Yes (editors) | Human-corrected utterance list used **only** when running **reviewed reprocessing**. |
+
+Feature detail and UX: [Interview transcript review](../features/interview-transcript-review.md).
+
+### Reviewed pass: single source of truth
+
+For **reviewed reprocessing** (Phase 3.6), **`reviewed_utterances` is the sole transcript source** for that run:
+
+1. **Reviewed full text** for `extractIntelligence` is **derived** from `reviewed_utterances` (e.g. concatenation of utterance texts with the same speaker/timestamp conventions as the initial pipeline). **Do not** mix in `transcript_full`, AssemblyAI `text`, or `transcript_display` during that pass.
+2. **Chunking** for embeddings and grounding uses **only** the utterance structures from `reviewed_utterances` (same shape as input to `chunkTranscript`: speaker, text, start, end).
+
+This keeps mention recovery, embeddings, and evidence aligned with what the human approved.
+
+### Human seed entities (strong inputs)
+
+Human-confirmed entities live in a **relational** table, `interview_review_entities` (see [database schema](../infrastructure/database-schema.md)), not as passive UI-only notes.
+
+On reviewed reprocessing they **must**:
+
+- Be supplied to extraction as **mandatory context** (names, types, optional linked `entity_id`) so the model recovers mentions and infers relationships against the **reviewed** text.
+- Flow through existing resolution (`matchOrCreateEntity` / `resolveExtractedEntities`) and grounding so **`entity_mentions`**, **`entity_relationships`**, and the wider graph reflect both model output and human seeds.
+
+They are **not** optional annotations that the pipeline may ignore.
+
+### Failure-safe rebuild (MVP)
+
+Reviewed reprocessing replaces derived data for the interview: chunks, mentions, relationships, and snippets. To avoid a **partially deleted** state if OpenAI or embedding calls fail:
+
+- **Compute first, swap second** — Run extraction, chunking, embedding generation, and build the full in-memory (or application-side) payload **before** deleting existing `interview_chunks` / dependent rows.
+- **Transactional swap** — In one **database transaction**: delete interview-scoped `entity_relationships`, `entity_mentions`, `interview_chunks`, and `content_snippets`; insert the new rows; update interview summary/sentiment/topics and any review flags. If any step fails, **ROLLBACK** leaves the prior `COMPLETED` graph intact.
+
+Long-running LLM work cannot run inside that transaction; the transaction should only wrap the **destructive replace** once new data is ready.
+
+### High-level flow (reviewed reprocess)
+
+```mermaid
+flowchart TD
+  Rev[reviewed_utterances JSONB] --> Full[Derive reviewed full text]
+  Rev --> Chunk[chunkTranscript from reviewed utterances]
+  Full --> Ext[extractIntelligence + seed entities]
+  Ext --> Norm[Anchor normalization metadata]
+  Chunk --> Norm
+  Norm --> Emb[Embeddings from content_for_embedding]
+  Emb --> Txn[Single DB txn: delete derived + insert new]
+  Txn --> Done[Interview COMPLETED from reviewed pass]
+```
+
+---
+
 ## Vector Index
 
 Defined in `supabase/migrations/00001_initial_schema.sql`:
@@ -307,3 +364,4 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Schema + hybrid_search | `supabase/migrations/00001_initial_schema.sql` |
 | Graph schema | `supabase/migrations/00004_graph_and_content.sql` |
 | Entity normalization schema | `supabase/migrations/00009_entity_normalization.sql` |
+| Human review & reprocessing | `supabase/migrations/00013_interview_transcript_review.sql` (Phase 3.6), `src/lib/ai/pipeline.ts` |
