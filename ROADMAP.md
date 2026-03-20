@@ -305,7 +305,7 @@
 | Step | Scope | Status |
 |------|--------|--------|
 | 1 | Docs (roadmap, ingestion, schema, feature doc, README, HITL cross-link) | Done |
-| 2 | Migration + `database.ts` + pipeline entrypoint (`runExtractionPipeline` / reviewed path) | Not started |
+| 2 | Migration + `database.ts` + pipeline entrypoint (`runIntelPipelineFromTranscriptInput` / `reprocessInterviewFromReview`) | Done |
 | 3 | Review UI (utterance editor, entity combobox, save draft) | Not started |
 | 4 | Reprocess endpoint + transactional swap | Not started |
 

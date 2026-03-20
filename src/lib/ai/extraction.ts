@@ -10,6 +10,7 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
+import type { EntityType } from "@/types/database";
 import { withRetry } from "./retry";
 
 const ExtractionSchema = z.object({
@@ -147,6 +148,7 @@ export async function extractIntelligence({
   speakerMap,
   primaryPerson,
   primaryOrg,
+  reviewerSeedEntities,
 }: {
   transcript: string;
   interviewTitle: string;
@@ -154,6 +156,11 @@ export async function extractIntelligence({
   speakerMap?: Record<string, string>;
   primaryPerson?: string | null;
   primaryOrg?: string | null;
+  /** Human-confirmed entities from transcript review — strong inputs for mention + relationship extraction. */
+  reviewerSeedEntities?: Array<{
+    displayName: string;
+    type: EntityType;
+  }>;
 }): Promise<ExtractionResult> {
   const speakerContext = speakerMap
     ? `\nSpeaker identification: ${JSON.stringify(speakerMap)}`
@@ -163,6 +170,16 @@ export async function extractIntelligence({
       ? `\nPrimary Entities (provided by the uploader — use these exact spellings when the transcript refers to them, even if the transcript misspells them):
 - Primary PERSON: ${primaryPerson ?? "unknown"}
 - Primary ORG: ${primaryOrg ?? "unknown"}`
+      : "";
+  const reviewerSeedsContext =
+    reviewerSeedEntities && reviewerSeedEntities.length > 0
+      ? `\nHUMAN-CONFIRMED ENTITIES (non-optional — you MUST treat these as real entities in this interview):
+${reviewerSeedEntities
+  .map(
+    (s) =>
+      `- "${s.displayName}" (type: ${s.type}) — include in your entities array when they appear in the transcript; use this exact spelling as canonical_name when the transcript refers to them. Infer relationships between these and other entities when the transcript supports it, with evidence quotes.`
+  )
+  .join("\n")}`
       : "";
 
   const { object } = await withRetry(
@@ -175,7 +192,7 @@ export async function extractIntelligence({
 Analyze the following interview transcript and extract structured intelligence.
 
 Interview: "${interviewTitle}"
-${country ? `Country/Region: ${country}` : ""}${speakerContext}${primaryEntitiesContext}
+${country ? `Country/Region: ${country}` : ""}${speakerContext}${primaryEntitiesContext}${reviewerSeedsContext}
 
 TRANSCRIPT:
 ${transcript}
@@ -191,7 +208,8 @@ INSTRUCTIONS:
 - Be precise with sentiment — distinguish between the interviewee's opinion and factual statements.
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
 - Risks and opportunities should be actionable intelligence, not generic statements.
-- RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.`,
+- RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.
+- If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.`,
       }),
     "extractIntelligence"
   );

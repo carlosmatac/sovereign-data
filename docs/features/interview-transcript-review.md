@@ -83,6 +83,13 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 
 ---
 
-## File reference (as implemented)
+## File reference (implementation status)
 
-_To be filled during Phase 3.6 implementation: migration `00013_interview_transcript_review.sql`, `src/lib/ai/pipeline.ts`, review UI routes, reprocess API._
+| Piece | Path |
+|-------|------|
+| Migration | `supabase/migrations/00013_interview_transcript_review.sql` |
+| Types | `src/types/database.ts` (`ReviewedUtterance`, `TranscriptReviewStatus`, `interview_review_entities`, RPC `clear_interview_derived_data`) |
+| Shared intel path + reviewed reprocess | `src/lib/ai/pipeline.ts` — `runIntelPipelineFromTranscriptInput` (internal), `reprocessInterviewFromReview`, `processTranscription` |
+| Extraction seeds | `src/lib/ai/extraction.ts` — `reviewerSeedEntities` |
+| Forced entity resolution | `src/lib/entities/resolve.ts` — `RawExtractedEntity.forcedEntityId` |
+| Review UI, save draft, reprocess API | _Not started (next phases)_ |

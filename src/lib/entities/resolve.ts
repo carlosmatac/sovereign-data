@@ -26,6 +26,8 @@ export interface RawExtractedEntity {
   type: EntityType;
   description: string;
   sentiment: string | null;
+  /** When set (e.g. human review seed linked to an existing row), skip matchOrCreate and use this entity ID. */
+  forcedEntityId?: string | null;
 }
 
 export interface ResolvedEntity {
@@ -120,6 +122,28 @@ async function resolveSingleEntity(params: {
   supabaseClient: SupabaseClient<Database>;
 }): Promise<ResolvedEntity> {
   const { raw, anchors, projectId, supabaseClient } = params;
+
+  if (raw.forcedEntityId) {
+    const { data: forced, error } = await supabaseClient
+      .from("entities")
+      .select("id, name")
+      .eq("id", raw.forcedEntityId)
+      .maybeSingle();
+
+    if (!error && forced) {
+      return {
+        entityId: forced.id,
+        resolvedName: forced.name,
+        rawName: raw.raw_name,
+        type: raw.type,
+        description: raw.description || "",
+        sentiment: raw.sentiment,
+        resolutionMethod: "exact",
+        resolutionConfidence: "high",
+        needsReview: false,
+      };
+    }
+  }
 
   // Determine the best name to resolve against:
   // 1. Check if this mention matches an interview anchor
