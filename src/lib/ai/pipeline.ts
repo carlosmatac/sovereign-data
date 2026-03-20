@@ -556,7 +556,7 @@ export async function processTranscription(
 
 /**
  * Rebuild chunks, mentions, relationships, and snippets from `reviewed_utterances` only.
- * Call after editors set `transcript_review_status` to `ready` (wired from API in a later phase).
+ * Triggered when an editor POSTs `/api/interviews/[id]/reprocess-review` (after `transcript_review_status = ready`).
  *
  * Failure safety: LLM + embeddings run **before** `clear_interview_derived_data`.
  * If the RPC or inserts fail after clear, the interview can be left without derived rows — surface FAILED + `transcript_review_status: ready` for retry.

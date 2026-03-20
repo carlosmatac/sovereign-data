@@ -96,4 +96,6 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 | Entity search API | `src/app/api/projects/[projectId]/entities/search/route.ts` |
 | Server actions | `src/app/actions/interview-review.ts` |
 | Parse `transcript_full` → initial utterances | `src/lib/interviews/transcript-utterances-from-full.ts` |
-| Reprocess API / button | _Phase 4_ |
+| Reprocess API + UI button | `POST /api/interviews/[id]/reprocess-review`, `TranscriptReviewEditor` “Run reprocessing” |
+
+**UX note:** Unsaved transcript edits are kept in the browser when you add/remove seed entities (we do not reset local utterance state on every server refresh). A full page reload or navigating away and back loads the last **saved** draft from the database.

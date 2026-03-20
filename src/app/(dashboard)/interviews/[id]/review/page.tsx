@@ -9,7 +9,13 @@ import {
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
 import { parseTranscriptFullToUtterances } from "@/lib/interviews/transcript-utterances-from-full";
-import type { ReviewedUtterance, SpeakerMap } from "@/types/database";
+import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
+import type {
+  InterviewStatus,
+  ReviewedUtterance,
+  SourceType,
+  SpeakerMap,
+} from "@/types/database";
 
 function isStoredReviewedUtterances(v: unknown): v is ReviewedUtterance[] {
   if (!Array.isArray(v) || v.length === 0) return false;
@@ -39,7 +45,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, transcript_full, speaker_map, audio_duration, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, status, error_message, source_type, transcript_full, speaker_map, audio_duration, reviewed_utterances, transcript_review_status, last_intel_source"
     )
     .eq("id", id)
     .single();
@@ -104,16 +110,26 @@ export default async function InterviewTranscriptReviewPage({
   }
 
   return (
-    <TranscriptReviewEditor
-      interviewId={id}
-      projectId={interview.project_id}
-      interviewTitle={interview.title}
-      speakerMap={(interview.speaker_map as SpeakerMap) ?? {}}
-      initialUtterances={initialUtterances}
-      reviewStatus={interview.transcript_review_status}
-      lastIntelSource={interview.last_intel_source}
-      seeds={seeds}
-      parseWarning={parseWarning}
-    />
+    <div className="space-y-6">
+      <div className="px-6 pt-6">
+        <InterviewStatusTracker
+          interviewId={id}
+          currentStatus={interview.status as InterviewStatus}
+          errorMessage={interview.error_message}
+          sourceType={interview.source_type as SourceType}
+        />
+      </div>
+      <TranscriptReviewEditor
+        interviewId={id}
+        projectId={interview.project_id}
+        interviewTitle={interview.title}
+        speakerMap={(interview.speaker_map as SpeakerMap) ?? {}}
+        initialUtterances={initialUtterances}
+        reviewStatus={interview.transcript_review_status}
+        lastIntelSource={interview.last_intel_source}
+        seeds={seeds}
+        parseWarning={parseWarning}
+      />
+    </div>
   );
 }

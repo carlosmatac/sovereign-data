@@ -114,10 +114,9 @@ export function TranscriptReviewEditor({
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
-
-  useEffect(() => {
-    setUtterances(initialUtterances);
-  }, [initialUtterances]);
+  const [reprocessStarting, setReprocessStarting] = useState(false);
+  // Utterances are not reset when `initialUtterances` props change (e.g. after router.refresh()
+  // from seed actions) so unsaved transcript edits are preserved until Save or full page reload.
 
   const speakerLabel = useCallback(
     (code: string) => speakerMap[code] ?? `Speaker ${code}`,
@@ -158,6 +157,26 @@ export function TranscriptReviewEditor({
 
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
+
+  const onRunReprocess = async () => {
+    setReprocessStarting(true);
+    try {
+      const res = await fetch(`/api/interviews/${interviewId}/reprocess-review`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        toast.error(json.error ?? "Could not start reprocessing");
+        return;
+      }
+      toast.success("Reprocessing started — pipeline runs in the background.");
+      router.refresh();
+    } catch {
+      toast.error("Could not start reprocessing");
+    } finally {
+      setReprocessStarting(false);
+    }
+  };
 
   const onSaveDraft = () => {
     startTransition(async () => {
@@ -258,7 +277,7 @@ export function TranscriptReviewEditor({
           {readyForReprocess && (
             <Badge variant="secondary" className="text-xs">
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              Ready for reprocess (run from API / next phase)
+              Ready to reprocess
             </Badge>
           )}
         </div>
@@ -335,6 +354,18 @@ export function TranscriptReviewEditor({
             >
               Mark ready for reprocess
             </Button>
+            {readyForReprocess && (
+              <Button
+                variant="default"
+                onClick={() => void onRunReprocess()}
+                disabled={pending || reprocessing || reprocessStarting}
+              >
+                {reprocessStarting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Run reprocessing
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
