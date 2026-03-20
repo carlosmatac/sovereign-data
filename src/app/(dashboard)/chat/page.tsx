@@ -4,9 +4,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
+import { Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
 
@@ -39,18 +38,22 @@ export default function ChatPage() {
     }
   }, [messages, isLoading, status]);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendCurrentInput = async () => {
     if (!input.trim() || isLoading) return;
     const text = input;
     setInput("");
     await sendMessage({ text });
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void sendCurrentInput();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSubmit(e);
+      void sendCurrentInput();
     }
   };
 
@@ -76,7 +79,7 @@ export default function ChatPage() {
     (lastMessage?.role === "user" || assistantPendingEmpty);
 
   return (
-    <div className="flex min-h-[calc(100dvh-2.5rem)] w-full flex-col bg-background text-foreground">
+    <div className="flex h-[calc(100dvh-2.5rem)] max-h-[calc(100dvh-2.5rem)] w-full flex-col overflow-hidden bg-background text-foreground">
       <header className="shrink-0 border-b border-border px-6 py-6 md:px-10 md:py-7">
         <div className="mx-auto max-w-3xl">
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
@@ -106,85 +109,102 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-6 py-9 md:px-10 md:py-11"
-      >
-        {messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 md:gap-[4.5rem]">
-            {messages.map((message) => {
-              const text = getMessageText(message.parts);
-              if (!text) return null;
-
-              if (message.role === "user") {
-                return (
-                  <div key={message.id} className="flex justify-end">
-                    <div className="max-w-md rounded-3xl border border-border/80 bg-primary px-5 py-4 text-[14px] leading-relaxed text-primary-foreground shadow-md md:px-6 md:py-[1.125rem]">
-                      {text}
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <article
-                  key={message.id}
-                  className="w-full max-w-[40rem] text-foreground"
-                >
-                  <IntelligenceBriefMarkdown>{text}</IntelligenceBriefMarkdown>
-                </article>
-              );
-            })}
-
-            {showIntelligenceActivity && (
-              <div className="w-full max-w-[40rem]">
-                <IntelligenceActivityStatus
-                  key={lastUserMessage?.id ?? "none"}
-                  phase={
-                    status === "streaming" ? "streaming" : "submitted"
-                  }
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <footer className="shrink-0 rounded-t-3xl border-t border-border bg-card/80 px-6 py-5 backdrop-blur-sm md:px-10 md:py-6">
-        <form
-          onSubmit={onSubmit}
-          className="mx-auto flex max-w-3xl items-end gap-3 md:gap-4"
+      {/* Scroll only the conversation; input stays fixed to bottom of this workspace */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-9 md:px-10 md:py-11"
         >
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Pose a question… (Enter to send, Shift+Enter for line break)"
-            className="min-h-[56px] max-h-[160px] resize-none rounded-2xl border-[1.5px] border-input bg-background px-4 py-3.5 text-[15px] leading-snug shadow-sm placeholder:text-muted-foreground focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/20"
-            rows={1}
-            disabled={isLoading}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="h-14 w-14 shrink-0 rounded-2xl shadow-sm"
-            disabled={!input.trim() || isLoading}
+          {messages.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 md:gap-[4.5rem]">
+              {messages.map((message) => {
+                const text = getMessageText(message.parts);
+                if (!text) return null;
+
+                if (message.role === "user") {
+                  return (
+                    <div key={message.id} className="flex justify-end">
+                      <div className="max-w-md rounded-3xl border border-border/80 bg-primary px-5 py-4 text-[14px] leading-relaxed text-primary-foreground shadow-md md:px-6 md:py-[1.125rem]">
+                        {text}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <article
+                    key={message.id}
+                    className="w-full max-w-[40rem] text-foreground"
+                  >
+                    <IntelligenceBriefMarkdown>{text}</IntelligenceBriefMarkdown>
+                  </article>
+                );
+              })}
+
+              {showIntelligenceActivity && (
+                <div className="w-full max-w-[40rem]">
+                  <IntelligenceActivityStatus
+                    key={lastUserMessage?.id ?? "none"}
+                    phase={
+                      status === "streaming" ? "streaming" : "submitted"
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <footer className="shrink-0 rounded-t-3xl border-t border-border bg-card/90 px-6 py-4 backdrop-blur-md md:px-10 md:py-5">
+          <form
+            onSubmit={handleFormSubmit}
+            className="mx-auto max-w-3xl"
           >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-        {error && (
-          <p className="mx-auto mt-4 max-w-3xl rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error.message}
-          </p>
-        )}
-      </footer>
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything about your interviews…"
+              className="min-h-[7.5rem] max-h-[min(40vh,280px)] resize-y rounded-2xl border-[1.5px] border-input bg-background px-4 py-4 text-[15px] leading-relaxed shadow-sm placeholder:text-muted-foreground focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/20"
+              rows={5}
+              disabled={isLoading}
+              aria-busy={isLoading}
+            />
+            <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+              <span>
+                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
+                  Enter
+                </kbd>{" "}
+                to send ·{" "}
+                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
+                  Shift
+                </kbd>
+                +
+                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
+                  Enter
+                </kbd>{" "}
+                new line
+              </span>
+              {isLoading && (
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <Loader2
+                    className="h-3.5 w-3.5 shrink-0 animate-spin"
+                    aria-hidden
+                  />
+                  Working…
+                </span>
+              )}
+            </div>
+          </form>
+          {error && (
+            <p className="mx-auto mt-3 max-w-3xl rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error.message}
+            </p>
+          )}
+        </footer>
+      </div>
     </div>
   );
 }
