@@ -117,6 +117,7 @@ export default async function InterviewTranscriptReviewPage({
           currentStatus={interview.status as InterviewStatus}
           errorMessage={interview.error_message}
           sourceType={interview.source_type as SourceType}
+          navigateToOnPipelineCompleted={`/interviews/${id}`}
         />
       </div>
       <TranscriptReviewEditor

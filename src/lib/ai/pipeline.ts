@@ -183,6 +183,8 @@ async function runIntelPipelineFromTranscriptInput(params: {
   }>;
   clearDerivedBeforeInsert: boolean;
   lastIntelSource: "assemblyai_auto" | "human_review";
+  /** Merged into the final COMPLETED row update (e.g. transcript_review_status for human review). */
+  completedInterviewExtra?: Record<string, unknown>;
 }): Promise<void> {
   const {
     supabase,
@@ -196,6 +198,7 @@ async function runIntelPipelineFromTranscriptInput(params: {
     reviewerSeedsForMerge,
     clearDerivedBeforeInsert,
     lastIntelSource,
+    completedInterviewExtra,
   } = params;
 
   const extraction = await extractIntelligence({
@@ -428,6 +431,7 @@ async function runIntelPipelineFromTranscriptInput(params: {
 
   await updateInterviewStatus(interviewId, "COMPLETED", {
     last_intel_source: lastIntelSource,
+    ...completedInterviewExtra,
   });
 
   console.log(
@@ -644,12 +648,9 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
       reviewerSeedsForMerge: seeds,
       clearDerivedBeforeInsert: true,
       lastIntelSource: "human_review",
+      // Single COMPLETED write so Realtime + refresh see draft, not stuck "reprocessing"
+      completedInterviewExtra: { transcript_review_status: "draft" },
     });
-
-    await supabase
-      .from("interviews")
-      .update({ transcript_review_status: "draft" })
-      .eq("id", interviewId);
   } catch (error) {
     console.error(`Review reprocess failed for interview ${interviewId}:`, error);
     await supabase

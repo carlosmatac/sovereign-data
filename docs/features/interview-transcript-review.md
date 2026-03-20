@@ -99,3 +99,5 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 | Reprocess API + UI button | `POST /api/interviews/[id]/reprocess-review`, `TranscriptReviewEditor` “Run reprocessing” |
 
 **UX note:** Unsaved transcript edits are kept in the browser when you add/remove seed entities (we do not reset local utterance state on every server refresh). A full page reload or navigating away and back loads the last **saved** draft from the database.
+
+**Completion UX:** The final `COMPLETED` database update for a human-review run includes `transcript_review_status: draft` in the **same** write as `last_intel_source: human_review`, so Realtime / polling never leave the UI stuck on “reprocessing”. The transcript review page’s status tracker then redirects to the interview detail route when the pipeline hits `COMPLETED`. The interview header shows a **Human-reviewed intel** badge when `last_intel_source === human_review`.

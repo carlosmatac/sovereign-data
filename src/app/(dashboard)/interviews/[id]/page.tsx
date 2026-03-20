@@ -24,6 +24,7 @@ import {
   FileText,
   Newspaper,
   FileIcon,
+  ClipboardCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -214,8 +215,17 @@ export default async function InterviewDetailPage({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+            {interview.last_intel_source === "human_review" && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Human-reviewed intel
+              </Badge>
+            )}
             {canEdit && (
               <DeleteInterviewButton
                 interviewId={interview.id}
