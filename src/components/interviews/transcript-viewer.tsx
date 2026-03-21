@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, MessageSquareText } from "lucide-react";
+import { resolveTranscriptBracketLabel } from "@/lib/interviews/speaker-display";
 
 interface TranscriptViewerProps {
   transcriptRaw: string;
@@ -56,8 +57,10 @@ export function TranscriptViewer({
       for (let i = 0; i < labels.length; i++) {
         const endIndex =
           i + 1 < labels.length ? labels[i + 1].start : text.length;
-        const speakerName =
-          nameMap?.[labels[i].speaker] ?? labels[i].speaker;
+        const speakerName = resolveTranscriptBracketLabel(
+          labels[i].speaker,
+          nameMap
+        );
         const chunk = text.slice(labels[i].contentStart, endIndex).trim();
         if (chunk) parts.push({ speaker: speakerName, text: chunk });
       }

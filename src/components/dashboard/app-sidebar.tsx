@@ -11,6 +11,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -83,6 +85,7 @@ interface AppSidebarProps {
 export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { state, isMobile } = useSidebar();
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -101,20 +104,46 @@ export function AppSidebar({ user }: AppSidebarProps) {
     : user.email?.slice(0, 2).toUpperCase() ?? "SD";
 
   return (
-    <Sidebar>
-      <SidebarHeader>
+    <Sidebar collapsible="icon">
+      <SidebarRail />
+      <SidebarHeader className="border-b border-sidebar-border/50">
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/projects" className="flex items-center px-2 py-3">
-              <Image
-                src="/apaisado_con_logo.svg"
-                alt="Sovereign Data — Intelligence Platform"
-                width={900}
-                height={200}
-                className="w-full max-w-[200px] object-contain dark:brightness-110"
-                priority
-              />
-            </Link>
+            {state === "expanded" || isMobile ? (
+              <Link
+                href="/projects"
+                className="hover:bg-sidebar-accent/50 flex items-center rounded-md px-2 py-3 transition-colors"
+              >
+                <Image
+                  src="/apaisado_con_logo.svg"
+                  alt="Sovereign Data — Intelligence Platform"
+                  width={900}
+                  height={200}
+                  className="w-full max-w-[200px] object-contain dark:brightness-110"
+                  priority
+                />
+              </Link>
+            ) : (
+              <SidebarMenuButton
+                asChild
+                tooltip={{ children: "Sovereign Data — Projects" }}
+                className="group-data-[collapsible=icon]:!h-auto group-data-[collapsible=icon]:!min-h-10 group-data-[collapsible=icon]:!w-full group-data-[collapsible=icon]:!max-w-none group-data-[collapsible=icon]:!shrink-0 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:!px-1.5 overflow-visible"
+              >
+                <Link
+                  href="/projects"
+                  aria-label="Sovereign Data — go to projects"
+                  className="flex w-full items-center justify-center"
+                >
+                  <Image
+                    src="/SD.svg"
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="size-8 object-contain dark:brightness-110"
+                  />
+                </Link>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -129,6 +158,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
+                    tooltip={item.title}
                   >
                     <Link href={item.href}>
                       <item.icon className="h-4 w-4" />
@@ -150,6 +180,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
+                    tooltip={item.title}
                   >
                     <Link href={item.href}>
                       <item.icon className="h-4 w-4" />
@@ -168,7 +199,14 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg">
+                <SidebarMenuButton
+                  size="lg"
+                  title={
+                    state === "collapsed" && !isMobile
+                      ? (user.name ?? user.email ?? "Account menu")
+                      : undefined
+                  }
+                >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="text-xs">
                       {initials}
