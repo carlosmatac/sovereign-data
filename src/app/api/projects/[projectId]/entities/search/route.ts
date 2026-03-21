@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserProjectRole } from "@/lib/auth/project-role";
+import type { EntityType } from "@/types/database";
+
+const ENTITY_TYPES: EntityType[] = [
+  "PERSON",
+  "COMPANY",
+  "GOVERNMENT",
+  "ORGANIZATION",
+  "LOCATION",
+  "EVENT",
+];
 
 /**
- * GET /api/projects/[projectId]/entities/search?q=
- * Debounced entity lookup for transcript review (project + global entities).
+ * GET /api/projects/[projectId]/entities/search?q=&type=&types=
+ * Debounced entity lookup (project + global entities).
+ * Optional `type` (e.g. PERSON) restricts to a single entity type.
+ * Optional `types` (comma-separated, e.g. COMPANY,ORGANIZATION) restricts to several types.
+ * If both are set, `types` wins.
  */
 export async function GET(
   request: NextRequest,
@@ -13,6 +26,20 @@ export async function GET(
 ) {
   const { projectId } = await params;
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const typeParam = request.nextUrl.searchParams.get("type")?.trim() ?? "";
+  const typesParam = request.nextUrl.searchParams.get("types")?.trim() ?? "";
+
+  const typesList = typesParam
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t): t is EntityType => ENTITY_TYPES.includes(t as EntityType));
+
+  const typeFilter = ENTITY_TYPES.includes(typeParam as EntityType)
+    ? (typeParam as EntityType)
+    : null;
+
+  const typeFilters: EntityType[] | null =
+    typesList.length > 0 ? typesList : typeFilter !== null ? [typeFilter] : null;
 
   if (q.length < 2) {
     return NextResponse.json({ entities: [] as const });
@@ -35,7 +62,7 @@ export async function GET(
   const admin = createAdminClient();
   const pattern = `%${q}%`;
 
-  const { data: projectScoped, error: e1 } = await admin
+  let projectQuery = admin
     .from("entities")
     .select("id, name, type")
     .eq("project_id", projectId)
@@ -44,12 +71,18 @@ export async function GET(
     .order("name")
     .limit(15);
 
+  if (typeFilters !== null) {
+    projectQuery = projectQuery.in("type", typeFilters);
+  }
+
+  const { data: projectScoped, error: e1 } = await projectQuery;
+
   if (e1) {
     console.error("entity search project:", e1);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 
-  const { data: globalScoped, error: e2 } = await admin
+  let globalQuery = admin
     .from("entities")
     .select("id, name, type")
     .is("project_id", null)
@@ -57,6 +90,12 @@ export async function GET(
     .ilike("name", pattern)
     .order("name")
     .limit(15);
+
+  if (typeFilters !== null) {
+    globalQuery = globalQuery.in("type", typeFilters);
+  }
+
+  const { data: globalScoped, error: e2 } = await globalQuery;
 
   if (e2) {
     console.error("entity search global:", e2);

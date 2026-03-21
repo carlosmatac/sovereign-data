@@ -36,6 +36,7 @@ import { EntityMentionsList } from "@/components/interviews/entity-mentions-list
 import { AudioPlayer } from "@/components/interviews/audio-player";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
+import { EditableSpeakersCard } from "@/components/interviews/editable-speakers-card";
 import type { SpeakerMap } from "@/types/database";
 
 export default async function InterviewDetailPage({
@@ -243,7 +244,7 @@ export default async function InterviewDetailPage({
       {/* Audio Player — only for audio source interviews */}
       {interview.source_type !== "document" && interview.audio_url && (
         <div className="mb-6">
-          <AudioPlayer src={interview.audio_url} title={interview.title} />
+          <AudioPlayer src={interview.audio_url} />
         </div>
       )}
 
@@ -507,26 +508,14 @@ export default async function InterviewDetailPage({
             {interview.source_type !== "document" &&
               interview.speaker_map &&
               Object.keys(interview.speaker_map).length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Speakers</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {Object.entries(
-                        interview.speaker_map as Record<string, string>
-                      ).map(([key, name]) => (
-                        <div
-                          key={key}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <span className="text-muted-foreground">{key}</span>
-                          <span className="font-medium">{name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <EditableSpeakersCard
+                  interviewId={interview.id}
+                  projectId={interview.project_id}
+                  initialSpeakerMap={
+                    (interview.speaker_map as SpeakerMap) ?? {}
+                  }
+                  canEdit={canEdit}
+                />
               )}
           </div>
         </div>

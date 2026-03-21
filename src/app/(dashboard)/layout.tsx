@@ -1,6 +1,9 @@
+import type { CSSProperties } from "react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
+import { DashboardInsetHeader } from "@/components/dashboard/dashboard-inset-header";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
@@ -24,16 +27,30 @@ export default async function DashboardLayout({
     .eq("id", user.id)
     .single();
 
+  const cookieStore = await cookies();
+  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
+  const sidebarDefaultOpen = sidebarCookie !== "false";
+
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      defaultOpen={sidebarDefaultOpen}
+      style={
+        {
+          "--sidebar-width-icon": "3.5rem",
+        } as CSSProperties
+      }
+    >
       <AppSidebar
         user={{
           email: user.email,
           name: profile?.full_name ?? undefined,
         }}
       />
-      <SidebarInset>
-        <main className="flex-1 overflow-auto">{children}</main>
+      <SidebarInset className="flex min-h-svh flex-col">
+        <DashboardInsetHeader />
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

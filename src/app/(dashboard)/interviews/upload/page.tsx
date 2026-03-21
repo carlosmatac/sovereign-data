@@ -43,6 +43,7 @@ import {
   MAX_EXPECTED_SPEAKERS,
 } from "@/lib/constants";
 import type { Project } from "@/types/database";
+import { InterviewAnchorEntityInput } from "@/components/interviews/interview-anchor-entity-input";
 
 type SourceType = "audio" | "document";
 
@@ -64,6 +65,12 @@ export default function UploadInterviewPage() {
   const [language, setLanguage] = useState("en");
   const [intervieweeName, setIntervieweeName] = useState("");
   const [intervieweeOrg, setIntervieweeOrg] = useState("");
+  const [intervieweeEntityId, setIntervieweeEntityId] = useState<string | null>(
+    null
+  );
+  const [intervieweeOrgEntityId, setIntervieweeOrgEntityId] = useState<
+    string | null
+  >(null);
 
   // Audio-specific state
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -96,6 +103,11 @@ export default function UploadInterviewPage() {
     }
     loadProjects();
   }, [supabase]);
+
+  useEffect(() => {
+    setIntervieweeEntityId(null);
+    setIntervieweeOrgEntityId(null);
+  }, [projectId]);
 
   // Clear the file when switching source types
   const handleSourceTypeChange = (type: SourceType) => {
@@ -233,6 +245,12 @@ export default function UploadInterviewPage() {
               : parseInt(expectedSpeakers, 10),
           interviewee_name: intervieweeName.trim() || undefined,
           interviewee_org: intervieweeOrg.trim() || undefined,
+          ...(intervieweeEntityId
+            ? { interviewee_entity_id: intervieweeEntityId }
+            : {}),
+          ...(intervieweeOrgEntityId
+            ? { interviewee_org_entity_id: intervieweeOrgEntityId }
+            : {}),
         }),
       });
 
@@ -275,6 +293,10 @@ export default function UploadInterviewPage() {
         formData.append("interviewee_name", intervieweeName.trim());
       if (intervieweeOrg.trim())
         formData.append("interviewee_org", intervieweeOrg.trim());
+      if (intervieweeEntityId)
+        formData.append("interviewee_entity_id", intervieweeEntityId);
+      if (intervieweeOrgEntityId)
+        formData.append("interviewee_org_entity_id", intervieweeOrgEntityId);
 
       const response = await fetch("/api/interviews/from-pdf", {
         method: "POST",
@@ -541,35 +563,7 @@ export default function UploadInterviewPage() {
                 />
               </div>
 
-              {/* Primary Entities (optional anchor hints) */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="interviewee-name">Interviewee name</Label>
-                  <Input
-                    id="interviewee-name"
-                    placeholder="e.g., Fessor Mbango"
-                    value={intervieweeName}
-                    onChange={(e) => setIntervieweeName(e.target.value)}
-                    maxLength={120}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="interviewee-org">
-                    Organization / Company
-                  </Label>
-                  <Input
-                    id="interviewee-org"
-                    placeholder="e.g., CENORED"
-                    value={intervieweeOrg}
-                    onChange={(e) => setIntervieweeOrg(e.target.value)}
-                    maxLength={120}
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              {/* Project Selection */}
+              {/* Project Selection — before entity anchors so autocomplete can query the project */}
               <div className="space-y-2">
                 <Label>Project *</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
@@ -593,6 +587,40 @@ export default function UploadInterviewPage() {
                     </Link>
                   </p>
                 )}
+              </div>
+
+              {/* Primary Entities (optional anchor hints) */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="interviewee-name">Interviewee name</Label>
+                  <InterviewAnchorEntityInput
+                    id="interviewee-name"
+                    projectId={projectId}
+                    kind="person"
+                    placeholder="e.g., Fessor Mbango"
+                    value={intervieweeName}
+                    onChange={setIntervieweeName}
+                    onSelectedEntityIdChange={setIntervieweeEntityId}
+                    disabled={loading}
+                    aria-label="Interviewee name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="interviewee-org">
+                    Organization / Company
+                  </Label>
+                  <InterviewAnchorEntityInput
+                    id="interviewee-org"
+                    projectId={projectId}
+                    kind="organization"
+                    placeholder="e.g., CENORED"
+                    value={intervieweeOrg}
+                    onChange={setIntervieweeOrg}
+                    onSelectedEntityIdChange={setIntervieweeOrgEntityId}
+                    disabled={loading}
+                    aria-label="Organization or company"
+                  />
+                </div>
               </div>
 
               {/* Description */}

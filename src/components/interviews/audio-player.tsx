@@ -17,10 +17,9 @@ function formatTime(seconds: number): string {
 
 interface AudioPlayerProps {
   src: string;
-  title?: string;
 }
 
-export function AudioPlayer({ src, title }: AudioPlayerProps) {
+export function AudioPlayer({ src }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -137,10 +136,10 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
             {formatTime(currentTime)}
           </span>
 
-          {/* Progress bar */}
-          <div className="relative flex-1">
+          {/* Progress bar — input taller than track so thumb centers on track (WebKit/Firefox) */}
+          <div className="relative flex h-8 flex-1 items-center">
             {loading ? (
-              <div className="h-1.5 w-full animate-pulse rounded-full bg-muted" />
+              <div className="h-0.5 w-full animate-pulse rounded-full bg-muted" />
             ) : (
               <input
                 type="range"
@@ -151,20 +150,27 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
                 onChange={handleSeek}
                 aria-label="Seek"
                 className="
-                  h-1.5 w-full cursor-pointer appearance-none rounded-full
-                  bg-muted accent-primary outline-none
+                  h-8 w-full cursor-pointer appearance-none rounded-full bg-transparent
+                  accent-foreground outline-none
+                  focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
+                  [&::-webkit-slider-runnable-track]:h-0.5 [&::-webkit-slider-runnable-track]:rounded-full
+                  [&::-webkit-slider-runnable-track]:bg-transparent
+                  [&::-webkit-slider-thumb]:mt-[calc((0.125rem-0.75rem)/2)]
                   [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3
                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-primary
+                  [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-foreground
+                  [&::-webkit-slider-thumb]:shadow-sm
+                  [&::-moz-range-track]:h-0.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent
                   [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3
                   [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0
-                  [&::-moz-range-thumb]:bg-primary
+                  [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:shadow-sm
                 "
                 style={{
+                  /* Gradient on the full input h-8 looked like a fat pill; paint only a 2px strip (matches track). */
                   background:
                     duration > 0
-                      ? `linear-gradient(to right, hsl(var(--primary)) ${(currentTime / duration) * 100}%, hsl(var(--muted)) ${(currentTime / duration) * 100}%)`
-                      : undefined,
+                      ? `linear-gradient(to right, var(--foreground) ${(currentTime / duration) * 100}%, var(--border) ${(currentTime / duration) * 100}%) center / 100% 2px no-repeat`
+                      : `linear-gradient(var(--border), var(--border)) center / 100% 2px no-repeat`,
                 }}
               />
             )}
@@ -190,13 +196,6 @@ export function AudioPlayer({ src, title }: AudioPlayerProps) {
             )}
           </Button>
         </div>
-
-        {/* Optional label */}
-        {title && (
-          <p className="mt-1 truncate pl-11 text-xs text-muted-foreground">
-            {title}
-          </p>
-        )}
       </CardContent>
     </Card>
   );
