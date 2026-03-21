@@ -35,6 +35,8 @@ import { DeleteInterviewButton } from "@/components/interviews/delete-interview-
 import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
 import { AudioPlayer } from "@/components/interviews/audio-player";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
+import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
+import type { SpeakerMap } from "@/types/database";
 
 export default async function InterviewDetailPage({
   params,
@@ -57,6 +59,16 @@ export default async function InterviewDetailPage({
 
   const userRole = await getUserProjectRole(interview.project_id);
   const canEdit = userRole === "owner" || userRole === "editor";
+
+  const transcriptForViewer = resolveTranscriptTextForInterviewViewer({
+    transcript_full: interview.transcript_full,
+    transcript_display: interview.transcript_display,
+    reviewed_utterances: interview.reviewed_utterances,
+    last_intel_source: interview.last_intel_source,
+    speaker_map: (interview.speaker_map as SpeakerMap) ?? {},
+    interviewee_name: interview.interviewee_name,
+    interviewee_org: interview.interviewee_org,
+  });
 
   // Fetch entities for this interview
   const { data: mentions } = await supabase
@@ -336,10 +348,10 @@ export default async function InterviewDetailPage({
               </Card>
             )}
 
-            {/* Full Transcript */}
-            {interview.transcript_full && (
+            {/* Full Transcript — after human review reprocess, text matches reviewed_utterances (via transcript_display); raw ASR stays in transcript_full */}
+            {transcriptForViewer && (
               <TranscriptViewer
-                transcriptRaw={interview.transcript_full}
+                transcriptRaw={transcriptForViewer}
                 actions={
                   canEdit ? (
                     <Button asChild variant="outline" size="sm">

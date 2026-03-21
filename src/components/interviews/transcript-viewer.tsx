@@ -27,8 +27,9 @@ const SPEAKER_STYLES = [
 ];
 
 /**
- * Read-only transcript with search. Uses raw stored transcript (`transcript_full`).
- * For anchor/name fixes, editors use Transcript review → human reprocessing.
+ * Read-only transcript with search. The parent passes the string to show: usually
+ * `transcript_full` (immutable ASR), or after human review reprocessing the
+ * reviewed display built from `reviewed_utterances` (stored as `transcript_display`).
  */
 export function TranscriptViewer({
   transcriptRaw,

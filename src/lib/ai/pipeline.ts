@@ -28,6 +28,7 @@ import {
 } from "@/lib/entities/resolve";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
 
 /** Extract a human-readable message from any thrown value (Error or Supabase PostgrestError). */
 function toErrorMessage(error: unknown): string {
@@ -429,10 +430,24 @@ async function runIntelPipelineFromTranscriptInput(params: {
     }
   }
 
-  await updateInterviewStatus(interviewId, "COMPLETED", {
+  const completedPatch: Record<string, unknown> = {
     last_intel_source: lastIntelSource,
     ...completedInterviewExtra,
-  });
+  };
+
+  if (lastIntelSource === "human_review" && chunkUtterances.length > 0) {
+    const formattedReviewed = formatUtterancesToTranscriptFull(
+      chunkUtterances,
+      speakerMap
+    );
+    const normalizedReviewed = normalizeTranscriptDisplay(formattedReviewed, {
+      intervieweeName: interview.interviewee_name,
+      intervieweeOrg: interview.interviewee_org,
+    });
+    completedPatch.transcript_display = normalizedReviewed.transcriptDisplay;
+  }
+
+  await updateInterviewStatus(interviewId, "COMPLETED", completedPatch);
 
   console.log(
     `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${rawEntities.length} raw), ${extraction.relationships.length} relationships`

@@ -1,4 +1,58 @@
 import type { ReviewedUtterance, SpeakerMap } from "@/types/database";
+import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
+
+/**
+ * Build `[Speaker label]: text` blocks from utterance rows (inverse of
+ * {@link parseTranscriptFullToUtterances}). Used after human review reprocessing
+ * to refresh `transcript_display` and the interview detail transcript viewer.
+ */
+export function formatUtterancesToTranscriptFull(
+  utterances: Array<{ speaker: string; text: string }>,
+  speakerMap: SpeakerMap
+): string {
+  return utterances
+    .map((u) => {
+      const label = speakerMap[u.speaker] ?? u.speaker;
+      return `[${label}]: ${u.text}`;
+    })
+    .join("\n\n");
+}
+
+/** Bracket-formatted string for the interview detail transcript when intel is from human review. */
+export function resolveTranscriptTextForInterviewViewer(params: {
+  transcript_full: string | null;
+  transcript_display: string | null;
+  reviewed_utterances: unknown;
+  last_intel_source: string | null;
+  speaker_map: SpeakerMap;
+  interviewee_name: string | null;
+  interviewee_org: string | null;
+}): string | null {
+  if (params.last_intel_source === "human_review") {
+    if (params.transcript_display?.trim()) {
+      return params.transcript_display;
+    }
+    const utterances = params.reviewed_utterances;
+    if (!Array.isArray(utterances) || utterances.length === 0) {
+      return params.transcript_full;
+    }
+    const parsed: Array<{ speaker: string; text: string }> = [];
+    for (const row of utterances) {
+      if (typeof row !== "object" || row === null) return params.transcript_full;
+      const o = row as Record<string, unknown>;
+      if (typeof o.speaker !== "string" || typeof o.text !== "string") {
+        return params.transcript_full;
+      }
+      parsed.push({ speaker: o.speaker, text: o.text });
+    }
+    const formatted = formatUtterancesToTranscriptFull(parsed, params.speaker_map);
+    return normalizeTranscriptDisplay(formatted, {
+      intervieweeName: params.interviewee_name,
+      intervieweeOrg: params.interviewee_org,
+    }).transcriptDisplay;
+  }
+  return params.transcript_full;
+}
 
 /**
  * Build review utterances from `transcript_full` (`[Speaker A]: text` blocks)
