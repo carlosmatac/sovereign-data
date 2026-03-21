@@ -45,12 +45,12 @@ interface Relationship {
 }
 
 const entityTypeColors: Record<string, string> = {
-  PERSON: "bg-blue-100 text-blue-800",
-  COMPANY: "bg-emerald-100 text-emerald-800",
-  GOVERNMENT: "bg-purple-100 text-purple-800",
-  ORGANIZATION: "bg-orange-100 text-orange-800",
-  LOCATION: "bg-rose-100 text-rose-800",
-  EVENT: "bg-amber-100 text-amber-800",
+  PERSON: "bg-blue-950/50 text-blue-200 ring-1 ring-blue-500/25",
+  COMPANY: "bg-emerald-950/50 text-emerald-200 ring-1 ring-emerald-500/25",
+  GOVERNMENT: "bg-purple-950/50 text-purple-200 ring-1 ring-purple-500/25",
+  ORGANIZATION: "bg-orange-950/50 text-orange-200 ring-1 ring-orange-500/25",
+  LOCATION: "bg-rose-950/50 text-rose-200 ring-1 ring-rose-500/25",
+  EVENT: "bg-amber-950/50 text-amber-200 ring-1 ring-amber-500/25",
 };
 
 const SdIcon = ({ className }: { className?: string }) => (

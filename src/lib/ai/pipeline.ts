@@ -134,9 +134,15 @@ function buildRawEntitiesWithReviewerSeeds(
   return merged;
 }
 
-function parseReviewedUtterancesJson(json: unknown): TranscriptUtterance[] | null {
+/** Parse reviewed JSON rows (speaker, text, start, end). */
+function parseRawReviewedUtterancesForChunking(json: unknown): Array<{
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+}> | null {
   if (!Array.isArray(json) || json.length === 0) return null;
-  const out: TranscriptUtterance[] = [];
+  const out: Array<{ speaker: string; text: string; start: number; end: number }> = [];
   for (const row of json) {
     if (typeof row !== "object" || row === null) return null;
     const o = row as Record<string, unknown>;
@@ -156,6 +162,33 @@ function parseReviewedUtterancesJson(json: unknown): TranscriptUtterance[] | nul
     });
   }
   return out;
+}
+
+/**
+ * `reviewed_utterances` stores **seconds** (editor + playback). Chunking expects **ms**.
+ * Legacy rows may still hold ms (large end values); use `audio_duration` to disambiguate.
+ */
+function parseReviewedUtterancesJson(
+  json: unknown,
+  audioDurationSec: number | null
+): TranscriptUtterance[] | null {
+  const raw = parseRawReviewedUtterancesForChunking(json);
+  if (!raw) return null;
+
+  const maxEnd = Math.max(0, ...raw.map((u) => u.end));
+  const dur = audioDurationSec != null && audioDurationSec > 0 ? audioDurationSec : null;
+
+  const storedInSeconds =
+    (dur != null && maxEnd <= dur + 300) ||
+    (dur != null && maxEnd <= Math.max(dur * 2, 90)) ||
+    (dur == null && maxEnd <= 86_400);
+
+  return raw.map((u) => ({
+    speaker: u.speaker,
+    text: u.text,
+    start: storedInSeconds ? u.start * 1000 : u.start,
+    end: storedInSeconds ? u.end * 1000 : u.end,
+  }));
 }
 
 /**
@@ -546,6 +579,16 @@ export async function processTranscription(
       intervieweeOrg: interview?.interviewee_org,
     });
 
+    const sourceUtterances =
+      transcription.utterances && transcription.utterances.length > 0
+        ? transcription.utterances.map((u) => ({
+            speaker: u.speaker,
+            text: u.text,
+            start: u.start,
+            end: u.end,
+          }))
+        : null;
+
     await updateInterviewStatus(interviewId, "EXTRACTING", {
       transcript_full: formattedTranscript,
       transcript_display: normalizedTranscript.transcriptDisplay,
@@ -553,6 +596,7 @@ export async function processTranscription(
       audio_duration: transcription.audio_duration
         ? Math.round(transcription.audio_duration)
         : null,
+      source_utterances: sourceUtterances,
     });
 
     if (normalizedTranscript.stats.replacementsApplied > 0) {
@@ -615,7 +659,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
     const { data: interview, error: fetchError } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, projects(country)"
+        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -630,7 +674,10 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
       );
     }
 
-    const utterances = parseReviewedUtterancesJson(interview.reviewed_utterances);
+    const utterances = parseReviewedUtterancesJson(
+      interview.reviewed_utterances,
+      interview.audio_duration
+    );
     if (!utterances) {
       throw new Error("reviewed_utterances is missing or invalid");
     }

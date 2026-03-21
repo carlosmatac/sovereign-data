@@ -1,12 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   Loader2,
+  Pause,
+  Play,
   Plus,
   Save,
   Search,
@@ -52,8 +64,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import type { EntityType, ReviewedUtterance, TranscriptReviewStatus } from "@/types/database";
+import type {
+  EntityType,
+  InterviewStatus,
+  ReviewedUtterance,
+  SourceType,
+  TranscriptReviewStatus,
+} from "@/types/database";
 import type { SpeakerMap } from "@/types/database";
 import {
   saveTranscriptReviewDraft,
@@ -62,6 +79,174 @@ import {
   createReviewSeedEntity,
   removeReviewSeedEntity,
 } from "@/app/actions/interview-review";
+import { cn } from "@/lib/utils";
+
+/** Match status-tracker: background poll when review reprocessing is active (no pipeline UI on this page). */
+const PIPELINE_POLL_MS = 10_000;
+
+const CHUNK_END_EPSILON_SEC = 0.06;
+
+function isValidChunkTimeRange(u: ReviewedUtterance): boolean {
+  return (
+    Number.isFinite(u.start) &&
+    Number.isFinite(u.end) &&
+    u.start >= 0 &&
+    u.end > u.start
+  );
+}
+
+function replaceAllNonOverlappingInsensitive(
+  haystack: string,
+  needle: string,
+  replacement: string
+): string {
+  if (!needle) return haystack;
+  const hLower = haystack.toLowerCase();
+  const nLower = needle.toLowerCase();
+  let result = "";
+  let i = 0;
+  while (i < haystack.length) {
+    const found = hLower.indexOf(nLower, i);
+    if (found === -1) {
+      result += haystack.slice(i);
+      break;
+    }
+    result += haystack.slice(i, found) + replacement;
+    i = found + needle.length;
+  }
+  return result;
+}
+
+/** One search hit in document order (case-insensitive). */
+type TextMatchOccurrence = {
+  utteranceIndex: number;
+  start: number;
+  end: number;
+  globalIndex: number;
+};
+
+function buildFlatMatches(
+  utterances: ReviewedUtterance[],
+  needle: string
+): TextMatchOccurrence[] {
+  if (!needle) return [];
+  const nLower = needle.toLowerCase();
+  const out: TextMatchOccurrence[] = [];
+  let g = 0;
+  utterances.forEach((u, ui) => {
+    const t = u.text;
+    const lower = t.toLowerCase();
+    let idx = 0;
+    while (idx <= lower.length) {
+      const found = lower.indexOf(nLower, idx);
+      if (found === -1) break;
+      const end = found + needle.length;
+      out.push({ utteranceIndex: ui, start: found, end, globalIndex: g++ });
+      idx = found + nLower.length;
+    }
+  });
+  return out;
+}
+
+type HighlightSeg = { text: string; kind: "plain" | "dim" | "active" };
+
+function buildHighlightSegments(
+  text: string,
+  occs: TextMatchOccurrence[],
+  activeMatchGlobal: number
+): HighlightSeg[] {
+  if (occs.length === 0) return [{ text, kind: "plain" }];
+  const sorted = [...occs].sort((a, b) => a.start - b.start);
+  const segs: HighlightSeg[] = [];
+  let cursor = 0;
+  for (const o of sorted) {
+    if (o.start > cursor) {
+      segs.push({ text: text.slice(cursor, o.start), kind: "plain" });
+    }
+    const kind =
+      activeMatchGlobal >= 0 && o.globalIndex === activeMatchGlobal ? "active" : "dim";
+    segs.push({ text: text.slice(o.start, o.end), kind });
+    cursor = o.end;
+  }
+  if (cursor < text.length) {
+    segs.push({ text: text.slice(cursor), kind: "plain" });
+  }
+  return segs;
+}
+
+function HighlightedTranscriptTextarea({
+  value,
+  onChange,
+  disabled,
+  rows,
+  utteranceIndex,
+  occurrences,
+  activeMatchGlobal,
+  onRegisterTextarea,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  rows: number;
+  utteranceIndex: number;
+  occurrences: TextMatchOccurrence[];
+  activeMatchGlobal: number;
+  onRegisterTextarea: (i: number, el: HTMLTextAreaElement | null) => void;
+}) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const segments = useMemo(
+    () => buildHighlightSegments(value, occurrences, activeMatchGlobal),
+    [value, occurrences, activeMatchGlobal]
+  );
+
+  return (
+    <div className="relative rounded-md border border-input/80 bg-background shadow-xs">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
+        <div
+          className="break-words px-3 py-2 text-base leading-relaxed whitespace-pre-wrap"
+          style={{ transform: `translateY(-${scrollTop}px)` }}
+        >
+          {segments.map((seg, idx) =>
+            seg.kind === "plain" ? (
+              <span key={idx}>{seg.text}</span>
+            ) : seg.kind === "dim" ? (
+              <mark
+                key={idx}
+                className="rounded-[3px] bg-amber-500/16 px-px text-inherit dark:bg-amber-400/12"
+              >
+                {seg.text}
+              </mark>
+            ) : (
+              <mark
+                key={idx}
+                className="rounded-[3px] bg-amber-400/40 px-px font-medium text-inherit shadow-[inset_0_0_0_1px_rgba(217,119,6,0.35)] dark:bg-amber-500/35 dark:shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35)]"
+              >
+                {seg.text}
+              </mark>
+            )
+          )}
+        </div>
+      </div>
+      <textarea
+        ref={(el) => onRegisterTextarea(utteranceIndex, el)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        rows={rows}
+        spellCheck={false}
+        className={cn(
+          "relative z-10 min-h-[5.5rem] w-full resize-y border-0 bg-transparent px-3 py-2 text-base leading-relaxed text-transparent caret-foreground shadow-none",
+          "selection:bg-primary/20",
+          "focus-visible:ring-0 focus-visible:outline-none",
+          "disabled:cursor-not-allowed disabled:opacity-50"
+        )}
+        style={{ WebkitTextFillColor: "transparent" }}
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        aria-label="Transcript segment text"
+      />
+    </div>
+  );
+}
 
 const ENTITY_TYPES: EntityType[] = [
   "PERSON",
@@ -89,6 +274,8 @@ type Props = {
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
   parseWarning?: string | null;
+  sourceType: SourceType;
+  audioUrl: string | null;
 };
 
 export function TranscriptReviewEditor({
@@ -101,6 +288,8 @@ export function TranscriptReviewEditor({
   lastIntelSource,
   seeds,
   parseWarning,
+  sourceType,
+  audioUrl,
 }: Props) {
   const router = useRouter();
   const [utterances, setUtterances] = useState<ReviewedUtterance[]>(initialUtterances);
@@ -115,6 +304,24 @@ export function TranscriptReviewEditor({
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
   const [reprocessStarting, setReprocessStarting] = useState(false);
+  const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
+  const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const segmentEndRef = useRef<number>(0);
+  const [playingChunkIndex, setPlayingChunkIndex] = useState<number | null>(null);
+  const [audioPaused, setAudioPaused] = useState(true);
+  const [activeClipTime, setActiveClipTime] = useState<number | null>(null);
+  const [transcriptFind, setTranscriptFind] = useState("");
+  const [transcriptReplace, setTranscriptReplace] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
+  const [searchEpoch, setSearchEpoch] = useState(0);
+  const utteranceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const textareaRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
+  const flatMatchesRef = useRef<TextMatchOccurrence[]>([]);
+  const prevNeedleRef = useRef<string>("");
+  const focusMatchAfterNavRef = useRef(false);
+
+  const chunkAudioEnabled =
+    sourceType !== "document" && Boolean(audioUrl?.trim());
   // Utterances are not reset when `initialUtterances` props change (e.g. after router.refresh()
   // from seed actions) so unsaved transcript edits are preserved until Save or full page reload.
 
@@ -128,6 +335,79 @@ export function TranscriptReviewEditor({
     const s = Math.floor(sec % 60);
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
+
+  const flatMatches = useMemo(
+    () => buildFlatMatches(utterances, transcriptFind),
+    [utterances, transcriptFind]
+  );
+  const findReplaceMatchCount = flatMatches.length;
+  flatMatchesRef.current = flatMatches;
+
+  /** Vertical positions (0–100%) for match rail ticks, proportional to character span. */
+  const findMatchRailMarkers = useMemo(() => {
+    const needle = transcriptFind;
+    if (!needle || flatMatches.length === 0) return [];
+    const gap = 2;
+    const totalWeight =
+      utterances.reduce((s, u) => s + u.text.length, 0) +
+      Math.max(0, utterances.length - 1) * gap;
+    if (totalWeight <= 0) return [];
+
+    return flatMatches.map((m) => {
+      let pref = 0;
+      for (let i = 0; i < m.utteranceIndex; i++) {
+        pref += utterances[i].text.length + gap;
+      }
+      const center = m.start + needle.length / 2;
+      const pos = pref + center;
+      return {
+        key: `g-${m.globalIndex}`,
+        topPct: (pos / totalWeight) * 100,
+        utteranceIndex: m.utteranceIndex,
+        globalIndex: m.globalIndex,
+      };
+    });
+  }, [utterances, transcriptFind, flatMatches]);
+
+  useEffect(() => {
+    const el = sharedAudioRef.current;
+    if (!el || !chunkAudioEnabled) return;
+    const onPlay = () => setAudioPaused(false);
+    const onPause = () => setAudioPaused(true);
+    const onEnded = () => {
+      setPlayingChunkIndex(null);
+      setAudioPaused(true);
+    };
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("ended", onEnded);
+    };
+  }, [chunkAudioEnabled, audioUrl]);
+
+  useEffect(() => {
+    const el = sharedAudioRef.current;
+    if (!el || playingChunkIndex === null) return;
+    const u = utterances[playingChunkIndex];
+    if (!u || !isValidChunkTimeRange(u)) return;
+
+    const onTimeUpdate = () => {
+      const t = el.currentTime;
+      setActiveClipTime(t);
+      if (t >= segmentEndRef.current - CHUNK_END_EPSILON_SEC) {
+        el.pause();
+        setPlayingChunkIndex(null);
+        setActiveClipTime(null);
+      } else if (t < u.start - 0.05) {
+        el.currentTime = u.start;
+      }
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+    return () => el.removeEventListener("timeupdate", onTimeUpdate);
+  }, [playingChunkIndex, utterances]);
 
   useEffect(() => {
     if (!searchOpen || searchQuery.trim().length < 2) {
@@ -157,6 +437,85 @@ export function TranscriptReviewEditor({
 
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
+  const reprocessBusy = reprocessStarting || reprocessing;
+
+  useEffect(() => {
+    if (reprocessing) {
+      const el = sharedAudioRef.current;
+      el?.pause();
+      setPlayingChunkIndex(null);
+      setActiveClipTime(null);
+    }
+  }, [reprocessing]);
+
+  useEffect(() => {
+    if (reviewStatus !== "reprocessing") {
+      lastPipelineStatusRef.current = null;
+      return;
+    }
+
+    const applyPipelineStatus = (newStatus: InterviewStatus, err?: string | null) => {
+      if (newStatus === lastPipelineStatusRef.current) return;
+      lastPipelineStatusRef.current = newStatus;
+
+      if (newStatus === "COMPLETED") {
+        router.push(`/interviews/${interviewId}`);
+        return;
+      }
+      if (newStatus === "FAILED") {
+        if (err) toast.error(err);
+        router.refresh();
+      }
+    };
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/interviews/${interviewId}/poll`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          status?: InterviewStatus;
+          error_message?: string | null;
+        };
+        if (data.status) {
+          applyPipelineStatus(data.status, data.error_message ?? null);
+        }
+      } catch {
+        /* poll is best-effort */
+      }
+    };
+
+    void poll();
+    const pollId = window.setInterval(poll, PIPELINE_POLL_MS);
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`interview-${interviewId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "interviews",
+          filter: `id=eq.${interviewId}`,
+        },
+        (payload) => {
+          const newStatus = payload.new.status as InterviewStatus;
+          applyPipelineStatus(newStatus, payload.new.error_message as string | null);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(pollId);
+      supabase.removeChannel(channel);
+    };
+  }, [reviewStatus, interviewId, router]);
+
+  useEffect(() => {
+    if (reviewStatus === "reprocessing") {
+      setReprocessStarting(false);
+    }
+  }, [reviewStatus]);
 
   const onRunReprocess = async () => {
     setReprocessStarting(true);
@@ -167,13 +526,13 @@ export function TranscriptReviewEditor({
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         toast.error(json.error ?? "Could not start reprocessing");
+        setReprocessStarting(false);
         return;
       }
       toast.success("Reprocessing started — pipeline runs in the background.");
       router.refresh();
     } catch {
       toast.error("Could not start reprocessing");
-    } finally {
       setReprocessStarting(false);
     }
   };
@@ -250,10 +609,164 @@ export function TranscriptReviewEditor({
     });
   };
 
+  const toggleChunkAudio = useCallback(
+    (index: number) => {
+      const el = sharedAudioRef.current;
+      if (!el || !chunkAudioEnabled || reprocessing) return;
+      const u = utterances[index];
+      if (!isValidChunkTimeRange(u)) return;
+
+      if (playingChunkIndex === index) {
+        if (el.paused) {
+          segmentEndRef.current = u.end;
+          setActiveClipTime(el.currentTime);
+          void el.play().catch(() => toast.error("Could not play audio"));
+        } else {
+          el.pause();
+          setActiveClipTime(el.currentTime);
+        }
+        return;
+      }
+
+      segmentEndRef.current = u.end;
+      el.pause();
+      el.currentTime = u.start;
+      setActiveClipTime(u.start);
+      setPlayingChunkIndex(index);
+      void el.play().catch(() => {
+        toast.error("Could not play audio");
+        setPlayingChunkIndex(null);
+        setActiveClipTime(null);
+      });
+    },
+    [chunkAudioEnabled, playingChunkIndex, utterances, reprocessing]
+  );
+
+  const seekWithinUtterance = useCallback(
+    (index: number, rawTime: number) => {
+      const el = sharedAudioRef.current;
+      if (!el || !chunkAudioEnabled || reprocessing) return;
+      const u = utterances[index];
+      if (!isValidChunkTimeRange(u)) return;
+      const t = Math.min(u.end, Math.max(u.start, rawTime));
+      segmentEndRef.current = u.end;
+      el.currentTime = t;
+      setPlayingChunkIndex(index);
+      setActiveClipTime(t);
+    },
+    [chunkAudioEnabled, utterances, reprocessing]
+  );
+
+  const scrollToUtterance = useCallback((index: number) => {
+    utteranceRefs.current.get(index)?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, []);
+
+  useEffect(() => {
+    const n = transcriptFind;
+    if (n !== prevNeedleRef.current) {
+      prevNeedleRef.current = n;
+      focusMatchAfterNavRef.current = false;
+      if (!n) {
+        setActiveMatchIndex(-1);
+        return;
+      }
+      setActiveMatchIndex(0);
+      setSearchEpoch((e) => e + 1);
+      return;
+    }
+    if (!n) return;
+    if (flatMatches.length === 0) {
+      setActiveMatchIndex(-1);
+      return;
+    }
+    setActiveMatchIndex((prev) =>
+      prev < 0 ? 0 : Math.min(prev, flatMatches.length - 1)
+    );
+  }, [transcriptFind, flatMatches]);
+
+  useEffect(() => {
+    if (activeMatchIndex < 0) return;
+    const list = flatMatchesRef.current;
+    if (list.length === 0) return;
+    const m = list[activeMatchIndex];
+    if (!m) return;
+    scrollToUtterance(m.utteranceIndex);
+    const id = requestAnimationFrame(() => {
+      if (!focusMatchAfterNavRef.current) return;
+      focusMatchAfterNavRef.current = false;
+      const ta = textareaRefs.current.get(m.utteranceIndex);
+      if (ta) {
+        ta.focus();
+        try {
+          ta.setSelectionRange(m.start, m.end);
+        } catch {
+          /* selection may be invalid transiently */
+        }
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeMatchIndex, searchEpoch, scrollToUtterance]);
+
+  const goPrevMatch = useCallback(() => {
+    focusMatchAfterNavRef.current = true;
+    setActiveMatchIndex((i) => {
+      const len = flatMatchesRef.current.length;
+      if (len === 0) return -1;
+      if (i <= 0) return len - 1;
+      return i - 1;
+    });
+  }, []);
+
+  const goNextMatch = useCallback(() => {
+    focusMatchAfterNavRef.current = true;
+    setActiveMatchIndex((i) => {
+      const len = flatMatchesRef.current.length;
+      if (len === 0) return -1;
+      if (i < 0) return 0;
+      return (i + 1) % len;
+    });
+  }, []);
+
+  const registerTranscriptTextarea = useCallback(
+    (rowIndex: number, el: HTMLTextAreaElement | null) => {
+      if (el) textareaRefs.current.set(rowIndex, el);
+      else textareaRefs.current.delete(rowIndex);
+    },
+    []
+  );
+
+  const onReplaceAllInTranscript = useCallback(() => {
+    const needle = transcriptFind;
+    if (!needle || findReplaceMatchCount === 0 || reprocessing) return;
+    const n = findReplaceMatchCount;
+    setUtterances((prev) =>
+      prev.map((u) => ({
+        ...u,
+        text: replaceAllNonOverlappingInsensitive(u.text, needle, transcriptReplace),
+      }))
+    );
+    toast.success(
+      `Replaced ${n} match${n === 1 ? "" : "es"} in the reviewed transcript. Save draft when ready.`
+    );
+  }, [transcriptFind, transcriptReplace, findReplaceMatchCount, reprocessing]);
+
   const emptyState = utterances.length === 0;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
+    <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+      {chunkAudioEnabled && audioUrl ? (
+        <audio
+          ref={sharedAudioRef}
+          src={audioUrl}
+          preload="metadata"
+          className="hidden"
+          aria-hidden
+          onError={() => toast.error("Audio failed to load")}
+        />
+      ) : null}
       <div>
         <Link
           href={`/interviews/${interviewId}`}
@@ -262,9 +775,9 @@ export function TranscriptReviewEditor({
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to interview
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Transcript review</h1>
-        <p className="mt-1 text-muted-foreground">{interviewTitle}</p>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Transcript review</h1>
+        <p className="mt-2 text-base text-muted-foreground">{interviewTitle}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           {lastIntelSource && (
             <span>
               Last intel: <span className="text-foreground">{lastIntelSource}</span>
@@ -275,19 +788,19 @@ export function TranscriptReviewEditor({
             <span className="text-foreground">{reviewStatus}</span>
           </span>
           {readyForReprocess && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs font-normal">
               <CheckCircle2 className="mr-1 h-3 w-3" />
               Ready to reprocess
             </Badge>
           )}
+          {reprocessing && (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+              Intel pipeline running — editing is paused.
+            </span>
+          )}
         </div>
       </div>
-
-      {reprocessing && (
-        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
-          Reprocessing in progress — editing is disabled until it finishes.
-        </div>
-      )}
 
       {parseWarning && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -295,47 +808,239 @@ export function TranscriptReviewEditor({
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Reviewed utterances</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm">
+        <CardHeader className="space-y-1.5 pb-4">
+          <CardTitle className="text-xl">Reviewed utterances</CardTitle>
+          <CardDescription className="text-base leading-relaxed">
             Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
             unless you re-run from a future utterance editor.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {emptyState ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               No utterances to edit. Ensure this interview has a speaker-labelled transcript, then
               save a draft from the interview detail page after upload completes.
             </p>
           ) : (
-            <ScrollArea className="h-[min(60vh,520px)] pr-4">
-              <div className="space-y-4">
-                {utterances.map((u, i) => (
-                  <div
-                    key={`${u.speaker}-${u.start}-${i}`}
-                    className="rounded-lg border bg-card/50 p-3"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="outline">{speakerLabel(u.speaker)}</Badge>
-                      <span>
-                        {formatTime(u.start)} – {formatTime(u.end)}
-                      </span>
+            <>
+              <div className="mb-4 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 shadow-sm backdrop-blur-[2px] dark:border-border/50 dark:bg-card/30">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border/40 bg-background/70 px-2.5 py-1 shadow-inner dark:border-border/30 dark:bg-background/40">
+                      <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+                      <Input
+                        id="tr-find"
+                        value={transcriptFind}
+                        onChange={(e) => setTranscriptFind(e.target.value)}
+                        placeholder="Find in transcript…"
+                        disabled={reprocessing}
+                        autoComplete="off"
+                        className="h-8 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 md:text-sm"
+                        aria-label="Find in reviewed transcript (case-insensitive)"
+                      />
                     </div>
-                    <Textarea
-                      value={u.text}
-                      onChange={(e) => updateText(i, e.target.value)}
-                      disabled={reprocessing}
-                      rows={3}
-                      className="resize-y text-sm"
-                    />
+                    {transcriptFind ? (
+                      flatMatches.length > 0 ? (
+                        <div className="flex items-center gap-0.5">
+                          <span
+                            className="min-w-[4.5rem] px-1 text-center text-xs font-medium tabular-nums text-amber-800/90 dark:text-amber-200/85"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {activeMatchIndex >= 0
+                              ? `${activeMatchIndex + 1} of ${flatMatches.length}`
+                              : `0 of ${flatMatches.length}`}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            disabled={reprocessing}
+                            aria-label="Previous match"
+                            onClick={goPrevMatch}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            disabled={reprocessing}
+                            aria-label="Next match"
+                            onClick={goNextMatch}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No matches</span>
+                      )
+                    ) : null}
                   </div>
-                ))}
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5 dark:border-border/30">
+                    <Input
+                      id="tr-replace"
+                      value={transcriptReplace}
+                      onChange={(e) => setTranscriptReplace(e.target.value)}
+                      placeholder="Replace with…"
+                      disabled={reprocessing}
+                      autoComplete="off"
+                      className="h-9 min-w-0 flex-1 border-border/50 bg-background/60 text-sm shadow-sm dark:bg-background/40 sm:max-w-xl"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0 border-border/60 text-xs font-medium"
+                      disabled={
+                        reprocessing || !transcriptFind || findReplaceMatchCount === 0
+                      }
+                      onClick={onReplaceAllInTranscript}
+                    >
+                      Replace all
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </ScrollArea>
+              <div className="flex h-[min(65vh,600px)] gap-2">
+                {transcriptFind && findMatchRailMarkers.length > 0 ? (
+                  <div
+                    className="relative w-3 shrink-0 rounded-full border border-border/70 bg-muted/50"
+                    aria-label="Match positions in transcript"
+                  >
+                    <div className="absolute inset-x-0 top-2 bottom-2 mx-auto w-px rounded-full bg-muted-foreground/25" />
+                    {findMatchRailMarkers.map((mk) => (
+                      <button
+                        key={mk.key}
+                        type="button"
+                        title="Go to this match"
+                        className={cn(
+                          "absolute left-1/2 z-10 h-2.5 w-2.5 rounded-sm bg-amber-500/90 shadow-sm ring-1 ring-amber-700/25 transition-transform hover:scale-125 hover:bg-amber-400 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none dark:ring-amber-400/30",
+                          mk.globalIndex === activeMatchIndex &&
+                            "h-3 w-3 bg-amber-400 ring-2 ring-amber-600/50 dark:bg-amber-400 dark:ring-amber-300/60"
+                        )}
+                        style={{
+                          top: `${mk.topPct}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                        onClick={() => {
+                          focusMatchAfterNavRef.current = true;
+                          setActiveMatchIndex(mk.globalIndex);
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pr-1">
+                  <div className="space-y-5 pb-1">
+                    {utterances.map((u, rowIndex) => {
+                      const clipSliderValue =
+                        playingChunkIndex === rowIndex
+                          ? Math.min(
+                              u.end,
+                              Math.max(u.start, activeClipTime ?? u.start)
+                            )
+                          : u.start;
+                      return (
+                        <div
+                          key={`${u.speaker}-${u.start}-${rowIndex}`}
+                          ref={(el) => {
+                            if (el) utteranceRefs.current.set(rowIndex, el);
+                            else utteranceRefs.current.delete(rowIndex);
+                          }}
+                          className={cn(
+                            "rounded-lg border bg-card/50 p-4 transition-[box-shadow,ring]",
+                            playingChunkIndex === rowIndex &&
+                              !audioPaused &&
+                              "ring-2 ring-primary/45 border-primary/35",
+                            playingChunkIndex === rowIndex &&
+                              audioPaused &&
+                              "ring-1 ring-muted-foreground/40"
+                          )}
+                        >
+                          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="font-normal">
+                                {speakerLabel(u.speaker)}
+                              </Badge>
+                              <span className="tabular-nums">
+                                {formatTime(u.start)} – {formatTime(u.end)}
+                              </span>
+                            </div>
+                          </div>
+                          {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
+                            <div className="mb-2.5 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                disabled={reprocessing}
+                                aria-label={
+                                  playingChunkIndex === rowIndex && !audioPaused
+                                    ? "Pause audio for this segment"
+                                    : "Play audio for this segment"
+                                }
+                                onClick={() => toggleChunkAudio(rowIndex)}
+                              >
+                                {playingChunkIndex === rowIndex && !audioPaused ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <input
+                                type="range"
+                                className="h-2 min-w-0 flex-1 cursor-pointer accent-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:accent-amber-500"
+                                min={u.start}
+                                max={u.end}
+                                step={0.01}
+                                value={clipSliderValue}
+                                disabled={reprocessing}
+                                aria-valuemin={u.start}
+                                aria-valuemax={u.end}
+                                aria-valuenow={clipSliderValue}
+                                aria-label={`Seek within this utterance (${formatTime(u.start)} to ${formatTime(u.end)})`}
+                                onChange={(e) =>
+                                  seekWithinUtterance(rowIndex, parseFloat(e.target.value))
+                                }
+                              />
+                            </div>
+                          ) : null}
+                          {transcriptFind ? (
+                            <HighlightedTranscriptTextarea
+                              value={u.text}
+                              onChange={(v) => updateText(rowIndex, v)}
+                              disabled={reprocessing}
+                              rows={4}
+                              utteranceIndex={rowIndex}
+                              occurrences={flatMatches.filter(
+                                (m) => m.utteranceIndex === rowIndex
+                              )}
+                              activeMatchGlobal={activeMatchIndex}
+                              onRegisterTextarea={registerTranscriptTextarea}
+                            />
+                          ) : (
+                            <Textarea
+                              value={u.text}
+                              onChange={(e) => updateText(rowIndex, e.target.value)}
+                              disabled={reprocessing}
+                              rows={4}
+                              className="resize-y text-base leading-relaxed"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             <Button
               onClick={onSaveDraft}
               disabled={pending || reprocessing || emptyState}
@@ -354,28 +1059,28 @@ export function TranscriptReviewEditor({
             >
               Mark ready for reprocess
             </Button>
-            {readyForReprocess && (
+            {(readyForReprocess || reprocessing) && (
               <Button
                 variant="default"
                 onClick={() => void onRunReprocess()}
-                disabled={pending || reprocessing || reprocessStarting}
+                disabled={pending || emptyState || reprocessBusy}
               >
-                {reprocessStarting ? (
+                {reprocessBusy ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Run reprocessing
+                {reprocessBusy ? "Reprocessing…" : "Run reprocessing"}
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Human-confirmed entities</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl">Human-confirmed entities</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
                 Strong inputs for the next reprocessing run: mention recovery and relationships.
               </CardDescription>
             </div>

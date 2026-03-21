@@ -553,7 +553,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
                 transition-all
                 ${
                   active
-                    ? "border-transparent text-background"
+                    ? "border-transparent text-white"
                     : "border-border bg-transparent text-muted-foreground opacity-40 hover:opacity-70"
                 }
               `}
@@ -597,14 +597,13 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
       */}
       <div
         ref={containerRef}
-        className="relative overflow-hidden rounded-xl border border-white/[0.06]"
-        style={{ height: 640, background: "#0b0e17" }}
+        className="relative h-[640px] overflow-hidden rounded-xl border border-border bg-background"
       >
 
         {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b0e17]/85">
-            <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
 
@@ -617,13 +616,13 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
         {/* Empty state */}
         {isEmpty && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 text-slate-500">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 text-muted-foreground">
             {filtersHidEverything ? (
               <>
                 <p className="text-sm">All entities are hidden by the current filters.</p>
                 <button
                   onClick={resetFilters}
-                  className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition-colors hover:bg-white/10"
+                  className="rounded-md border border-border bg-muted/50 px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
                 >
                   Reset filters
                 </button>
@@ -631,7 +630,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
             ) : (
               <>
                 <p className="text-sm">No entities found for this project.</p>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Process interviews to populate the graph.
                 </p>
               </>
@@ -653,11 +652,11 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
                 key={label}
                 variant="secondary"
                 size="icon"
-                className="h-7 w-7 border border-white/10 bg-[#1e293b]/80 hover:bg-[#1e293b] backdrop-blur"
+                className="h-7 w-7 border border-border bg-card/90 text-foreground hover:bg-card"
                 onClick={fn}
                 aria-label={label}
               >
-                <Icon className="h-3.5 w-3.5 text-slate-300" />
+                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             ))}
           </div>
@@ -665,11 +664,11 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
         {/* ── Legend (bottom-left, hidden when info card is open) ── */}
         {!isEmpty && !error && !focusedNode && (
-          <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-lg border border-white/[0.07] bg-[#0b0e17]/90 px-3 py-2 backdrop-blur">
+          <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-lg border border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
             {ENTITY_TYPES.filter((t) => !hiddenTypes.has(t)).map((type) => (
               <div
                 key={type}
-                className="flex items-center gap-1.5 text-[11px] text-slate-600"
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
               >
                 <span
                   className="inline-block h-2 w-2 shrink-0 rounded-full"
@@ -683,23 +682,23 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
         {/* ── Floating info card (bottom-left, when node focused) ── */}
         {focusedNode && (
-          <div className="absolute bottom-4 left-4 z-20 w-[280px] rounded-xl border border-white/[0.1] bg-[#0f172a]/97 shadow-2xl backdrop-blur-md">
+          <div className="absolute bottom-4 left-4 z-20 w-[280px] rounded-xl border border-border bg-card/98 shadow-xl backdrop-blur-md">
             {/* Header */}
-            <div className="flex items-start justify-between gap-2 border-b border-white/[0.06] px-4 pb-3 pt-4">
+            <div className="flex items-start justify-between gap-2 border-b border-border px-4 pb-3 pt-4">
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-1.5">
                   <span
                     className="inline-block h-2 w-2 shrink-0 rounded-full"
                     style={{ background: nodeColor(focusedNode.type) }}
                   />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {focusedNode.type.toLowerCase()}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold leading-snug text-slate-50">
+                <h3 className="text-sm font-semibold leading-snug text-foreground">
                   {focusedNode.name}
                 </h3>
-                <p className="mt-0.5 text-[11px] text-slate-500">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {focusedNode.mentionCount} mention
                   {focusedNode.mentionCount !== 1 ? "s" : ""} ·{" "}
                   {focusedEdges.length} connection
@@ -707,7 +706,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
                 </p>
               </div>
               <button
-                className="mt-0.5 shrink-0 rounded p-0.5 text-slate-600 transition-colors hover:text-slate-200"
+                className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setFocusedNodeId(null)}
                 aria-label="Close"
               >
@@ -717,7 +716,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
             {/* Description */}
             {focusedNode.description && (
-              <p className="border-b border-white/[0.06] px-4 py-2.5 text-[11px] leading-relaxed text-slate-400">
+              <p className="border-b border-border px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
                 {focusedNode.description.length > 180
                   ? `${focusedNode.description.slice(0, 178)}…`
                   : focusedNode.description}
@@ -727,7 +726,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
             {/* Connections list */}
             {focusedEdges.length > 0 ? (
               <div className="max-h-52 overflow-y-auto px-3 py-2">
-                <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Connections ({focusedEdges.length})
                 </p>
                 <div className="space-y-0.5">
@@ -741,19 +740,19 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
                     return (
                       <button
                         key={edge.id}
-                        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05]"
+                        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/60"
                         onClick={() => setFocusedNodeId(otherId)}
                       >
                         <span
                           className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
                           style={{ background: nodeColor(other?.type ?? "") }}
                         />
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-slate-300 group-hover:text-slate-100">
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
                           {dir} {other?.name ?? otherId}
                         </span>
                         <Badge
                           variant="outline"
-                          className="shrink-0 border-white/10 bg-transparent px-1.5 py-0 text-[9px] text-slate-500"
+                          className="shrink-0 border-border bg-transparent px-1.5 py-0 text-[9px] text-muted-foreground"
                         >
                           {edge.relationType.replace(/_/g, " ").toLowerCase()}
                         </Badge>
@@ -763,7 +762,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
                 </div>
               </div>
             ) : (
-              <p className="px-4 py-3 text-[11px] text-slate-600">
+              <p className="px-4 py-3 text-[11px] text-muted-foreground">
                 No connections in this project.
               </p>
             )}
@@ -772,7 +771,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
         {/* ── Hint text ──────────────────────────────────────── */}
         {!isEmpty && !error && !focusedNode && !loading && (
-          <p className="absolute bottom-3 right-14 z-10 select-none text-[11px] text-slate-700">
+          <p className="absolute bottom-3 right-14 z-10 select-none text-[11px] text-muted-foreground">
             Click a node to explore · Scroll to zoom · Drag to pan
           </p>
         )}

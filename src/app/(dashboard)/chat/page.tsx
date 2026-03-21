@@ -5,7 +5,6 @@ import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
-import Link from "next/link";
 import { Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
@@ -81,58 +80,11 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100dvh-2.5rem)] max-h-[calc(100dvh-2.5rem)] w-full flex-col overflow-hidden bg-background text-foreground">
-      <header className="shrink-0 border-b border-border px-6 py-6 md:px-10 md:py-7">
-        <div className="mx-auto max-w-3xl">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            Intelligence workspace
-          </p>
-          <h1 className="mt-1.5 text-xl font-semibold tracking-tight md:text-2xl">
-            Intelligence Chat
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Grounded answers from your interview corpus. Citations and sources
-            are shown in the response — verify every claim against the record.
-          </p>
-          {!projectId && !interviewId && (
-            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-              For questions about a specific programme (e.g. &ldquo;Nigeria
-              2026&rdquo;), open{" "}
-              <Link
-                href="/projects"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Projects
-              </Link>{" "}
-              and use{" "}
-              <span className="font-medium text-foreground">
-                Intelligence Chat
-              </span>{" "}
-              from that project — or stay here: workspace summaries are still
-              loaded for all your projects.
-            </p>
-          )}
-          {(projectId || interviewId) && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {projectId && (
-                <span className="rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shadow-sm">
-                  Project scope
-                </span>
-              )}
-              {interviewId && (
-                <span className="rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground shadow-sm">
-                  Single interview
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Scroll only the conversation; input stays fixed to bottom of this workspace */}
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Single canvas: one background token end-to-end (no card-white band) */}
+      <div className="flex min-h-0 flex-1 flex-col bg-background">
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-9 md:px-10 md:py-11"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-background px-6 pb-4 pt-8 md:px-10 md:pb-5 md:pt-10"
         >
           {messages.length === 0 ? (
             <EmptyState />
@@ -176,17 +128,17 @@ export default function ChatPage() {
           )}
         </div>
 
-        <footer className="shrink-0 rounded-t-3xl border-t border-border bg-card/90 px-6 py-4 backdrop-blur-md md:px-10 md:py-5">
+        <footer className="shrink-0 bg-background px-6 pb-6 pt-1 md:px-10 md:pb-8">
           <form
             onSubmit={handleFormSubmit}
-            className="mx-auto max-w-3xl"
+            className="mx-auto max-w-3xl bg-background"
           >
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about your interviews…"
-              className="min-h-[7.5rem] max-h-[min(40vh,280px)] resize-y rounded-2xl border-[1.5px] border-input bg-background px-4 py-4 text-[15px] leading-relaxed shadow-sm placeholder:text-muted-foreground focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/20"
+              className="min-h-[7.5rem] max-h-[min(40vh,280px)] resize-y rounded-2xl border border-sidebar-border/55 bg-sidebar px-4 py-4 text-[15px] leading-relaxed shadow-none placeholder:text-muted-foreground transition-[color,background-color,border-color,box-shadow] focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/15"
               rows={5}
               disabled={isLoading}
               aria-busy={isLoading}
@@ -232,14 +184,14 @@ function EmptyState() {
   return (
     <div className="flex min-h-[min(420px,50vh)] items-center justify-center px-2">
       <div className="mx-auto max-w-md text-center">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted/50 shadow-none">
           <Sparkles
             className="h-7 w-7 text-primary"
             strokeWidth={1.5}
           />
         </div>
         <h2 className="text-lg font-semibold tracking-tight">
-          Research copilot
+          Sovereign Data
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Ask analytical questions; responses read as structured briefs with
@@ -269,7 +221,7 @@ function EmptyState() {
           ].map((example) => (
             <div
               key={example.text}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-[13px] leading-snug text-muted-foreground shadow-sm"
+              className="flex items-start gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-3.5 text-[13px] leading-snug text-muted-foreground shadow-none"
             >
               <example.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <span>{example.text}</span>

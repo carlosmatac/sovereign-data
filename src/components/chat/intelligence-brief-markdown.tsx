@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 
 /**
  * Editorial / brief styling for Intelligence Chat assistant output.
- * Light theme — aligned with app `background` / `foreground` / `muted` tokens.
+ * Uses semantic theme tokens (dark slate app default).
  */
 const briefComponents: Components = {
   h1: ({ children }) => (

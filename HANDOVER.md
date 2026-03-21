@@ -63,6 +63,8 @@
 | Transcription | AssemblyAI Universal-2 |
 | Web Search | Tavily (optional) |
 
+**UI theme:** Default is **dark slate / navy-charcoal** (brand-aligned with logo `#0f172a` + white). Tokens live in `src/app/globals.css`; `next-themes` forces `dark` via `src/components/providers/app-theme-provider.tsx`.
+
 ---
 
 ## 3. CRITICAL GOTCHAS (Do NOT Violate)
