@@ -46,11 +46,11 @@ export default async function DashboardLayout({
           name: profile?.full_name ?? undefined,
         }}
       />
-      <SidebarInset className="flex min-h-svh flex-col">
+      <SidebarInset className="flex min-h-svh min-w-0 flex-col">
         <DashboardInsetHeader />
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto">
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

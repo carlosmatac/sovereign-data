@@ -200,7 +200,7 @@ function HighlightedTranscriptTextarea({
   );
 
   return (
-    <div className="relative rounded-md border border-input/80 bg-background shadow-xs">
+    <div className="relative w-full min-w-0 rounded-md border border-input/80 bg-background shadow-xs">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
         <div
           className="break-words px-3 py-2 text-base leading-relaxed whitespace-pre-wrap"
@@ -756,7 +756,7 @@ export function TranscriptReviewEditor({
   const emptyState = utterances.length === 0;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-8 px-6 py-8">
       {chunkAudioEnabled && audioUrl ? (
         <audio
           ref={sharedAudioRef}
@@ -808,7 +808,7 @@ export function TranscriptReviewEditor({
         </div>
       )}
 
-      <Card className="shadow-sm">
+      <Card className="w-full min-w-0 shadow-sm">
         <CardHeader className="space-y-1.5 pb-4">
           <CardTitle className="text-xl">Reviewed utterances</CardTitle>
           <CardDescription className="text-base leading-relaxed">
@@ -824,10 +824,10 @@ export function TranscriptReviewEditor({
             </p>
           ) : (
             <>
-              <div className="mb-4 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 shadow-sm backdrop-blur-[2px] dark:border-border/50 dark:bg-card/30">
+              <div className="mb-4 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 backdrop-blur-[2px] dark:border-border/50 dark:bg-card/30">
                 <div className="flex flex-col gap-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border/40 bg-background/70 px-2.5 py-1 shadow-inner dark:border-border/30 dark:bg-background/40">
+                    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border/50 bg-input/25 px-2.5 py-1 dark:border-border/40 dark:bg-input/20">
                       <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
                       <Input
                         id="tr-find"
@@ -905,7 +905,7 @@ export function TranscriptReviewEditor({
                   </div>
                 </div>
               </div>
-              <div className="flex h-[min(65vh,600px)] gap-2">
+              <div className="flex h-[min(65vh,600px)] w-full min-w-0 gap-2">
                 {transcriptFind && findMatchRailMarkers.length > 0 ? (
                   <div
                     className="relative w-3 shrink-0 rounded-full border border-border/70 bg-muted/50"
@@ -1075,7 +1075,7 @@ export function TranscriptReviewEditor({
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm">
+      <Card className="w-full min-w-0 shadow-sm">
         <CardHeader>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
