@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +15,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   Loader2,
+  Pause,
+  Play,
   Plus,
   Save,
   Search,
@@ -58,6 +67,7 @@ import type {
   EntityType,
   InterviewStatus,
   ReviewedUtterance,
+  SourceType,
   TranscriptReviewStatus,
 } from "@/types/database";
 import type { SpeakerMap } from "@/types/database";
@@ -68,9 +78,54 @@ import {
   createReviewSeedEntity,
   removeReviewSeedEntity,
 } from "@/app/actions/interview-review";
+import { cn } from "@/lib/utils";
 
 /** Match status-tracker: background poll when review reprocessing is active (no pipeline UI on this page). */
 const PIPELINE_POLL_MS = 10_000;
+
+const CHUNK_END_EPSILON_SEC = 0.06;
+
+function isValidChunkTimeRange(u: ReviewedUtterance): boolean {
+  return (
+    Number.isFinite(u.start) &&
+    Number.isFinite(u.end) &&
+    u.start >= 0 &&
+    u.end > u.start
+  );
+}
+
+function countSubstringOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let n = 0;
+  let idx = 0;
+  while (idx <= haystack.length) {
+    const i = haystack.indexOf(needle, idx);
+    if (i === -1) break;
+    n++;
+    idx = i + needle.length;
+  }
+  return n;
+}
+
+function replaceAllNonOverlapping(
+  haystack: string,
+  needle: string,
+  replacement: string
+): string {
+  if (!needle) return haystack;
+  let result = "";
+  let idx = 0;
+  while (idx < haystack.length) {
+    const i = haystack.indexOf(needle, idx);
+    if (i === -1) {
+      result += haystack.slice(idx);
+      break;
+    }
+    result += haystack.slice(idx, i) + replacement;
+    idx = i + needle.length;
+  }
+  return result;
+}
 
 const ENTITY_TYPES: EntityType[] = [
   "PERSON",
@@ -98,6 +153,8 @@ type Props = {
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
   parseWarning?: string | null;
+  sourceType: SourceType;
+  audioUrl: string | null;
 };
 
 export function TranscriptReviewEditor({
@@ -110,6 +167,8 @@ export function TranscriptReviewEditor({
   lastIntelSource,
   seeds,
   parseWarning,
+  sourceType,
+  audioUrl,
 }: Props) {
   const router = useRouter();
   const [utterances, setUtterances] = useState<ReviewedUtterance[]>(initialUtterances);
@@ -125,6 +184,15 @@ export function TranscriptReviewEditor({
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
   const [reprocessStarting, setReprocessStarting] = useState(false);
   const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
+  const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const segmentEndRef = useRef<number>(0);
+  const [playingChunkIndex, setPlayingChunkIndex] = useState<number | null>(null);
+  const [audioPaused, setAudioPaused] = useState(true);
+  const [transcriptFind, setTranscriptFind] = useState("");
+  const [transcriptReplace, setTranscriptReplace] = useState("");
+
+  const chunkAudioEnabled =
+    sourceType !== "document" && Boolean(audioUrl?.trim());
   // Utterances are not reset when `initialUtterances` props change (e.g. after router.refresh()
   // from seed actions) so unsaved transcript edits are preserved until Save or full page reload.
 
@@ -138,6 +206,49 @@ export function TranscriptReviewEditor({
     const s = Math.floor(sec % 60);
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
+
+  const findReplaceMatchCount = useMemo(() => {
+    const needle = transcriptFind;
+    if (!needle) return 0;
+    let total = 0;
+    for (const u of utterances) {
+      total += countSubstringOccurrences(u.text, needle);
+    }
+    return total;
+  }, [utterances, transcriptFind]);
+
+  useEffect(() => {
+    const el = sharedAudioRef.current;
+    if (!el || !chunkAudioEnabled) return;
+    const onPlay = () => setAudioPaused(false);
+    const onPause = () => setAudioPaused(true);
+    const onEnded = () => {
+      setPlayingChunkIndex(null);
+      setAudioPaused(true);
+    };
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("ended", onEnded);
+    };
+  }, [chunkAudioEnabled, audioUrl]);
+
+  useEffect(() => {
+    const el = sharedAudioRef.current;
+    if (!el || playingChunkIndex === null) return;
+
+    const onTimeUpdate = () => {
+      if (el.currentTime >= segmentEndRef.current - CHUNK_END_EPSILON_SEC) {
+        el.pause();
+        setPlayingChunkIndex(null);
+      }
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+    return () => el.removeEventListener("timeupdate", onTimeUpdate);
+  }, [playingChunkIndex]);
 
   useEffect(() => {
     if (!searchOpen || searchQuery.trim().length < 2) {
@@ -168,6 +279,14 @@ export function TranscriptReviewEditor({
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
   const reprocessBusy = reprocessStarting || reprocessing;
+
+  useEffect(() => {
+    if (reprocessing) {
+      const el = sharedAudioRef.current;
+      el?.pause();
+      setPlayingChunkIndex(null);
+    }
+  }, [reprocessing]);
 
   useEffect(() => {
     if (reviewStatus !== "reprocessing") {
@@ -330,10 +449,64 @@ export function TranscriptReviewEditor({
     });
   };
 
+  const toggleChunkAudio = useCallback(
+    (index: number) => {
+      const el = sharedAudioRef.current;
+      if (!el || !chunkAudioEnabled || reprocessing) return;
+      const u = utterances[index];
+      if (!isValidChunkTimeRange(u)) return;
+
+      if (playingChunkIndex === index) {
+        if (el.paused) {
+          segmentEndRef.current = u.end;
+          void el.play().catch(() => toast.error("Could not play audio"));
+        } else {
+          el.pause();
+        }
+        return;
+      }
+
+      segmentEndRef.current = u.end;
+      el.pause();
+      el.currentTime = u.start;
+      setPlayingChunkIndex(index);
+      void el.play().catch(() => {
+        toast.error("Could not play audio");
+        setPlayingChunkIndex(null);
+      });
+    },
+    [chunkAudioEnabled, playingChunkIndex, utterances, reprocessing]
+  );
+
+  const onReplaceAllInTranscript = useCallback(() => {
+    const needle = transcriptFind;
+    if (!needle || findReplaceMatchCount === 0 || reprocessing) return;
+    const n = findReplaceMatchCount;
+    setUtterances((prev) =>
+      prev.map((u) => ({
+        ...u,
+        text: replaceAllNonOverlapping(u.text, needle, transcriptReplace),
+      }))
+    );
+    toast.success(
+      `Replaced ${n} match${n === 1 ? "" : "es"} in the reviewed transcript. Save draft when ready.`
+    );
+  }, [transcriptFind, transcriptReplace, findReplaceMatchCount, reprocessing]);
+
   const emptyState = utterances.length === 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+      {chunkAudioEnabled && audioUrl ? (
+        <audio
+          ref={sharedAudioRef}
+          src={audioUrl}
+          preload="metadata"
+          className="hidden"
+          aria-hidden
+          onError={() => toast.error("Audio failed to load")}
+        />
+      ) : null}
       <div>
         <Link
           href={`/interviews/${interviewId}`}
@@ -390,21 +563,100 @@ export function TranscriptReviewEditor({
               save a draft from the interview detail page after upload completes.
             </p>
           ) : (
-            <ScrollArea className="h-[min(65vh,600px)] pr-4">
-              <div className="space-y-5">
-                {utterances.map((u, i) => (
-                  <div
-                    key={`${u.speaker}-${u.start}-${i}`}
-                    className="rounded-lg border bg-card/50 p-4"
+            <>
+              <div className="mb-4 flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[200px]">
+                  <Label htmlFor="tr-find" className="text-xs text-muted-foreground">
+                    Find in reviewed text
+                  </Label>
+                  <Input
+                    id="tr-find"
+                    value={transcriptFind}
+                    onChange={(e) => setTranscriptFind(e.target.value)}
+                    placeholder="Search…"
+                    disabled={reprocessing}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[200px]">
+                  <Label htmlFor="tr-replace" className="text-xs text-muted-foreground">
+                    Replace with
+                  </Label>
+                  <Input
+                    id="tr-replace"
+                    value={transcriptReplace}
+                    onChange={(e) => setTranscriptReplace(e.target.value)}
+                    placeholder="Replacement (can be empty)"
+                    disabled={reprocessing}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:shrink-0">
+                  <p className="text-xs text-muted-foreground">
+                    {transcriptFind
+                      ? `${findReplaceMatchCount} match${findReplaceMatchCount === 1 ? "" : "es"} found`
+                      : "Enter text to search"}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    disabled={
+                      reprocessing || !transcriptFind || findReplaceMatchCount === 0
+                    }
+                    onClick={onReplaceAllInTranscript}
                   >
-                    <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <Badge variant="outline" className="font-normal">
-                        {speakerLabel(u.speaker)}
-                      </Badge>
-                      <span className="tabular-nums">
-                        {formatTime(u.start)} – {formatTime(u.end)}
-                      </span>
-                    </div>
+                    Replace all
+                  </Button>
+                </div>
+              </div>
+              <ScrollArea className="h-[min(65vh,600px)] pr-4">
+                <div className="space-y-5">
+                  {utterances.map((u, i) => (
+                    <div
+                      key={`${u.speaker}-${u.start}-${i}`}
+                      className={cn(
+                        "rounded-lg border bg-card/50 p-4 transition-[box-shadow,ring]",
+                        playingChunkIndex === i &&
+                          !audioPaused &&
+                          "ring-2 ring-primary/45 border-primary/35",
+                        playingChunkIndex === i &&
+                          audioPaused &&
+                          "ring-1 ring-muted-foreground/40"
+                      )}
+                    >
+                      <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="font-normal">
+                            {speakerLabel(u.speaker)}
+                          </Badge>
+                          <span className="tabular-nums">
+                            {formatTime(u.start)} – {formatTime(u.end)}
+                          </span>
+                        </div>
+                        {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            disabled={reprocessing}
+                            aria-label={
+                              playingChunkIndex === i && !audioPaused
+                                ? "Pause audio for this segment"
+                                : "Play audio for this segment"
+                            }
+                            onClick={() => toggleChunkAudio(i)}
+                          >
+                            {playingChunkIndex === i && !audioPaused ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                        ) : null}
+                      </div>
                     <Textarea
                       value={u.text}
                       onChange={(e) => updateText(i, e.target.value)}
@@ -413,9 +665,10 @@ export function TranscriptReviewEditor({
                       className="resize-y text-base leading-relaxed"
                     />
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
           )}
           <div className="mt-6 flex flex-wrap gap-2">
             <Button

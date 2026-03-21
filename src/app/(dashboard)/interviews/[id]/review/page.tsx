@@ -9,7 +9,11 @@ import {
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
 import { parseTranscriptFullToUtterances } from "@/lib/interviews/transcript-utterances-from-full";
-import type { ReviewedUtterance, SpeakerMap } from "@/types/database";
+import type {
+  ReviewedUtterance,
+  SourceType,
+  SpeakerMap,
+} from "@/types/database";
 
 function isStoredReviewedUtterances(v: unknown): v is ReviewedUtterance[] {
   if (!Array.isArray(v) || v.length === 0) return false;
@@ -39,7 +43,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, transcript_full, speaker_map, audio_duration, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, audio_url, transcript_full, speaker_map, audio_duration, reviewed_utterances, transcript_review_status, last_intel_source"
     )
     .eq("id", id)
     .single();
@@ -114,6 +118,8 @@ export default async function InterviewTranscriptReviewPage({
       lastIntelSource={interview.last_intel_source}
       seeds={seeds}
       parseWarning={parseWarning}
+      sourceType={interview.source_type as SourceType}
+      audioUrl={interview.audio_url}
     />
   );
 }
