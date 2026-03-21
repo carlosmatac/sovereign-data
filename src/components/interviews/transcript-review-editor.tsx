@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -53,7 +54,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { EntityType, ReviewedUtterance, TranscriptReviewStatus } from "@/types/database";
+import type {
+  EntityType,
+  InterviewStatus,
+  ReviewedUtterance,
+  TranscriptReviewStatus,
+} from "@/types/database";
 import type { SpeakerMap } from "@/types/database";
 import {
   saveTranscriptReviewDraft,
@@ -62,6 +68,9 @@ import {
   createReviewSeedEntity,
   removeReviewSeedEntity,
 } from "@/app/actions/interview-review";
+
+/** Match status-tracker: background poll when review reprocessing is active (no pipeline UI on this page). */
+const PIPELINE_POLL_MS = 10_000;
 
 const ENTITY_TYPES: EntityType[] = [
   "PERSON",
@@ -115,6 +124,7 @@ export function TranscriptReviewEditor({
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
   const [reprocessStarting, setReprocessStarting] = useState(false);
+  const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
   // Utterances are not reset when `initialUtterances` props change (e.g. after router.refresh()
   // from seed actions) so unsaved transcript edits are preserved until Save or full page reload.
 
@@ -157,6 +167,76 @@ export function TranscriptReviewEditor({
 
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
+  const reprocessBusy = reprocessStarting || reprocessing;
+
+  useEffect(() => {
+    if (reviewStatus !== "reprocessing") {
+      lastPipelineStatusRef.current = null;
+      return;
+    }
+
+    const applyPipelineStatus = (newStatus: InterviewStatus, err?: string | null) => {
+      if (newStatus === lastPipelineStatusRef.current) return;
+      lastPipelineStatusRef.current = newStatus;
+
+      if (newStatus === "COMPLETED") {
+        router.push(`/interviews/${interviewId}`);
+        return;
+      }
+      if (newStatus === "FAILED") {
+        if (err) toast.error(err);
+        router.refresh();
+      }
+    };
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/interviews/${interviewId}/poll`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          status?: InterviewStatus;
+          error_message?: string | null;
+        };
+        if (data.status) {
+          applyPipelineStatus(data.status, data.error_message ?? null);
+        }
+      } catch {
+        /* poll is best-effort */
+      }
+    };
+
+    void poll();
+    const pollId = window.setInterval(poll, PIPELINE_POLL_MS);
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`interview-${interviewId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "interviews",
+          filter: `id=eq.${interviewId}`,
+        },
+        (payload) => {
+          const newStatus = payload.new.status as InterviewStatus;
+          applyPipelineStatus(newStatus, payload.new.error_message as string | null);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(pollId);
+      supabase.removeChannel(channel);
+    };
+  }, [reviewStatus, interviewId, router]);
+
+  useEffect(() => {
+    if (reviewStatus === "reprocessing") {
+      setReprocessStarting(false);
+    }
+  }, [reviewStatus]);
 
   const onRunReprocess = async () => {
     setReprocessStarting(true);
@@ -167,13 +247,13 @@ export function TranscriptReviewEditor({
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         toast.error(json.error ?? "Could not start reprocessing");
+        setReprocessStarting(false);
         return;
       }
       toast.success("Reprocessing started — pipeline runs in the background.");
       router.refresh();
     } catch {
       toast.error("Could not start reprocessing");
-    } finally {
       setReprocessStarting(false);
     }
   };
@@ -253,7 +333,7 @@ export function TranscriptReviewEditor({
   const emptyState = utterances.length === 0;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
+    <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
       <div>
         <Link
           href={`/interviews/${interviewId}`}
@@ -262,9 +342,9 @@ export function TranscriptReviewEditor({
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to interview
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Transcript review</h1>
-        <p className="mt-1 text-muted-foreground">{interviewTitle}</p>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Transcript review</h1>
+        <p className="mt-2 text-base text-muted-foreground">{interviewTitle}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           {lastIntelSource && (
             <span>
               Last intel: <span className="text-foreground">{lastIntelSource}</span>
@@ -275,19 +355,19 @@ export function TranscriptReviewEditor({
             <span className="text-foreground">{reviewStatus}</span>
           </span>
           {readyForReprocess && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs font-normal">
               <CheckCircle2 className="mr-1 h-3 w-3" />
               Ready to reprocess
             </Badge>
           )}
+          {reprocessing && (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+              Intel pipeline running — editing is paused.
+            </span>
+          )}
         </div>
       </div>
-
-      {reprocessing && (
-        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
-          Reprocessing in progress — editing is disabled until it finishes.
-        </div>
-      )}
 
       {parseWarning && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -295,31 +375,33 @@ export function TranscriptReviewEditor({
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Reviewed utterances</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm">
+        <CardHeader className="space-y-1.5 pb-4">
+          <CardTitle className="text-xl">Reviewed utterances</CardTitle>
+          <CardDescription className="text-base leading-relaxed">
             Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
             unless you re-run from a future utterance editor.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {emptyState ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               No utterances to edit. Ensure this interview has a speaker-labelled transcript, then
               save a draft from the interview detail page after upload completes.
             </p>
           ) : (
-            <ScrollArea className="h-[min(60vh,520px)] pr-4">
-              <div className="space-y-4">
+            <ScrollArea className="h-[min(65vh,600px)] pr-4">
+              <div className="space-y-5">
                 {utterances.map((u, i) => (
                   <div
                     key={`${u.speaker}-${u.start}-${i}`}
-                    className="rounded-lg border bg-card/50 p-3"
+                    className="rounded-lg border bg-card/50 p-4"
                   >
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="outline">{speakerLabel(u.speaker)}</Badge>
-                      <span>
+                    <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <Badge variant="outline" className="font-normal">
+                        {speakerLabel(u.speaker)}
+                      </Badge>
+                      <span className="tabular-nums">
                         {formatTime(u.start)} – {formatTime(u.end)}
                       </span>
                     </div>
@@ -327,15 +409,15 @@ export function TranscriptReviewEditor({
                       value={u.text}
                       onChange={(e) => updateText(i, e.target.value)}
                       disabled={reprocessing}
-                      rows={3}
-                      className="resize-y text-sm"
+                      rows={4}
+                      className="resize-y text-base leading-relaxed"
                     />
                   </div>
                 ))}
               </div>
             </ScrollArea>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             <Button
               onClick={onSaveDraft}
               disabled={pending || reprocessing || emptyState}
@@ -354,28 +436,28 @@ export function TranscriptReviewEditor({
             >
               Mark ready for reprocess
             </Button>
-            {readyForReprocess && (
+            {(readyForReprocess || reprocessing) && (
               <Button
                 variant="default"
                 onClick={() => void onRunReprocess()}
-                disabled={pending || reprocessing || reprocessStarting}
+                disabled={pending || emptyState || reprocessBusy}
               >
-                {reprocessStarting ? (
+                {reprocessBusy ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Run reprocessing
+                {reprocessBusy ? "Reprocessing…" : "Run reprocessing"}
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Human-confirmed entities</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl">Human-confirmed entities</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
                 Strong inputs for the next reprocessing run: mention recovery and relationships.
               </CardDescription>
             </div>
