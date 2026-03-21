@@ -244,6 +244,8 @@ export interface Database {
           language: string;
           interviewee_name: string | null;
           interviewee_org: string | null;
+          interviewee_entity_id: string | null;
+          interviewee_org_entity_id: string | null;
           source_type: SourceType;
           expected_speakers: number | null;
           conducted_at: string | null;
@@ -274,6 +276,8 @@ export interface Database {
           language?: string;
           interviewee_name?: string | null;
           interviewee_org?: string | null;
+          interviewee_entity_id?: string | null;
+          interviewee_org_entity_id?: string | null;
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
@@ -304,6 +308,8 @@ export interface Database {
           language?: string;
           interviewee_name?: string | null;
           interviewee_org?: string | null;
+          interviewee_entity_id?: string | null;
+          interviewee_org_entity_id?: string | null;
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
@@ -327,6 +333,20 @@ export interface Database {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "interviews_interviewee_entity_id_fkey";
+            columns: ["interviewee_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "interviews_interviewee_org_entity_id_fkey";
+            columns: ["interviewee_org_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
             referencedColumns: ["id"];
           },
         ];

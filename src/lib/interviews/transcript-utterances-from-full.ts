@@ -1,5 +1,6 @@
 import type { ReviewedUtterance, SourceUtterance, SpeakerMap } from "@/types/database";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
+import { buildSpeakerLabelToCodeMap } from "@/lib/interviews/speaker-display";
 
 /**
  * Build `[Speaker label]: text` blocks from utterance rows (inverse of
@@ -81,10 +82,7 @@ export function parseTranscriptFullToUtterances(
   speakerMap: SpeakerMap,
   audioDurationSeconds: number | null
 ): ReviewedUtterance[] {
-  const labelToCode = new Map<string, string>();
-  for (const [code, label] of Object.entries(speakerMap)) {
-    labelToCode.set(label, code);
-  }
+  const labelToCode = buildSpeakerLabelToCodeMap(speakerMap);
 
   const blocks = transcriptFull.trim().split(/\n\n+/);
   const parsedBlocks = blocks.filter((b) => {

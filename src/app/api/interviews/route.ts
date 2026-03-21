@@ -3,9 +3,22 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 import { parseExpectedSpeakers } from "@/lib/constants";
+import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
 
 const MAX_ANCHOR_LENGTH = 120;
 const HONORIFIC_PREFIX_REGEX = /^\s*(mr|mrs|ms|dr|prof)\.?\s+/i;
+
+function parseOptionalUuid(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  ) {
+    return null;
+  }
+  return s;
+}
 
 function sanitizeOptionalAnchor(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -120,6 +133,8 @@ export async function POST(request: NextRequest) {
     expectedSpeakers: rawExpectedSpeakers,
     interviewee_name: rawIntervieweeName,
     interviewee_org: rawIntervieweeOrg,
+    interviewee_entity_id: rawIntervieweeEntityId,
+    interviewee_org_entity_id: rawIntervieweeOrgEntityId,
   } = body as {
     title: string;
     project_id: string;
@@ -129,6 +144,8 @@ export async function POST(request: NextRequest) {
     expectedSpeakers?: unknown;
     interviewee_name?: unknown;
     interviewee_org?: unknown;
+    interviewee_entity_id?: unknown;
+    interviewee_org_entity_id?: unknown;
   };
 
   // Validate required fields
@@ -150,11 +167,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
-  const intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
+  let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
+  const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
 
   // 2. Use admin client for DB operations (bypasses RLS, safe after auth check)
   const admin = createAdminClient();
+
+  if (intervieweeEntityId) {
+    const v = await validateInterviewAnchorEntityId(admin, {
+      entityId: intervieweeEntityId,
+      projectId: project_id,
+      role: "person",
+    });
+    if (!v.ok) {
+      return NextResponse.json(
+        { error: "Invalid interviewee entity selection" },
+        { status: 400 }
+      );
+    }
+    intervieweeName = v.name;
+  }
+
+  if (intervieweeOrgEntityId) {
+    const v = await validateInterviewAnchorEntityId(admin, {
+      entityId: intervieweeOrgEntityId,
+      projectId: project_id,
+      role: "organization",
+    });
+    if (!v.ok) {
+      return NextResponse.json(
+        { error: "Invalid organization entity selection" },
+        { status: 400 }
+      );
+    }
+    intervieweeOrg = v.name;
+  }
 
   // ── Create interview record ────────────────────────────────────
   const { data: interview, error: insertError } = await admin
@@ -170,6 +219,8 @@ export async function POST(request: NextRequest) {
       expected_speakers: expectedSpeakers,
       interviewee_name: intervieweeName,
       interviewee_org: intervieweeOrg,
+      interviewee_entity_id: intervieweeEntityId,
+      interviewee_org_entity_id: intervieweeOrgEntityId,
     })
     .select()
     .single();
