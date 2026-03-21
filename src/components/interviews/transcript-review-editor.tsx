@@ -62,7 +62,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   EntityType,
   InterviewStatus,
@@ -94,37 +93,57 @@ function isValidChunkTimeRange(u: ReviewedUtterance): boolean {
   );
 }
 
-function countSubstringOccurrences(haystack: string, needle: string): number {
+function countSubstringOccurrencesInsensitive(haystack: string, needle: string): number {
   if (!needle) return 0;
-  let n = 0;
-  let idx = 0;
-  while (idx <= haystack.length) {
-    const i = haystack.indexOf(needle, idx);
-    if (i === -1) break;
-    n++;
-    idx = i + needle.length;
+  const h = haystack.toLowerCase();
+  const n = needle.toLowerCase();
+  let count = 0;
+  let i = 0;
+  while (i <= h.length) {
+    const found = h.indexOf(n, i);
+    if (found === -1) break;
+    count++;
+    i = found + n.length;
   }
-  return n;
+  return count;
 }
 
-function replaceAllNonOverlapping(
+function replaceAllNonOverlappingInsensitive(
   haystack: string,
   needle: string,
   replacement: string
 ): string {
   if (!needle) return haystack;
+  const hLower = haystack.toLowerCase();
+  const nLower = needle.toLowerCase();
   let result = "";
-  let idx = 0;
-  while (idx < haystack.length) {
-    const i = haystack.indexOf(needle, idx);
-    if (i === -1) {
-      result += haystack.slice(idx);
+  let i = 0;
+  while (i < haystack.length) {
+    const found = hLower.indexOf(nLower, i);
+    if (found === -1) {
+      result += haystack.slice(i);
       break;
     }
-    result += haystack.slice(idx, i) + replacement;
-    idx = i + needle.length;
+    result += haystack.slice(i, found) + replacement;
+    i = found + needle.length;
   }
   return result;
+}
+
+/** Char offsets (centers) of each case-insensitive match in `text`. */
+function findInsensitiveMatchCenters(text: string, needle: string): number[] {
+  if (!needle) return [];
+  const lower = text.toLowerCase();
+  const n = needle.toLowerCase();
+  const centers: number[] = [];
+  let idx = 0;
+  while (idx <= lower.length) {
+    const found = lower.indexOf(n, idx);
+    if (found === -1) break;
+    centers.push(found + needle.length / 2);
+    idx = found + n.length;
+  }
+  return centers;
 }
 
 const ENTITY_TYPES: EntityType[] = [
@@ -188,8 +207,10 @@ export function TranscriptReviewEditor({
   const segmentEndRef = useRef<number>(0);
   const [playingChunkIndex, setPlayingChunkIndex] = useState<number | null>(null);
   const [audioPaused, setAudioPaused] = useState(true);
+  const [activeClipTime, setActiveClipTime] = useState<number | null>(null);
   const [transcriptFind, setTranscriptFind] = useState("");
   const [transcriptReplace, setTranscriptReplace] = useState("");
+  const utteranceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const chunkAudioEnabled =
     sourceType !== "document" && Boolean(audioUrl?.trim());
@@ -212,9 +233,36 @@ export function TranscriptReviewEditor({
     if (!needle) return 0;
     let total = 0;
     for (const u of utterances) {
-      total += countSubstringOccurrences(u.text, needle);
+      total += countSubstringOccurrencesInsensitive(u.text, needle);
     }
     return total;
+  }, [utterances, transcriptFind]);
+
+  /** Vertical positions (0–100%) for match rail ticks, proportional to character span. */
+  const findMatchRailMarkers = useMemo(() => {
+    const needle = transcriptFind;
+    if (!needle) return [];
+    const gap = 2;
+    const totalWeight =
+      utterances.reduce((s, u) => s + u.text.length, 0) +
+      Math.max(0, utterances.length - 1) * gap;
+    if (totalWeight <= 0) return [];
+
+    const markers: Array<{ key: string; topPct: number; utteranceIndex: number }> = [];
+    let prefix = 0;
+    utterances.forEach((u, i) => {
+      const centers = findInsensitiveMatchCenters(u.text, needle);
+      for (let m = 0; m < centers.length; m++) {
+        const pos = prefix + centers[m];
+        markers.push({
+          key: `${i}-${m}-${centers[m]}`,
+          topPct: (pos / totalWeight) * 100,
+          utteranceIndex: i,
+        });
+      }
+      prefix += u.text.length + gap;
+    });
+    return markers;
   }, [utterances, transcriptFind]);
 
   useEffect(() => {
@@ -239,16 +287,23 @@ export function TranscriptReviewEditor({
   useEffect(() => {
     const el = sharedAudioRef.current;
     if (!el || playingChunkIndex === null) return;
+    const u = utterances[playingChunkIndex];
+    if (!u || !isValidChunkTimeRange(u)) return;
 
     const onTimeUpdate = () => {
-      if (el.currentTime >= segmentEndRef.current - CHUNK_END_EPSILON_SEC) {
+      const t = el.currentTime;
+      setActiveClipTime(t);
+      if (t >= segmentEndRef.current - CHUNK_END_EPSILON_SEC) {
         el.pause();
         setPlayingChunkIndex(null);
+        setActiveClipTime(null);
+      } else if (t < u.start - 0.05) {
+        el.currentTime = u.start;
       }
     };
     el.addEventListener("timeupdate", onTimeUpdate);
     return () => el.removeEventListener("timeupdate", onTimeUpdate);
-  }, [playingChunkIndex]);
+  }, [playingChunkIndex, utterances]);
 
   useEffect(() => {
     if (!searchOpen || searchQuery.trim().length < 2) {
@@ -285,6 +340,7 @@ export function TranscriptReviewEditor({
       const el = sharedAudioRef.current;
       el?.pause();
       setPlayingChunkIndex(null);
+      setActiveClipTime(null);
     }
   }, [reprocessing]);
 
@@ -459,9 +515,11 @@ export function TranscriptReviewEditor({
       if (playingChunkIndex === index) {
         if (el.paused) {
           segmentEndRef.current = u.end;
+          setActiveClipTime(el.currentTime);
           void el.play().catch(() => toast.error("Could not play audio"));
         } else {
           el.pause();
+          setActiveClipTime(el.currentTime);
         }
         return;
       }
@@ -469,14 +527,38 @@ export function TranscriptReviewEditor({
       segmentEndRef.current = u.end;
       el.pause();
       el.currentTime = u.start;
+      setActiveClipTime(u.start);
       setPlayingChunkIndex(index);
       void el.play().catch(() => {
         toast.error("Could not play audio");
         setPlayingChunkIndex(null);
+        setActiveClipTime(null);
       });
     },
     [chunkAudioEnabled, playingChunkIndex, utterances, reprocessing]
   );
+
+  const seekWithinUtterance = useCallback(
+    (index: number, rawTime: number) => {
+      const el = sharedAudioRef.current;
+      if (!el || !chunkAudioEnabled || reprocessing) return;
+      const u = utterances[index];
+      if (!isValidChunkTimeRange(u)) return;
+      const t = Math.min(u.end, Math.max(u.start, rawTime));
+      segmentEndRef.current = u.end;
+      el.currentTime = t;
+      setPlayingChunkIndex(index);
+      setActiveClipTime(t);
+    },
+    [chunkAudioEnabled, utterances, reprocessing]
+  );
+
+  const scrollToUtterance = useCallback((index: number) => {
+    utteranceRefs.current.get(index)?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, []);
 
   const onReplaceAllInTranscript = useCallback(() => {
     const needle = transcriptFind;
@@ -485,7 +567,7 @@ export function TranscriptReviewEditor({
     setUtterances((prev) =>
       prev.map((u) => ({
         ...u,
-        text: replaceAllNonOverlapping(u.text, needle, transcriptReplace),
+        text: replaceAllNonOverlappingInsensitive(u.text, needle, transcriptReplace),
       }))
     );
     toast.success(
@@ -564,39 +646,54 @@ export function TranscriptReviewEditor({
             </p>
           ) : (
             <>
-              <div className="mb-4 flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[200px]">
-                  <Label htmlFor="tr-find" className="text-xs text-muted-foreground">
-                    Find in reviewed text
-                  </Label>
-                  <Input
-                    id="tr-find"
-                    value={transcriptFind}
-                    onChange={(e) => setTranscriptFind(e.target.value)}
-                    placeholder="Search…"
-                    disabled={reprocessing}
-                    autoComplete="off"
-                  />
+              <div className="mb-4 space-y-3 rounded-lg border border-dashed bg-muted/20 px-3 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                  <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[220px]">
+                    <Label htmlFor="tr-find" className="text-xs text-muted-foreground">
+                      Find in reviewed text
+                    </Label>
+                    <Input
+                      id="tr-find"
+                      value={transcriptFind}
+                      onChange={(e) => setTranscriptFind(e.target.value)}
+                      placeholder="Search… (case-insensitive)"
+                      disabled={reprocessing}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {transcriptFind ? (
+                    <div
+                      className="flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-amber-500/55 bg-amber-500/15 px-4 py-2 shadow-sm dark:bg-amber-500/20"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="text-2xl font-bold tabular-nums leading-none text-amber-950 dark:text-amber-50">
+                        {findReplaceMatchCount}
+                      </span>
+                      <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        match{findReplaceMatchCount === 1 ? "" : "es"}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="pb-1 text-sm text-muted-foreground sm:pb-2">
+                      Type to search; markers appear beside the transcript.
+                    </p>
+                  )}
                 </div>
-                <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[200px]">
-                  <Label htmlFor="tr-replace" className="text-xs text-muted-foreground">
-                    Replace with
-                  </Label>
-                  <Input
-                    id="tr-replace"
-                    value={transcriptReplace}
-                    onChange={(e) => setTranscriptReplace(e.target.value)}
-                    placeholder="Replacement (can be empty)"
-                    disabled={reprocessing}
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="flex flex-col gap-2 sm:shrink-0">
-                  <p className="text-xs text-muted-foreground">
-                    {transcriptFind
-                      ? `${findReplaceMatchCount} match${findReplaceMatchCount === 1 ? "" : "es"} found`
-                      : "Enter text to search"}
-                  </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                  <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-[220px]">
+                    <Label htmlFor="tr-replace" className="text-xs text-muted-foreground">
+                      Replace with
+                    </Label>
+                    <Input
+                      id="tr-replace"
+                      value={transcriptReplace}
+                      onChange={(e) => setTranscriptReplace(e.target.value)}
+                      placeholder="Replacement (can be empty)"
+                      disabled={reprocessing}
+                      autoComplete="off"
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="secondary"
@@ -611,63 +708,117 @@ export function TranscriptReviewEditor({
                   </Button>
                 </div>
               </div>
-              <ScrollArea className="h-[min(65vh,600px)] pr-4">
-                <div className="space-y-5">
-                  {utterances.map((u, i) => (
-                    <div
-                      key={`${u.speaker}-${u.start}-${i}`}
-                      className={cn(
-                        "rounded-lg border bg-card/50 p-4 transition-[box-shadow,ring]",
-                        playingChunkIndex === i &&
-                          !audioPaused &&
-                          "ring-2 ring-primary/45 border-primary/35",
-                        playingChunkIndex === i &&
-                          audioPaused &&
-                          "ring-1 ring-muted-foreground/40"
-                      )}
-                    >
-                      <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="font-normal">
-                            {speakerLabel(u.speaker)}
-                          </Badge>
-                          <span className="tabular-nums">
-                            {formatTime(u.start)} – {formatTime(u.end)}
-                          </span>
-                        </div>
-                        {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            disabled={reprocessing}
-                            aria-label={
-                              playingChunkIndex === i && !audioPaused
-                                ? "Pause audio for this segment"
-                                : "Play audio for this segment"
-                            }
-                            onClick={() => toggleChunkAudio(i)}
-                          >
-                            {playingChunkIndex === i && !audioPaused ? (
-                              <Pause className="h-4 w-4" />
-                            ) : (
-                              <Play className="h-4 w-4" />
-                            )}
-                          </Button>
-                        ) : null}
-                      </div>
-                    <Textarea
-                      value={u.text}
-                      onChange={(e) => updateText(i, e.target.value)}
-                      disabled={reprocessing}
-                      rows={4}
-                      className="resize-y text-base leading-relaxed"
-                    />
+              <div className="flex h-[min(65vh,600px)] gap-2">
+                {transcriptFind && findMatchRailMarkers.length > 0 ? (
+                  <div
+                    className="relative w-3 shrink-0 rounded-full border border-border/70 bg-muted/50"
+                    aria-label="Match positions in transcript"
+                  >
+                    <div className="absolute inset-x-0 top-2 bottom-2 mx-auto w-px rounded-full bg-muted-foreground/25" />
+                    {findMatchRailMarkers.map((mk) => (
+                      <button
+                        key={mk.key}
+                        type="button"
+                        title="Scroll to this match"
+                        className="absolute left-1/2 z-10 h-2.5 w-2.5 rounded-sm bg-amber-500 shadow-md ring-1 ring-amber-700/30 transition-transform hover:scale-125 hover:bg-amber-400 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+                        style={{
+                          top: `${mk.topPct}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                        onClick={() => scrollToUtterance(mk.utteranceIndex)}
+                      />
+                    ))}
                   </div>
-                  ))}
+                ) : null}
+                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pr-1">
+                  <div className="space-y-5 pb-1">
+                    {utterances.map((u, rowIndex) => {
+                      const clipSliderValue =
+                        playingChunkIndex === rowIndex
+                          ? Math.min(
+                              u.end,
+                              Math.max(u.start, activeClipTime ?? u.start)
+                            )
+                          : u.start;
+                      return (
+                        <div
+                          key={`${u.speaker}-${u.start}-${rowIndex}`}
+                          ref={(el) => {
+                            if (el) utteranceRefs.current.set(rowIndex, el);
+                            else utteranceRefs.current.delete(rowIndex);
+                          }}
+                          className={cn(
+                            "rounded-lg border bg-card/50 p-4 transition-[box-shadow,ring]",
+                            playingChunkIndex === rowIndex &&
+                              !audioPaused &&
+                              "ring-2 ring-primary/45 border-primary/35",
+                            playingChunkIndex === rowIndex &&
+                              audioPaused &&
+                              "ring-1 ring-muted-foreground/40"
+                          )}
+                        >
+                          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="font-normal">
+                                {speakerLabel(u.speaker)}
+                              </Badge>
+                              <span className="tabular-nums">
+                                {formatTime(u.start)} – {formatTime(u.end)}
+                              </span>
+                            </div>
+                          </div>
+                          {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
+                            <div className="mb-2.5 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                disabled={reprocessing}
+                                aria-label={
+                                  playingChunkIndex === rowIndex && !audioPaused
+                                    ? "Pause audio for this segment"
+                                    : "Play audio for this segment"
+                                }
+                                onClick={() => toggleChunkAudio(rowIndex)}
+                              >
+                                {playingChunkIndex === rowIndex && !audioPaused ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <input
+                                type="range"
+                                className="h-2 min-w-0 flex-1 cursor-pointer accent-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:accent-amber-500"
+                                min={u.start}
+                                max={u.end}
+                                step={0.01}
+                                value={clipSliderValue}
+                                disabled={reprocessing}
+                                aria-valuemin={u.start}
+                                aria-valuemax={u.end}
+                                aria-valuenow={clipSliderValue}
+                                aria-label={`Seek within this utterance (${formatTime(u.start)} to ${formatTime(u.end)})`}
+                                onChange={(e) =>
+                                  seekWithinUtterance(rowIndex, parseFloat(e.target.value))
+                                }
+                              />
+                            </div>
+                          ) : null}
+                          <Textarea
+                            value={u.text}
+                            onChange={(e) => updateText(rowIndex, e.target.value)}
+                            disabled={reprocessing}
+                            rows={4}
+                            className="resize-y text-base leading-relaxed"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </ScrollArea>
+              </div>
             </>
           )}
           <div className="mt-6 flex flex-wrap gap-2">
