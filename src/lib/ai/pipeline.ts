@@ -170,6 +170,8 @@ async function runIntelPipelineFromTranscriptInput(params: {
     project_id: string;
     interviewee_name: string | null;
     interviewee_org: string | null;
+    interviewee_entity_id?: string | null;
+    interviewee_org_entity_id?: string | null;
   };
   country?: string;
   speakerMap: SpeakerMap;
@@ -310,6 +312,17 @@ async function runIntelPipelineFromTranscriptInput(params: {
     }
   }
 
+  if (interview.interviewee_entity_id && interview.interviewee_name?.trim()) {
+    const n = interview.interviewee_name.trim();
+    entityIdMap.set(n, interview.interviewee_entity_id);
+    entityIdMap.set(normalizeEntityName(n), interview.interviewee_entity_id);
+  }
+  if (interview.interviewee_org_entity_id && interview.interviewee_org?.trim()) {
+    const n = interview.interviewee_org.trim();
+    entityIdMap.set(n, interview.interviewee_org_entity_id);
+    entityIdMap.set(normalizeEntityName(n), interview.interviewee_org_entity_id);
+  }
+
   const { data: persistedChunks } = await supabase
     .from("interview_chunks")
     .select("id, chunk_index, content, speaker")
@@ -381,9 +394,19 @@ async function runIntelPipelineFromTranscriptInput(params: {
   const personName = interview.interviewee_name ?? "";
   const orgName = interview.interviewee_org ?? "";
   const personEntityId =
-    entityIdMap.get(personName) ?? entityIdMap.get(normalizeEntityName(personName)) ?? null;
+    interview.interviewee_entity_id ??
+    (personName
+      ? entityIdMap.get(personName) ??
+        entityIdMap.get(normalizeEntityName(personName)) ??
+        null
+      : null);
   const orgEntityId =
-    entityIdMap.get(orgName) ?? entityIdMap.get(normalizeEntityName(orgName)) ?? null;
+    interview.interviewee_org_entity_id ??
+    (orgName
+      ? entityIdMap.get(orgName) ??
+        entityIdMap.get(normalizeEntityName(orgName)) ??
+        null
+      : null);
 
   if (personEntityId || orgEntityId) {
     for (const row of chunkRows) {
@@ -509,7 +532,9 @@ export async function processTranscription(
 
     const { data: interview } = await supabase
       .from("interviews")
-      .select("title, project_id, interviewee_name, interviewee_org, projects(country)")
+      .select(
+        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+      )
       .eq("id", interviewId)
       .single();
 
@@ -557,6 +582,8 @@ export async function processTranscription(
         project_id: interview.project_id,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
+        interviewee_entity_id: interview.interviewee_entity_id,
+        interviewee_org_entity_id: interview.interviewee_org_entity_id,
       },
       country,
       speakerMap,
@@ -588,7 +615,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
     const { data: interview, error: fetchError } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, speaker_map, reviewed_utterances, transcript_review_status, projects(country)"
+        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -654,6 +681,8 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
         project_id: interview.project_id,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
+        interviewee_entity_id: interview.interviewee_entity_id,
+        interviewee_org_entity_id: interview.interviewee_org_entity_id,
       },
       country,
       speakerMap: (interview.speaker_map as SpeakerMap) ?? {},

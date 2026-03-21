@@ -9,11 +9,24 @@ const pdfParse = require("pdf-parse/lib/pdf-parse") as (
 ) => Promise<{ text: string; numpages: number }>;
 import { processDocument } from "@/lib/ai/document-pipeline";
 import { MAX_PDF_SIZE_BYTES, MIN_PDF_TEXT_LENGTH } from "@/lib/constants";
+import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
 
 // Force Node.js runtime — pdf-parse requires Node APIs (not Edge compatible)
 export const runtime = "nodejs";
 
 const MAX_ANCHOR_LENGTH = 120;
+
+function parseOptionalUuid(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  ) {
+    return null;
+  }
+  return s;
+}
 
 function sanitizeOptionalAnchor(value: FormDataEntryValue | null): string | null {
   if (typeof value !== "string") return null;
@@ -35,6 +48,8 @@ function sanitizeOptionalAnchor(value: FormDataEntryValue | null): string | null
  *   - language: string (optional, default "en")
  *   - interviewee_name: string (optional)
  *   - interviewee_org: string (optional)
+ *   - interviewee_entity_id: UUID string (optional, must match a PERSON in project/global)
+ *   - interviewee_org_entity_id: UUID string (optional, COMPANY/ORGANIZATION/GOVERNMENT)
  *
  * Uses admin client for DB writes (auth verified via getUser first).
  */
@@ -63,6 +78,8 @@ export async function POST(request: NextRequest) {
   const rawLanguage = formData.get("language");
   const rawIntervieweeName = formData.get("interviewee_name");
   const rawIntervieweeOrg = formData.get("interviewee_org");
+  const rawIntervieweeEntityId = formData.get("interviewee_entity_id");
+  const rawIntervieweeOrgEntityId = formData.get("interviewee_org_entity_id");
 
   // Validate required fields
   if (!pdfFile || !(pdfFile instanceof File)) {
@@ -91,8 +108,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
-  const intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
+  let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
+  const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
   const language =
     typeof rawLanguage === "string" && rawLanguage.trim()
       ? rawLanguage.trim()
@@ -125,18 +144,51 @@ export async function POST(request: NextRequest) {
 
   // 4. Create interview record with source_type: 'document'
   const admin = createAdminClient();
+  const projectIdTrim = rawProjectId.trim();
+
+  if (intervieweeEntityId) {
+    const v = await validateInterviewAnchorEntityId(admin, {
+      entityId: intervieweeEntityId,
+      projectId: projectIdTrim,
+      role: "person",
+    });
+    if (!v.ok) {
+      return NextResponse.json(
+        { error: "Invalid interviewee entity selection" },
+        { status: 400 }
+      );
+    }
+    intervieweeName = v.name;
+  }
+
+  if (intervieweeOrgEntityId) {
+    const v = await validateInterviewAnchorEntityId(admin, {
+      entityId: intervieweeOrgEntityId,
+      projectId: projectIdTrim,
+      role: "organization",
+    });
+    if (!v.ok) {
+      return NextResponse.json(
+        { error: "Invalid organization entity selection" },
+        { status: 400 }
+      );
+    }
+    intervieweeOrg = v.name;
+  }
 
   const { data: interview, error: insertError } = await admin
     .from("interviews")
     .insert({
       title: rawTitle.trim(),
-      project_id: rawProjectId.trim(),
+      project_id: projectIdTrim,
       language,
       status: "PROCESSING",
       source_type: "document",
       created_by: user.id,
       interviewee_name: intervieweeName,
       interviewee_org: intervieweeOrg,
+      interviewee_entity_id: intervieweeEntityId,
+      interviewee_org_entity_id: intervieweeOrgEntityId,
     })
     .select()
     .single();
