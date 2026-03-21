@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   MapPin,
   Mic,
+  MessageSquare,
   Users,
   Calendar,
   Upload,
@@ -106,10 +107,16 @@ export default async function ProjectDetailPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {role === "owner" && (
             <EditProjectDialog project={project} />
           )}
+          <Button asChild variant="outline">
+            <Link href={`/chat?project=${projectId}`}>
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Intelligence Chat
+            </Link>
+          </Button>
           {canEdit && (
             <Button asChild>
               <Link href={`/interviews/upload?project=${projectId}`}>

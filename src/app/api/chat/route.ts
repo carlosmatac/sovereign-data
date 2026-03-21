@@ -11,6 +11,10 @@ import {
   getRelationships,
   getMentions,
 } from "@/lib/ai/entity-lookup";
+import {
+  buildProjectIntelBrief,
+  buildWorkspaceIntelBriefForUser,
+} from "@/lib/chat/intel-brief";
 
 interface RagChunk {
   chunk_id: string;
@@ -151,6 +155,21 @@ export async function POST(request: NextRequest) {
     `[chat-scope] intent=${scopeIntent} explicitInterview=${effectiveInterviewId ?? "none"} scopedToInterview=${scopedToInterview}`
   );
 
+  const dbIntelBrief = projectId
+    ? await buildProjectIntelBrief(admin, projectId)
+    : await buildWorkspaceIntelBriefForUser(admin, user.id);
+
+  const dbIntelSection = dbIntelBrief
+    ? `
+═══════════════════════════════════════════════════════
+DATABASE INTEL (project + interview summaries)
+═══════════════════════════════════════════════════════
+${dbIntelBrief}
+
+The user may refer to a project by its display name (e.g. "Nigeria 2026"). That name is the PROJECT title above, not necessarily a phrase inside transcript excerpts. Use this section to answer "what we know about our project" at a high level; cite transcript chunks [n] for verbatim claims and use lookup tools for entities and relationships.
+`
+    : "";
+
   // ── RAG Retrieval ───────────────────────────────────────────────
   const [queryEmbedding] = await generateEmbeddings([queryText]);
 
@@ -226,17 +245,19 @@ TOOL USE PRIORITY:
 3. \`lookupMentions\` — Use to get interview contexts where an entity was discussed.
 4. \`webSearch\` — Use ONLY when internal data is insufficient AND the user needs current events or external context. Internal evidence always takes priority.
 
+If DATABASE INTEL lists interviews and summaries, you DO know something about the workspace/project — do not say you have "no data" when that section is non-empty. Combine it with RETRIEVED CONTEXT and tools for a complete answer.
+
 CITATION RULES:
 - Transcript chunks: cite as [1], [2], etc.
 - Entity tool results: cite as "According to our entity database: …"
 - Web results: cite as inline markdown links. List in a separate "Web Sources" section.
 
 ${buildScopeBlock(scopedToInterview, interviewMeta, scopeWarning)}
-
+${dbIntelSection}
 ${
   contextBlock
     ? `RETRIEVED CONTEXT (from interview transcripts):\n\n${contextBlock}\n\nSOURCE REFERENCES:\n${citationsSummary}`
-    : "NO RELEVANT TRANSCRIPT CONTEXT FOUND for this query. Use the lookup tools or tell the user you could not find relevant information."
+    : "NO RELEVANT TRANSCRIPT CONTEXT FOUND for this query. If DATABASE INTEL above has summaries, use those and lookup tools; otherwise say what is missing."
 }`;
 
   const chatMessages = messages.map((m) => ({

@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
 import { Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
@@ -92,6 +93,24 @@ export default function ChatPage() {
             Grounded answers from your interview corpus. Citations and sources
             are shown in the response — verify every claim against the record.
           </p>
+          {!projectId && !interviewId && (
+            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              For questions about a specific programme (e.g. &ldquo;Nigeria
+              2026&rdquo;), open{" "}
+              <Link
+                href="/projects"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Projects
+              </Link>{" "}
+              and use{" "}
+              <span className="font-medium text-foreground">
+                Intelligence Chat
+              </span>{" "}
+              from that project — or stay here: workspace summaries are still
+              loaded for all your projects.
+            </p>
+          )}
           {(projectId || interviewId) && (
             <div className="mt-4 flex flex-wrap gap-2">
               {projectId && (
@@ -225,6 +244,11 @@ function EmptyState() {
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Ask analytical questions; responses read as structured briefs with
           transcript-backed context. Start with a focused question below.
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Tip: for &ldquo;what do we know about project X?&rdquo;, open chat
+          from that project&apos;s page so search is scoped, or ask here —
+          project and summary data is included automatically.
         </p>
         <div className="mt-8 grid gap-2.5 text-left">
           {[
