@@ -3,6 +3,7 @@ import { Gabarito } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppThemeProvider } from "@/components/providers/app-theme-provider";
 import "./globals.css";
 
 const gabarito = Gabarito({
@@ -40,10 +41,12 @@ export default function RootLayout({
       <body
         className={`${gabarito.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <TooltipProvider>
-          {children}
-          <Toaster richColors position="bottom-right" />
-        </TooltipProvider>
+        <AppThemeProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster richColors position="bottom-right" />
+          </TooltipProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );
