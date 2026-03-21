@@ -8,14 +8,35 @@ import {
   TranscriptReviewEditor,
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
-import { parseTranscriptFullToUtterances } from "@/lib/interviews/transcript-utterances-from-full";
+import {
+  parseTranscriptFullToUtterances,
+  sourceUtterancesToReviewedUtterances,
+} from "@/lib/interviews/transcript-utterances-from-full";
 import type {
   ReviewedUtterance,
   SourceType,
+  SourceUtterance,
   SpeakerMap,
 } from "@/types/database";
 
 function isStoredReviewedUtterances(v: unknown): v is ReviewedUtterance[] {
+  if (!Array.isArray(v) || v.length === 0) return false;
+  for (const row of v) {
+    if (typeof row !== "object" || row === null) return false;
+    const o = row as Record<string, unknown>;
+    if (
+      typeof o.speaker !== "string" ||
+      typeof o.text !== "string" ||
+      typeof o.start !== "number" ||
+      typeof o.end !== "number"
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isSourceUtterances(v: unknown): v is SourceUtterance[] {
   if (!Array.isArray(v) || v.length === 0) return false;
   for (const row of v) {
     if (typeof row !== "object" || row === null) return false;
@@ -43,7 +64,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, source_type, audio_url, transcript_full, speaker_map, audio_duration, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, audio_url, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
     )
     .eq("id", id)
     .single();
@@ -60,6 +81,8 @@ export default async function InterviewTranscriptReviewPage({
 
   if (isStoredReviewedUtterances(interview.reviewed_utterances)) {
     initialUtterances = interview.reviewed_utterances;
+  } else if (isSourceUtterances(interview.source_utterances)) {
+    initialUtterances = sourceUtterancesToReviewedUtterances(interview.source_utterances);
   } else if (interview.transcript_full) {
     const speakerMap = (interview.speaker_map as SpeakerMap) ?? {};
     initialUtterances = parseTranscriptFullToUtterances(

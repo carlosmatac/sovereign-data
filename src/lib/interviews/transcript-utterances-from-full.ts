@@ -1,4 +1,4 @@
-import type { ReviewedUtterance, SpeakerMap } from "@/types/database";
+import type { ReviewedUtterance, SourceUtterance, SpeakerMap } from "@/types/database";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 
 /**
@@ -55,8 +55,26 @@ export function resolveTranscriptTextForInterviewViewer(params: {
 }
 
 /**
- * Build review utterances from `transcript_full` (`[Speaker A]: text` blocks)
- * when `reviewed_utterances` has not been saved yet.
+ * Convert immutable ASR rows (milliseconds) into review rows (**seconds**)
+ * for the editor and HTML audio playback. Order matches `transcript_full`
+ * when both come from the same AssemblyAI run.
+ */
+export function sourceUtterancesToReviewedUtterances(
+  rows: SourceUtterance[]
+): ReviewedUtterance[] {
+  return rows.map((u) => ({
+    speaker: u.speaker,
+    text: u.text,
+    start: u.start / 1000,
+    end: u.end / 1000,
+  }));
+}
+
+/**
+ * Legacy fallback: build review utterances from `transcript_full` only when
+ * `source_utterances` is unavailable. Assigns **synthetic** equal time slots
+ * over `audio_duration` — not real diarization timing; audio playback will
+ * not match ASR boundaries.
  */
 export function parseTranscriptFullToUtterances(
   transcriptFull: string,

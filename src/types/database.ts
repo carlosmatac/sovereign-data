@@ -55,8 +55,19 @@ export type TranscriptReviewStatus = "none" | "draft" | "ready" | "reprocessing"
 // JSON Column Types
 // ============================================
 
-/** Stored in `interviews.reviewed_utterances` — sole transcript source for reviewed reprocessing. */
+/**
+ * Stored in `interviews.reviewed_utterances`.
+ * `start` / `end` are **seconds** (wall-clock, same as HTMLMediaElement.currentTime).
+ */
 export interface ReviewedUtterance {
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** Stored in `interviews.source_utterances` — immutable ASR rows; **milliseconds** (AssemblyAI). */
+export interface SourceUtterance {
   speaker: string;
   text: string;
   start: number;
@@ -225,6 +236,7 @@ export interface Database {
           speaker_map: SpeakerMap;
           transcript_full: string | null;
           transcript_display: string | null;
+          source_utterances: SourceUtterance[] | null;
           summary: string | null;
           sentiment: SentimentData | null;
           topics: string[] | null;
@@ -254,6 +266,7 @@ export interface Database {
           speaker_map?: SpeakerMap;
           transcript_full?: string | null;
           transcript_display?: string | null;
+          source_utterances?: SourceUtterance[] | null;
           summary?: string | null;
           sentiment?: SentimentData | null;
           topics?: string[] | null;
@@ -283,6 +296,7 @@ export interface Database {
           speaker_map?: SpeakerMap;
           transcript_full?: string | null;
           transcript_display?: string | null;
+          source_utterances?: SourceUtterance[] | null;
           summary?: string | null;
           sentiment?: SentimentData | null;
           topics?: string[] | null;
