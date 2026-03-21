@@ -49,9 +49,19 @@ export type ReportTemplate =
   | "executive_briefing"
   | "custom";
 
+export type TranscriptReviewStatus = "none" | "draft" | "ready" | "reprocessing";
+
 // ============================================
 // JSON Column Types
 // ============================================
+
+/** Stored in `interviews.reviewed_utterances` — sole transcript source for reviewed reprocessing. */
+export interface ReviewedUtterance {
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+}
 
 export interface SpeakerMap {
   [speakerLabel: string]: string;
@@ -225,6 +235,9 @@ export interface Database {
           source_type: SourceType;
           expected_speakers: number | null;
           conducted_at: string | null;
+          reviewed_utterances: ReviewedUtterance[] | null;
+          transcript_review_status: TranscriptReviewStatus;
+          last_intel_source: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -251,6 +264,9 @@ export interface Database {
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
+          reviewed_utterances?: ReviewedUtterance[] | null;
+          transcript_review_status?: TranscriptReviewStatus;
+          last_intel_source?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -277,6 +293,9 @@ export interface Database {
           source_type?: SourceType;
           expected_speakers?: number | null;
           conducted_at?: string | null;
+          reviewed_utterances?: ReviewedUtterance[] | null;
+          transcript_review_status?: TranscriptReviewStatus;
+          last_intel_source?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -291,6 +310,61 @@ export interface Database {
           },
           {
             foreignKeyName: "interviews_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      interview_review_entities: {
+        Row: {
+          id: string;
+          interview_id: string;
+          entity_id: string | null;
+          display_name: string;
+          entity_type: EntityType;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          interview_id: string;
+          entity_id?: string | null;
+          display_name: string;
+          entity_type: EntityType;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          interview_id?: string;
+          entity_id?: string | null;
+          display_name?: string;
+          entity_type?: EntityType;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "interview_review_entities_interview_id_fkey";
+            columns: ["interview_id"];
+            isOneToOne: false;
+            referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "interview_review_entities_entity_id_fkey";
+            columns: ["entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "interview_review_entities_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -694,6 +768,10 @@ export interface Database {
           similarity: number;
         }>;
       };
+      clear_interview_derived_data: {
+        Args: { p_interview_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       interview_status: InterviewStatus;
@@ -706,6 +784,7 @@ export interface Database {
       snippet_status: SnippetStatus;
       report_status: ReportStatus;
       report_template: ReportTemplate;
+      transcript_review_status: TranscriptReviewStatus;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -731,3 +810,4 @@ export type EntityMention = Tables<"entity_mentions">;
 export type EntityRelationship = Tables<"entity_relationships">;
 export type ContentSnippet = Tables<"content_snippets">;
 export type Report = Tables<"reports">;
+export type InterviewReviewEntity = Tables<"interview_review_entities">;

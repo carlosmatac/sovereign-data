@@ -2,14 +2,15 @@
 // ETL Pipeline Orchestrator
 // ============================================
 // Runs after AssemblyAI webhook: Extract -> Chunk -> Embed -> Persist
+// Reviewed reprocessing: same intel path from reviewed_utterances only.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTranscription } from "./assemblyai";
-import { extractIntelligence } from "./extraction";
-import { chunkTranscript, chunkPlainText } from "./chunking";
+import { extractIntelligence, type ExtractionResult } from "./extraction";
+import { chunkTranscript, chunkPlainText, type TranscriptUtterance } from "./chunking";
 import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
-import type { ChunkMetadata, InterviewStatus } from "@/types/database";
+import type { ChunkMetadata, EntityType, InterviewStatus, SpeakerMap } from "@/types/database";
 import { normalizeEntityName } from "@/lib/entities/normalize";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 import {
@@ -25,6 +26,8 @@ import {
   resolveExtractedEntities,
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 /** Extract a human-readable message from any thrown value (Error or Supabase PostgrestError). */
 function toErrorMessage(error: unknown): string {
@@ -61,7 +64,7 @@ async function updateInterviewStatus(
 }
 
 async function markEntityNeedsReview(
-  supabase: ReturnType<typeof createAdminClient>,
+  supabase: SupabaseClient<Database>,
   entityId: string
 ) {
   const { data: existing, error: fetchError } = await supabase
@@ -91,16 +94,367 @@ async function markEntityNeedsReview(
   }
 }
 
+function buildRawEntitiesWithReviewerSeeds(
+  extraction: ExtractionResult,
+  seeds: Array<{
+    display_name: string;
+    entity_type: EntityType;
+    entity_id: string | null;
+  }>
+): RawExtractedEntity[] {
+  const rawFromModel: RawExtractedEntity[] = extraction.entities.map((e) => ({
+    raw_name: e.raw_name,
+    canonical_name: e.canonical_name,
+    type: e.type,
+    description: e.description,
+    sentiment: e.sentiment ?? null,
+  }));
+
+  const covered = new Set<string>();
+  for (const e of rawFromModel) {
+    covered.add(normalizeEntityName(e.canonical_name));
+    covered.add(normalizeEntityName(e.raw_name));
+  }
+
+  const merged = [...rawFromModel];
+  for (const s of seeds) {
+    const n = normalizeEntityName(s.display_name);
+    if (covered.has(n)) continue;
+    covered.add(n);
+    merged.push({
+      raw_name: s.display_name,
+      canonical_name: s.display_name,
+      type: s.entity_type,
+      description: "Human-confirmed entity from transcript review (pre-reprocess).",
+      sentiment: null,
+      forcedEntityId: s.entity_id ?? undefined,
+    });
+  }
+  return merged;
+}
+
+function parseReviewedUtterancesJson(json: unknown): TranscriptUtterance[] | null {
+  if (!Array.isArray(json) || json.length === 0) return null;
+  const out: TranscriptUtterance[] = [];
+  for (const row of json) {
+    if (typeof row !== "object" || row === null) return null;
+    const o = row as Record<string, unknown>;
+    if (
+      typeof o.speaker !== "string" ||
+      typeof o.text !== "string" ||
+      typeof o.start !== "number" ||
+      typeof o.end !== "number"
+    ) {
+      return null;
+    }
+    out.push({
+      speaker: o.speaker,
+      text: o.text,
+      start: o.start,
+      end: o.end,
+    });
+  }
+  return out;
+}
+
+/**
+ * Shared path: extraction → chunk → embed → persist chunks → resolve → ground → relationships → snippets.
+ * @param clearDerivedBeforeInsert — when true, RPC-wipes chunks/mentions/relationships/snippets after embeddings are computed and before chunk insert (reviewed reprocess).
+ */
+async function runIntelPipelineFromTranscriptInput(params: {
+  supabase: SupabaseClient<Database>;
+  interviewId: string;
+  interview: {
+    title: string;
+    project_id: string;
+    interviewee_name: string | null;
+    interviewee_org: string | null;
+  };
+  country?: string;
+  speakerMap: SpeakerMap;
+  /** Plain transcript for GPT only. Reviewed pass: derive only from reviewed utterances. */
+  extractionTranscript: string;
+  chunkUtterances: TranscriptUtterance[];
+  reviewerSeedsForExtraction?: Array<{ displayName: string; type: EntityType }>;
+  reviewerSeedsForMerge?: Array<{
+    display_name: string;
+    entity_type: EntityType;
+    entity_id: string | null;
+  }>;
+  clearDerivedBeforeInsert: boolean;
+  lastIntelSource: "assemblyai_auto" | "human_review";
+  /** Merged into the final COMPLETED row update (e.g. transcript_review_status for human review). */
+  completedInterviewExtra?: Record<string, unknown>;
+}): Promise<void> {
+  const {
+    supabase,
+    interviewId,
+    interview,
+    country,
+    speakerMap,
+    extractionTranscript,
+    chunkUtterances,
+    reviewerSeedsForExtraction,
+    reviewerSeedsForMerge,
+    clearDerivedBeforeInsert,
+    lastIntelSource,
+    completedInterviewExtra,
+  } = params;
+
+  const extraction = await extractIntelligence({
+    transcript: extractionTranscript,
+    interviewTitle: interview.title ?? "Unknown Interview",
+    country,
+    speakerMap,
+    primaryPerson: interview.interviewee_name ?? null,
+    primaryOrg: interview.interviewee_org ?? null,
+    reviewerSeedEntities: reviewerSeedsForExtraction,
+  });
+
+  await updateInterviewStatus(interviewId, "EMBEDDING", {
+    summary: extraction.summary,
+    sentiment: extraction.sentiment,
+    topics: extraction.topics,
+  });
+
+  const chunks =
+    chunkUtterances.length > 0
+      ? chunkTranscript(chunkUtterances)
+      : chunkPlainText(extractionTranscript);
+
+  const chunkAnchors = {
+    intervieweeName: interview.interviewee_name ?? null,
+    intervieweeOrg: interview.interviewee_org ?? null,
+  };
+
+  const baseMetadata: Partial<ChunkMetadata> = {
+    country,
+    topics: extraction.topics,
+    entities: extraction.entities.map((e) => e.canonical_name),
+  };
+
+  const enrichedChunks = chunks.map((chunk) => {
+    const normResult = normalizeChunkWithAnchors(chunk.content, chunkAnchors);
+    const metadata = buildNormalizedChunkMetadata(baseMetadata, normResult, chunkAnchors);
+    return { chunk, metadata, normResult };
+  });
+
+  const embeddingTexts = enrichedChunks.map((ec) =>
+    ec.metadata.content_for_embedding ?? ec.chunk.content
+  );
+  const embeddings = await generateEmbeddings(embeddingTexts);
+
+  if (clearDerivedBeforeInsert) {
+    const { error: rpcError } = await supabase.rpc("clear_interview_derived_data", {
+      p_interview_id: interviewId,
+    });
+    if (rpcError) {
+      throw new Error(`clear_interview_derived_data failed: ${rpcError.message}`);
+    }
+  }
+
+  const chunkRows = enrichedChunks.map((ec, i) => ({
+    interview_id: interviewId,
+    chunk_index: ec.chunk.chunkIndex,
+    content: ec.chunk.content,
+    speaker: ec.chunk.speaker,
+    start_time: ec.chunk.startTime,
+    end_time: ec.chunk.endTime,
+    embedding: JSON.stringify(embeddings[i]),
+    metadata: ec.metadata,
+  }));
+
+  for (let i = 0; i < chunkRows.length; i += 50) {
+    const batch = chunkRows.slice(i, i + 50);
+    const { error: chunkError } = await supabase.from("interview_chunks").insert(batch);
+    if (chunkError) {
+      console.error("Failed to insert chunks batch:", chunkError);
+      throw chunkError;
+    }
+  }
+
+  const projectId = interview.project_id;
+  const rawEntities = buildRawEntitiesWithReviewerSeeds(
+    extraction,
+    reviewerSeedsForMerge ?? []
+  );
+
+  const resolvedEntities = await resolveExtractedEntities({
+    rawEntities,
+    anchors: {
+      intervieweeName: interview.interviewee_name ?? null,
+      intervieweeOrg: interview.interviewee_org ?? null,
+    },
+    projectId,
+    supabaseClient: supabase,
+  });
+
+  const entityIdMap = new Map<string, string>();
+  const entitiesForGrounding: EntityForGrounding[] = [];
+
+  for (const resolved of resolvedEntities) {
+    entityIdMap.set(resolved.resolvedName, resolved.entityId);
+    entityIdMap.set(normalizeEntityName(resolved.resolvedName), resolved.entityId);
+    if (resolved.rawName) {
+      entityIdMap.set(resolved.rawName, resolved.entityId);
+      entityIdMap.set(normalizeEntityName(resolved.rawName), resolved.entityId);
+    }
+    entitiesForGrounding.push({
+      name: resolved.resolvedName,
+      entityId: resolved.entityId,
+      sentiment: resolved.sentiment,
+    });
+    if (resolved.needsReview) {
+      await markEntityNeedsReview(supabase, resolved.entityId);
+    }
+  }
+
+  const { data: persistedChunks } = await supabase
+    .from("interview_chunks")
+    .select("id, chunk_index, content, speaker")
+    .eq("interview_id", interviewId)
+    .order("chunk_index");
+
+  const chunksForGrounding: ChunkForGrounding[] = (persistedChunks ?? []).map((c) => ({
+    id: c.id,
+    chunkIndex: c.chunk_index,
+    content: c.content,
+    speaker: c.speaker,
+  }));
+
+  const groundedMap = await groundEntityMentions({
+    entities: entitiesForGrounding,
+    chunks: chunksForGrounding,
+    anchors: {
+      intervieweeName: interview.interviewee_name ?? null,
+      intervieweeOrg: interview.interviewee_org ?? null,
+    },
+    entityIdMap,
+    supabaseClient: supabase,
+  });
+
+  const groundedEntityIds = new Set<string>();
+  const mentionRows: Array<{
+    entity_id: string;
+    interview_id: string;
+    chunk_id: string | null;
+    context: string | null;
+    sentiment: string | null;
+  }> = [];
+
+  for (const [entityId, mentions] of groundedMap.entries()) {
+    groundedEntityIds.add(entityId);
+    for (const gm of mentions) {
+      mentionRows.push({
+        entity_id: gm.entityId,
+        interview_id: interviewId,
+        chunk_id: gm.chunkId,
+        context: gm.context,
+        sentiment: gm.sentiment,
+      });
+    }
+  }
+
+  for (const entity of entitiesForGrounding) {
+    if (!groundedEntityIds.has(entity.entityId)) {
+      mentionRows.push({
+        entity_id: entity.entityId,
+        interview_id: interviewId,
+        chunk_id: null,
+        context: null,
+        sentiment: entity.sentiment,
+      });
+    }
+  }
+
+  for (let i = 0; i < mentionRows.length; i += 50) {
+    const batch = mentionRows.slice(i, i + 50);
+    const { error: mentionError } = await supabase
+      .from("entity_mentions")
+      .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
+    if (mentionError) {
+      console.error("Failed to upsert entity mentions batch:", mentionError);
+    }
+  }
+
+  const personName = interview.interviewee_name ?? "";
+  const orgName = interview.interviewee_org ?? "";
+  const personEntityId =
+    entityIdMap.get(personName) ?? entityIdMap.get(normalizeEntityName(personName)) ?? null;
+  const orgEntityId =
+    entityIdMap.get(orgName) ?? entityIdMap.get(normalizeEntityName(orgName)) ?? null;
+
+  if (personEntityId || orgEntityId) {
+    for (const row of chunkRows) {
+      const meta = row.metadata as ChunkMetadata;
+      if (personEntityId) meta.primary_person_entity_id = personEntityId;
+      if (orgEntityId) meta.primary_org_entity_id = orgEntityId;
+    }
+    for (const row of chunkRows) {
+      const { error: metaError } = await supabase
+        .from("interview_chunks")
+        .update({ metadata: row.metadata })
+        .eq("interview_id", interviewId)
+        .eq("chunk_index", row.chunk_index);
+      if (metaError) {
+        console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
+      }
+    }
+  }
+
+  for (const rel of extraction.relationships) {
+    const sourceId =
+      entityIdMap.get(rel.source_name) ??
+      entityIdMap.get(normalizeEntityName(rel.source_name));
+    const targetId =
+      entityIdMap.get(rel.target_name) ??
+      entityIdMap.get(normalizeEntityName(rel.target_name));
+    if (sourceId && targetId) {
+      const { error: relError } = await supabase.from("entity_relationships").upsert(
+        {
+          source_entity_id: sourceId,
+          target_entity_id: targetId,
+          relation_type: rel.relation_type,
+          confidence: rel.confidence,
+          evidence_text: rel.evidence_text ?? null,
+          interview_id: interviewId,
+        },
+        {
+          onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
+        }
+      );
+      if (relError) {
+        console.error("Failed to upsert relationship:", relError);
+      }
+    }
+  }
+
+  await updateInterviewStatus(interviewId, "COMPLETED", {
+    last_intel_source: lastIntelSource,
+    ...completedInterviewExtra,
+  });
+
+  console.log(
+    `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${rawEntities.length} raw), ${extraction.relationships.length} relationships`
+  );
+
+  try {
+    const keyQuotes = extraction.sentiment.highlights.map((h) => h.text);
+    await generateContentSnippets({
+      interviewId,
+      title: interview.title ?? "Unknown Interview",
+      summary: extraction.summary,
+      topics: extraction.topics,
+      country,
+      keyQuotes,
+    });
+  } catch (contentErr) {
+    console.error(`Content generation failed for ${interviewId} (non-critical):`, contentErr);
+  }
+}
+
 /**
  * Process a completed transcription through the full ETL pipeline.
- *
- * Flow:
- * 1. Fetch transcription from AssemblyAI
- * 2. Save raw transcript
- * 3. Extract structured intelligence (GPT-4o-mini)
- * 4. Chunk transcript (speaker-aware)
- * 5. Generate embeddings
- * 6. Persist chunks + entities to database
  */
 export async function processTranscription(
   interviewId: string,
@@ -109,7 +463,6 @@ export async function processTranscription(
   const supabase = createAdminClient();
 
   try {
-    // ── Step 1: Fetch transcription ──────────────────────────────
     const transcription = await getTranscription(assemblyaiId);
 
     if (transcription.status === "error") {
@@ -126,8 +479,7 @@ export async function processTranscription(
       return;
     }
 
-    // Build speaker map and speaker-labeled transcript from utterances
-    const speakerMap: Record<string, string> = {};
+    const speakerMap: SpeakerMap = {};
     let formattedTranscript = transcription.text;
 
     if (transcription.utterances && transcription.utterances.length > 0) {
@@ -135,26 +487,25 @@ export async function processTranscription(
       speakers.forEach((s) => {
         speakerMap[s] = `Speaker ${s}`;
       });
-
       formattedTranscript = transcription.utterances
         .map((u) => `[${speakerMap[u.speaker]}]: ${u.text}`)
         .join("\n\n");
     }
 
-    // Fetch interview metadata for extraction context + transcript display anchors
     const { data: interview } = await supabase
       .from("interviews")
       .select("title, project_id, interviewee_name, interviewee_org, projects(country)")
       .eq("id", interviewId)
       .single();
 
-    const country = (interview?.projects as Record<string, unknown>)?.country as string | undefined;
+    const country = (interview?.projects as Record<string, unknown>)?.country as
+      | string
+      | undefined;
     const normalizedTranscript = normalizeTranscriptDisplay(formattedTranscript, {
       intervieweeName: interview?.interviewee_name,
       intervieweeOrg: interview?.interviewee_org,
     });
 
-    // Save speaker-formatted raw transcript + cleaned display transcript
     await updateInterviewStatus(interviewId, "EXTRACTING", {
       transcript_full: formattedTranscript,
       transcript_display: normalizedTranscript.transcriptDisplay,
@@ -170,347 +521,145 @@ export async function processTranscription(
       );
     }
 
-    // ── Step 2: Extract intelligence ─────────────────────────────
-
-    const extraction = await extractIntelligence({
-      transcript: transcription.text,
-      interviewTitle: interview?.title ?? "Unknown Interview",
-      country,
-      speakerMap,
-      primaryPerson: interview?.interviewee_name ?? null,
-      primaryOrg: interview?.interviewee_org ?? null,
-    });
-
-    // Save extraction results
-    await updateInterviewStatus(interviewId, "EMBEDDING", {
-      summary: extraction.summary,
-      sentiment: extraction.sentiment,
-      topics: extraction.topics,
-    });
-
-    // ── Step 3: Chunk transcript ─────────────────────────────────
-    const chunks = transcription.utterances
-      ? chunkTranscript(
-          transcription.utterances.map((u) => ({
-            speaker: u.speaker,
-            text: u.text,
-            start: u.start,
-            end: u.end,
-          }))
-        )
-      : chunkPlainText(transcription.text);
-
-    // ── Step 3b: Anchor-aware chunk normalization ────────────────
-    // Prefer anchor enrichment over speculative text replacement.
-    // Raw evidence stays in interview_chunks.content (immutable).
-    // content_for_embedding carries the anchor-enriched text for
-    // embedding generation — raw/normalized text + primary anchors.
-    const chunkAnchors = {
-      intervieweeName: interview?.interviewee_name ?? null,
-      intervieweeOrg: interview?.interviewee_org ?? null,
-    };
-
-    const baseMetadata: Partial<ChunkMetadata> = {
-      country,
-      topics: extraction.topics,
-      entities: extraction.entities.map((e) => e.canonical_name),
-    };
-
-    const enrichedChunks = chunks.map((chunk) => {
-      const normResult = normalizeChunkWithAnchors(chunk.content, chunkAnchors);
-      const metadata = buildNormalizedChunkMetadata(
-        baseMetadata,
-        normResult,
-        chunkAnchors
-      );
-      return { chunk, metadata, normResult };
-    });
-
-    // ── Step 4: Generate embeddings ──────────────────────────────
-    // Prefer anchor enrichment over speculative text replacement.
-    // content_for_embedding = (high-confidence normalized text OR raw text)
-    // + structured anchor context (primary interviewee, primary institution).
-    const embeddingTexts = enrichedChunks.map((ec) =>
-      ec.metadata.content_for_embedding ?? ec.chunk.content
-    );
-    const embeddings = await generateEmbeddings(embeddingTexts);
-
-    // ── Step 5: Persist chunks ───────────────────────────────────
-    const chunkRows = enrichedChunks.map((ec, i) => ({
-      interview_id: interviewId,
-      chunk_index: ec.chunk.chunkIndex,
-      content: ec.chunk.content, // raw evidence — never mutated
-      speaker: ec.chunk.speaker,
-      start_time: ec.chunk.startTime,
-      end_time: ec.chunk.endTime,
-      embedding: JSON.stringify(embeddings[i]),
-      metadata: ec.metadata,
-    }));
-
-    let normAppliedCount = 0;
-    for (const ec of enrichedChunks) {
-      if (ec.normResult.normalizationApplied) normAppliedCount++;
-    }
-    if (normAppliedCount > 0) {
-      console.log(
-        `Anchor normalization applied to ${normAppliedCount}/${enrichedChunks.length} chunks for interview ${interviewId}`
-      );
-    }
-
-    // Insert in batches of 50 to avoid payload limits
-    for (let i = 0; i < chunkRows.length; i += 50) {
-      const batch = chunkRows.slice(i, i + 50);
-      const { error: chunkError } = await supabase
-        .from("interview_chunks")
-        .insert(batch);
-
-      if (chunkError) {
-        console.error("Failed to insert chunks batch:", chunkError);
-        throw chunkError;
-      }
-    }
-
-    // ── Step 6: Entity resolution (Stage 2 of extraction pipeline) ──
-    // Raw entities from GPT carry raw_name + canonical_name.
-    // This stage resolves them against interview anchors, existing
-    // entities, and aliases — with confidence/method tracking.
-    const entityIdMap = new Map<string, string>();
-    const projectId = interview?.project_id;
-
-    if (!projectId) {
+    if (!interview?.project_id) {
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
 
-    const rawEntities: RawExtractedEntity[] = extraction.entities.map((e) => ({
-      raw_name: e.raw_name,
-      canonical_name: e.canonical_name,
-      type: e.type,
-      description: e.description,
-      sentiment: e.sentiment ?? null,
-    }));
+    const chunkUtterances: TranscriptUtterance[] = transcription.utterances
+      ? transcription.utterances.map((u) => ({
+          speaker: u.speaker,
+          text: u.text,
+          start: u.start,
+          end: u.end,
+        }))
+      : [];
 
-    const resolvedEntities = await resolveExtractedEntities({
-      rawEntities,
-      anchors: {
-        intervieweeName: interview?.interviewee_name ?? null,
-        intervieweeOrg: interview?.interviewee_org ?? null,
+    await runIntelPipelineFromTranscriptInput({
+      supabase,
+      interviewId,
+      interview: {
+        title: interview.title,
+        project_id: interview.project_id,
+        interviewee_name: interview.interviewee_name,
+        interviewee_org: interview.interviewee_org,
       },
-      projectId,
-      supabaseClient: supabase,
+      country,
+      speakerMap,
+      extractionTranscript: transcription.text,
+      chunkUtterances,
+      clearDerivedBeforeInsert: false,
+      lastIntelSource: "assemblyai_auto",
     });
-
-    const entitiesForGrounding: EntityForGrounding[] = [];
-
-    for (const resolved of resolvedEntities) {
-      entityIdMap.set(resolved.resolvedName, resolved.entityId);
-      entityIdMap.set(normalizeEntityName(resolved.resolvedName), resolved.entityId);
-      // Also register raw_name so relationship lookup works
-      if (resolved.rawName) {
-        entityIdMap.set(resolved.rawName, resolved.entityId);
-        entityIdMap.set(normalizeEntityName(resolved.rawName), resolved.entityId);
-      }
-
-      entitiesForGrounding.push({
-        name: resolved.resolvedName,
-        entityId: resolved.entityId,
-        sentiment: resolved.sentiment,
-      });
-
-      if (resolved.needsReview) {
-        await markEntityNeedsReview(supabase, resolved.entityId);
-      }
-    }
-
-    console.log(
-      `Entity resolution: ${resolvedEntities.length} unique entities from ${rawEntities.length} raw mentions (interview ${interviewId})`
-    );
-
-    // ── Step 6a: Ground entity mentions to chunks ─────────────────
-    // Hybrid strategy: exact → alias → anchor_context → fuzzy.
-    // Grounded mentions carry chunk_id + context evidence so chat
-    // and reports can surface exact transcript provenance.
-    const { data: persistedChunks } = await supabase
-      .from("interview_chunks")
-      .select("id, chunk_index, content, speaker")
-      .eq("interview_id", interviewId)
-      .order("chunk_index");
-
-    const chunksForGrounding: ChunkForGrounding[] = (persistedChunks ?? []).map((c) => ({
-      id: c.id,
-      chunkIndex: c.chunk_index,
-      content: c.content,
-      speaker: c.speaker,
-    }));
-
-    const groundedMap = await groundEntityMentions({
-      entities: entitiesForGrounding,
-      chunks: chunksForGrounding,
-      anchors: {
-        intervieweeName: interview?.interviewee_name ?? null,
-        intervieweeOrg: interview?.interviewee_org ?? null,
-      },
-      entityIdMap,
-      supabaseClient: supabase,
-    });
-
-    // Persist grounded mentions (with chunk_id + context)
-    const groundedEntityIds = new Set<string>();
-    const mentionRows: Array<{
-      entity_id: string;
-      interview_id: string;
-      chunk_id: string | null;
-      context: string | null;
-      sentiment: string | null;
-    }> = [];
-
-    for (const [entityId, mentions] of groundedMap.entries()) {
-      groundedEntityIds.add(entityId);
-      for (const gm of mentions) {
-        mentionRows.push({
-          entity_id: gm.entityId,
-          interview_id: interviewId,
-          chunk_id: gm.chunkId,
-          context: gm.context,
-          sentiment: gm.sentiment,
-        });
-      }
-    }
-
-    // Fallback: interview-level mention for entities with no chunk grounding
-    for (const entity of entitiesForGrounding) {
-      if (!groundedEntityIds.has(entity.entityId)) {
-        mentionRows.push({
-          entity_id: entity.entityId,
-          interview_id: interviewId,
-          chunk_id: null,
-          context: null,
-          sentiment: entity.sentiment,
-        });
-      }
-    }
-
-    // Batch-upsert mentions (ignore duplicates from re-processing)
-    for (let i = 0; i < mentionRows.length; i += 50) {
-      const batch = mentionRows.slice(i, i + 50);
-      const { error: mentionError } = await supabase
-        .from("entity_mentions")
-        .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
-
-      if (mentionError) {
-        console.error("Failed to upsert entity mentions batch:", mentionError);
-      }
-    }
-
-    if (groundedEntityIds.size > 0) {
-      const totalGrounded = mentionRows.filter((r) => r.chunk_id).length;
-      console.log(
-        `Entity grounding: ${groundedEntityIds.size}/${entitiesForGrounding.length} entities grounded to ${totalGrounded} chunk mentions for interview ${interviewId}`
-      );
-    }
-
-    // ── Step 6b: Backfill anchor entity IDs into chunk metadata ──
-    // Now that entity matching is done, resolve the primary person
-    // and org anchors to their canonical entity IDs so chunks carry
-    // full provenance for downstream intelligence consumers.
-    const personName = interview?.interviewee_name ?? "";
-    const orgName = interview?.interviewee_org ?? "";
-    const personEntityId =
-      entityIdMap.get(personName) ??
-      entityIdMap.get(normalizeEntityName(personName)) ??
-      null;
-    const orgEntityId =
-      entityIdMap.get(orgName) ??
-      entityIdMap.get(normalizeEntityName(orgName)) ??
-      null;
-
-    if (personEntityId || orgEntityId) {
-      for (let i = 0; i < chunkRows.length; i += 50) {
-        const batch = chunkRows.slice(i, i + 50);
-        for (const row of batch) {
-          const meta = row.metadata as ChunkMetadata;
-          if (personEntityId) meta.primary_person_entity_id = personEntityId;
-          if (orgEntityId) meta.primary_org_entity_id = orgEntityId;
-        }
-      }
-
-      // Batch-update metadata with entity IDs (non-critical — log and continue)
-      for (let i = 0; i < chunkRows.length; i += 50) {
-        const batch = chunkRows.slice(i, i + 50);
-        for (const row of batch) {
-          const { error: metaError } = await supabase
-            .from("interview_chunks")
-            .update({ metadata: row.metadata })
-            .eq("interview_id", interviewId)
-            .eq("chunk_index", row.chunk_index);
-
-          if (metaError) {
-            console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
-          }
-        }
-      }
-    }
-
-    // ── Step 7: Persist relationships ────────────────────────────
-    for (const rel of extraction.relationships) {
-      const sourceId =
-        entityIdMap.get(rel.source_name) ??
-        entityIdMap.get(normalizeEntityName(rel.source_name));
-      const targetId =
-        entityIdMap.get(rel.target_name) ??
-        entityIdMap.get(normalizeEntityName(rel.target_name));
-
-      if (sourceId && targetId) {
-        const { error: relError } = await supabase
-          .from("entity_relationships")
-          .upsert(
-            {
-              source_entity_id: sourceId,
-              target_entity_id: targetId,
-              relation_type: rel.relation_type,
-              confidence: rel.confidence,
-              evidence_text: rel.evidence_text ?? null,
-              interview_id: interviewId,
-            },
-            {
-              onConflict:
-                "source_entity_id,target_entity_id,relation_type,interview_id",
-            }
-          );
-
-        if (relError) {
-          console.error("Failed to upsert relationship:", relError);
-        }
-      }
-    }
-
-    // ── Done ─────────────────────────────────────────────────────
-    await updateInterviewStatus(interviewId, "COMPLETED");
-
-    console.log(
-      `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${extraction.entities.length} raw), ${extraction.relationships.length} relationships`
-    );
-
-    // ── Step 8: Content generation (non-critical) ────────────────
-    try {
-      const keyQuotes = extraction.sentiment.highlights.map((h) => h.text);
-      await generateContentSnippets({
-        interviewId,
-        title: interview?.title ?? "Unknown Interview",
-        summary: extraction.summary,
-        topics: extraction.topics,
-        country,
-        keyQuotes,
-      });
-    } catch (contentErr) {
-      console.error(
-        `Content generation failed for ${interviewId} (non-critical):`,
-        contentErr
-      );
-    }
   } catch (error) {
     console.error(`Pipeline failed for interview ${interviewId}:`, error);
     await updateInterviewStatus(interviewId, "FAILED", {
       error_message: toErrorMessage(error),
     });
+  }
+}
+
+/**
+ * Rebuild chunks, mentions, relationships, and snippets from `reviewed_utterances` only.
+ * Triggered when an editor POSTs `/api/interviews/[id]/reprocess-review` (after `transcript_review_status = ready`).
+ *
+ * Failure safety: LLM + embeddings run **before** `clear_interview_derived_data`.
+ * If the RPC or inserts fail after clear, the interview can be left without derived rows — surface FAILED + `transcript_review_status: ready` for retry.
+ * Full delete+insert in one DB transaction is deferred (see docs).
+ */
+export async function reprocessInterviewFromReview(interviewId: string): Promise<void> {
+  const supabase = createAdminClient();
+
+  try {
+    const { data: interview, error: fetchError } = await supabase
+      .from("interviews")
+      .select(
+        "title, project_id, interviewee_name, interviewee_org, speaker_map, reviewed_utterances, transcript_review_status, projects(country)"
+      )
+      .eq("id", interviewId)
+      .single();
+
+    if (fetchError || !interview) {
+      throw new Error(fetchError?.message ?? "Interview not found");
+    }
+
+    if (interview.transcript_review_status !== "ready") {
+      throw new Error(
+        `Review reprocessing requires transcript_review_status=ready (current: ${interview.transcript_review_status})`
+      );
+    }
+
+    const utterances = parseReviewedUtterancesJson(interview.reviewed_utterances);
+    if (!utterances) {
+      throw new Error("reviewed_utterances is missing or invalid");
+    }
+
+    const extractionTranscript = utterances.map((u) => u.text).join("\n");
+
+    const { data: seedRows, error: seedsError } = await supabase
+      .from("interview_review_entities")
+      .select("display_name, entity_type, entity_id")
+      .eq("interview_id", interviewId);
+
+    if (seedsError) {
+      throw new Error(`Failed to load review seeds: ${seedsError.message}`);
+    }
+
+    const seeds =
+      seedRows?.map((r) => ({
+        display_name: r.display_name,
+        entity_type: r.entity_type,
+        entity_id: r.entity_id,
+      })) ?? [];
+
+    const reviewerSeedsForExtraction = seeds.map((s) => ({
+      displayName: s.display_name,
+      type: s.entity_type,
+    }));
+
+    await supabase
+      .from("interviews")
+      .update({
+        status: "EXTRACTING",
+        transcript_review_status: "reprocessing",
+        error_message: null,
+      })
+      .eq("id", interviewId);
+
+    const country = (interview.projects as Record<string, unknown>)?.country as string | undefined;
+
+    if (!interview.project_id) {
+      throw new Error(`Missing project_id for interview ${interviewId}`);
+    }
+
+    await runIntelPipelineFromTranscriptInput({
+      supabase,
+      interviewId,
+      interview: {
+        title: interview.title,
+        project_id: interview.project_id,
+        interviewee_name: interview.interviewee_name,
+        interviewee_org: interview.interviewee_org,
+      },
+      country,
+      speakerMap: (interview.speaker_map as SpeakerMap) ?? {},
+      extractionTranscript,
+      chunkUtterances: utterances,
+      reviewerSeedsForExtraction,
+      reviewerSeedsForMerge: seeds,
+      clearDerivedBeforeInsert: true,
+      lastIntelSource: "human_review",
+      // Single COMPLETED write so Realtime + refresh see draft, not stuck "reprocessing"
+      completedInterviewExtra: { transcript_review_status: "draft" },
+    });
+  } catch (error) {
+    console.error(`Review reprocess failed for interview ${interviewId}:`, error);
+    await supabase
+      .from("interviews")
+      .update({
+        status: "FAILED",
+        transcript_review_status: "ready",
+        error_message: toErrorMessage(error),
+      })
+      .eq("id", interviewId);
   }
 }

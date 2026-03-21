@@ -16,7 +16,7 @@
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | COMPLETE | 100% |
 | 3.5 | Intelligence Chat Upgrades | COMPLETE | 100% |
-| 3.6 | Human Review & Interview Reprocessing | IN PROGRESS | 0% |
+| 3.6 | Human Review & Interview Reprocessing | COMPLETE | 100% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
 ---
@@ -287,7 +287,7 @@
 
 ---
 
-## Phase 3.6 — Human Review & Interview Reprocessing (IN PROGRESS)
+## Phase 3.6 — Human Review & Interview Reprocessing (COMPLETE)
 
 **Goal**: Let editors correct ASR transcripts, seed entities with search/create, and **reprocess** an interview so chunks, mentions, relationships, and downstream intelligence are rebuilt from **reviewed utterances only**, with **human seed entities** as mandatory strong inputs to extraction and graph persistence — without overwriting immutable raw transcript.
 
@@ -305,9 +305,16 @@
 | Step | Scope | Status |
 |------|--------|--------|
 | 1 | Docs (roadmap, ingestion, schema, feature doc, README, HITL cross-link) | Done |
-| 2 | Migration + `database.ts` + pipeline entrypoint (`runExtractionPipeline` / reviewed path) | Not started |
-| 3 | Review UI (utterance editor, entity combobox, save draft) | Not started |
-| 4 | Reprocess endpoint + transactional swap | Not started |
+| 2 | Migration + `database.ts` + pipeline entrypoint (`runIntelPipelineFromTranscriptInput` / `reprocessInterviewFromReview`) | Done |
+| 3 | Review UI (utterance editor, entity combobox, save draft, mark ready) | Done |
+| 4 | Reprocess endpoint (fire-and-forget) + Run reprocessing UI | Done |
+| 5 | Detail transcript card: raw-only viewer + “Transcript review” (removed cleaned toggle + recompute) | Done |
+
+### Optional later (not part of 3.6 MVP)
+
+- Single DB transaction for delete+insert of derived rows after reprocess (full atomic swap)
+- Pause pipeline at “pending review” before first extraction
+- Utterance merge/split, evidence spans on seed rows
 
 ### Phase 3.6 completion criteria (target)
 
@@ -418,7 +425,7 @@ Current state: Phases 0–3.5 are ALL COMPLETE. The platform has:
 - Interview deletion with CASCADE cleanup
 - Sales War Room on project dashboard (mock CRM data, ready for HubSpot integration)
 - Upload anchors for interviewee/org to improve ASR + extraction consistency
-- Transcript display layer with cleaned/original toggle and owner-triggered recompute
+- Transcript review UI + human reprocessing (`reviewed_utterances`, seed entities); detail page shows raw transcript + “Transcript review” only
 
 The database has 10 tables across 11 migrations. See ROADMAP.md for full task
 history and architecture decisions.

@@ -19,7 +19,7 @@ This document describes **Phase 3.6**: the transcript review UI, the `interview_
 | Layer | Where it lives | Purpose |
 |-------|----------------|---------|
 | **Raw** | `interviews.transcript_full` | Immutable speaker-labeled AssemblyAI output. Never overwritten for audit. |
-| **Auto display** | `interviews.transcript_display` | Deterministic anchor normalization for reading (`normalizeTranscriptDisplay`). Not the reviewed artifact. |
+| **Auto display** | `interviews.transcript_display` | Still populated on ingest (`normalizeTranscriptDisplay`). The interview **detail** transcript card shows **raw** only; editors fix text via **Transcript review**. |
 | **Reviewed** | `interviews.reviewed_utterances` | Editor-owned JSON array of utterances (`speaker`, `text`, `start`, `end`). **Only** this layer feeds reviewed reprocessing. |
 
 ---
@@ -83,6 +83,21 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 
 ---
 
-## File reference (as implemented)
+## File reference (implementation status)
 
-_To be filled during Phase 3.6 implementation: migration `00013_interview_transcript_review.sql`, `src/lib/ai/pipeline.ts`, review UI routes, reprocess API._
+| Piece | Path |
+|-------|------|
+| Migration | `supabase/migrations/00013_interview_transcript_review.sql` |
+| Types | `src/types/database.ts` (`ReviewedUtterance`, `TranscriptReviewStatus`, `interview_review_entities`, RPC `clear_interview_derived_data`) |
+| Shared intel path + reviewed reprocess | `src/lib/ai/pipeline.ts` — `runIntelPipelineFromTranscriptInput` (internal), `reprocessInterviewFromReview`, `processTranscription` |
+| Extraction seeds | `src/lib/ai/extraction.ts` — `reviewerSeedEntities` |
+| Forced entity resolution | `src/lib/entities/resolve.ts` — `RawExtractedEntity.forcedEntityId` |
+| Review UI + save draft + seeds | `src/app/(dashboard)/interviews/[id]/review/page.tsx`, `src/components/interviews/transcript-review-editor.tsx` |
+| Entity search API | `src/app/api/projects/[projectId]/entities/search/route.ts` |
+| Server actions | `src/app/actions/interview-review.ts` |
+| Parse `transcript_full` → initial utterances | `src/lib/interviews/transcript-utterances-from-full.ts` |
+| Reprocess API + UI button | `POST /api/interviews/[id]/reprocess-review`, `TranscriptReviewEditor` “Run reprocessing” |
+
+**UX note:** Unsaved transcript edits are kept in the browser when you add/remove seed entities (we do not reset local utterance state on every server refresh). A full page reload or navigating away and back loads the last **saved** draft from the database.
+
+**Completion UX:** The final `COMPLETED` database update for a human-review run includes `transcript_review_status: draft` in the **same** write as `last_intel_source: human_review`, so Realtime / polling never leave the UI stuck on “reprocessing”. The transcript review page’s status tracker then redirects to the interview detail route when the pipeline hits `COMPLETED`. The interview header shows a **Human-reviewed intel** badge when `last_intel_source === human_review`.

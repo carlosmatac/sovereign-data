@@ -24,16 +24,16 @@ import {
   FileText,
   Newspaper,
   FileIcon,
+  ClipboardCheck,
 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
 import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
-import { RecomputeCleanedTranscriptButton } from "@/components/interviews/recompute-cleaned-transcript-button";
 import { AudioPlayer } from "@/components/interviews/audio-player";
-import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 
 export default async function InterviewDetailPage({
@@ -57,7 +57,6 @@ export default async function InterviewDetailPage({
 
   const userRole = await getUserProjectRole(interview.project_id);
   const canEdit = userRole === "owner" || userRole === "editor";
-  const isOwner = userRole === "owner";
 
   // Fetch entities for this interview
   const { data: mentions } = await supabase
@@ -154,14 +153,6 @@ export default async function InterviewDetailPage({
     highlights?: Array<{ text: string; sentiment: string }>;
   } | null;
 
-  const transcriptNormalizationStats =
-    interview.transcript_full
-      ? normalizeTranscriptDisplay(interview.transcript_full, {
-          intervieweeName: interview.interviewee_name,
-          intervieweeOrg: interview.interviewee_org,
-        }).stats
-      : null;
-
   return (
     <div className="p-6">
       {/* Back navigation */}
@@ -213,8 +204,17 @@ export default async function InterviewDetailPage({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+            {interview.last_intel_source === "human_review" && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Human-reviewed intel
+              </Badge>
+            )}
             {canEdit && (
               <DeleteInterviewButton
                 interviewId={interview.id}
@@ -340,15 +340,13 @@ export default async function InterviewDetailPage({
             {interview.transcript_full && (
               <TranscriptViewer
                 transcriptRaw={interview.transcript_full}
-                transcriptDisplay={interview.transcript_display}
-                replacementsApplied={
-                  transcriptNormalizationStats?.replacementsApplied
-                }
                 actions={
-                  isOwner ? (
-                    <RecomputeCleanedTranscriptButton
-                      interviewId={interview.id}
-                    />
+                  canEdit ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/interviews/${interview.id}/review`}>
+                        Transcript review
+                      </Link>
+                    </Button>
                   ) : null
                 }
                 speakerMap={

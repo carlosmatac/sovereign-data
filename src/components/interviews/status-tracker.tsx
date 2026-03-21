@@ -84,6 +84,8 @@ interface StatusTrackerProps {
   currentStatus: InterviewStatus;
   errorMessage?: string | null;
   sourceType?: SourceType | null;
+  /** When the pipeline reaches COMPLETED, navigate here instead of only `router.refresh()` (e.g. leave transcript review). */
+  navigateToOnPipelineCompleted?: string;
 }
 
 export function InterviewStatusTracker({
@@ -91,6 +93,7 @@ export function InterviewStatusTracker({
   currentStatus: initialStatus,
   errorMessage: initialError,
   sourceType,
+  navigateToOnPipelineCompleted,
 }: StatusTrackerProps) {
   const PIPELINE_STEPS =
     sourceType === "document" ? DOCUMENT_PIPELINE_STEPS : AUDIO_PIPELINE_STEPS;
@@ -122,12 +125,15 @@ export function InterviewStatusTracker({
         }
       }
 
-      // Refresh the page when completed to show full content
       if (newStatus === "COMPLETED") {
-        router.refresh();
+        if (navigateToOnPipelineCompleted) {
+          router.push(navigateToOnPipelineCompleted);
+        } else {
+          router.refresh();
+        }
       }
     },
-    [router]
+    [router, navigateToOnPipelineCompleted]
   );
 
   // ── Polling fallback ──────────────────────────────────────────────
