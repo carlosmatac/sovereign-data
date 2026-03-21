@@ -115,7 +115,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                 className="hover:bg-sidebar-accent/50 flex items-center rounded-md px-2 py-3 transition-colors"
               >
                 <Image
-                  src="/apaisado_con_logo.svg"
+                  src="/apaisado_con_logo_v2.svg"
                   alt="Sovereign Data — Intelligence Platform"
                   width={900}
                   height={200}
@@ -135,7 +135,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   className="flex w-full items-center justify-center"
                 >
                   <Image
-                    src="/SD.svg"
+                    src="/SD_v2.svg"
                     alt=""
                     width={32}
                     height={32}
