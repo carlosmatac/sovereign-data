@@ -112,7 +112,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             <EditProjectDialog project={project} />
           )}
           <Button asChild variant="outline">
-            <Link href={`/chat?project=${projectId}`}>
+            <Link href={`/chat/new?project=${projectId}`}>
               <MessageSquare className="mr-2 h-4 w-4" />
               Intelligence Chat
             </Link>

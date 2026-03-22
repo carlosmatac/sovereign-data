@@ -323,7 +323,8 @@ Assistant message bodies are rendered with **`IntelligenceBriefMarkdown`** (`src
 | Responsibility | File Path |
 |----------------|-----------|
 | Chat API route | `src/app/api/chat/route.ts` |
-| Chat UI page | `src/app/(dashboard)/chat/page.tsx` |
+| Chat persistence (V1) | [chat-persistence.md](./chat-persistence.md) |
+| Chat UI (list + thread) | `src/app/(dashboard)/chat/*`, `src/components/chat/intelligence-chat-view.tsx` |
 | Chat loading / activity panel | `src/components/chat/intelligence-activity-status.tsx` |
 | Assistant markdown (brief styling) | `src/components/chat/intelligence-brief-markdown.tsx` |
 | Embedding generation | `src/lib/ai/embeddings.ts` |
@@ -337,6 +338,7 @@ Assistant message bodies are rendered with **`IntelligenceBriefMarkdown`** (`src
 
 ## See also
 
+- [Chat persistence](./chat-persistence.md) — stored threads, 6+1 slice, `X-Conversation-Id`  
 - [Ingestion pipeline](./ingestion-pipeline.md) — where chunks and entities originate  
 - [Database schema](../infrastructure/database-schema.md)  
 - [Intelligence commercial copilot roadmap](../roadmaps/intelligence-commercial-copilot.md) — *planning* for retrieval/evidence upgrades (align with code before execution)  

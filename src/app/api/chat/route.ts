@@ -23,6 +23,11 @@ import {
   fetchTimelineForPerson,
   resolvePrefetchPositions,
 } from "@/lib/positions/query-validated-positions";
+import { resolveChatConversation } from "@/lib/chat/resolve-conversation";
+import {
+  persistAssistantTurn,
+  persistUserTurn,
+} from "@/lib/chat/persist-messages";
 
 interface RagChunk {
   chunk_id: string;
@@ -172,8 +177,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const messages: UIMessage[] = body.messages ?? [];
-  const projectId: string | null = body.projectId ?? null;
-  const explicitInterviewId: string | null = body.interviewId ?? null;
+  let projectId: string | null = body.projectId ?? null;
+  let explicitInterviewId: string | null = body.interviewId ?? null;
 
   if (messages.length === 0) {
     return new Response("No messages provided", { status: 400 });
@@ -195,10 +200,38 @@ export async function POST(request: NextRequest) {
     return new Response("Empty query", { status: 400 });
   }
 
+  const admin = createAdminClient();
+
+  const bodyConversationId =
+    typeof body.conversationId === "string" && body.conversationId.length > 0
+      ? body.conversationId
+      : null;
+
+  const resolved = await resolveChatConversation({
+    admin,
+    userId: user.id,
+    conversationId: bodyConversationId,
+    bodyProjectId: projectId,
+    bodyInterviewId: explicitInterviewId,
+  });
+  if (!resolved.ok) return resolved.response;
+
+  projectId = resolved.projectId;
+  explicitInterviewId = resolved.interviewId;
+  const activeConversationId = resolved.conversationId;
+
+  const persistedUser = await persistUserTurn({
+    admin,
+    conversationId: activeConversationId,
+    clientMessageId: lastUserMessage.id,
+    content: queryText,
+  });
+  if (!persistedUser.ok) return persistedUser.response;
+  const userMessageDbId = persistedUser.userMessageDbId;
+
   const temporalClassification = await classifyChatTemporalIntent(queryText);
 
   // ── Scope detection ─────────────────────────────────────────────
-  const admin = createAdminClient();
   const scopeIntent = detectScopeIntent(queryText);
   const effectiveInterviewId = explicitInterviewId ?? null;
 
@@ -394,7 +427,11 @@ ${
     : "NO RELEVANT TRANSCRIPT CONTEXT FOUND for this query. If DATABASE INTEL above has summaries, use those and lookup tools; otherwise say what is missing."
 }`;
 
-  const chatMessages = messages.map((m) => ({
+  const priorForModel = messages.slice(0, -1).slice(-6);
+  const lastForModel = messages[messages.length - 1];
+  const messagesForModel = [...priorForModel, lastForModel];
+
+  const chatMessages = messagesForModel.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.parts
       .filter((p): p is { type: "text"; text: string } => p.type === "text")
@@ -577,10 +614,19 @@ ${
       console.log(
         `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent} temporal=${temporalClassification.temporal_intent}`
       );
+      await persistAssistantTurn({
+        admin,
+        conversationId: activeConversationId,
+        userMessageDbId,
+        text,
+      });
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    headers: { "X-Conversation-Id": activeConversationId },
+    originalMessages: messages,
+  });
 }
 
 // ── Scope detection ─────────────────────────────────────────────────
