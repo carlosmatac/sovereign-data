@@ -1,3 +1,13 @@
+---
+title: Interview UI visibility (demo toggles)
+status: done
+owner: team
+priority: low
+last_updated: 2026-03-21
+related_architecture: []
+related_infrastructure: []
+---
+
 # Interview UI visibility (demo toggles)
 
 ## Marketing Assets on interview detail

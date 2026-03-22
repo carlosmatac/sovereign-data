@@ -277,7 +277,7 @@ Sovereign distinguishes three transcript layers for an interview:
 | **Auto display transcript** | `interviews.transcript_display` | Overwritten only by automatic normalization | Deterministic anchor cleanup for reading (see `normalizeTranscriptDisplay`). Not a human review artifact. |
 | **Reviewed working transcript** | `interviews.reviewed_utterances` (JSONB) | Yes (editors) | Human-corrected utterance list used **only** when running **reviewed reprocessing**. |
 
-Feature detail and UX: [Interview transcript review](../features/interview-transcript-review.md).
+Feature detail and UX: [Interview transcript review](../features/done/interview-transcript-review.md).
 
 ### Reviewed pass: single source of truth
 
@@ -365,3 +365,12 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Graph schema | `supabase/migrations/00004_graph_and_content.sql` |
 | Entity normalization schema | `supabase/migrations/00009_entity_normalization.sql` |
 | Human review & reprocessing | `supabase/migrations/00013_interview_transcript_review.sql` (Phase 3.6), `src/lib/ai/pipeline.ts` |
+
+---
+
+## See also
+
+- [Interview transcript review](../features/done/interview-transcript-review.md) — UX and data model for human review  
+- [Database schema](../infrastructure/database-schema.md)  
+- [Active workstreams](../roadmaps/active-workstreams.md) — current priorities (not legacy roadmaps)  
+- [HANDOVER.md](../../HANDOVER.md) — operational gotchas  

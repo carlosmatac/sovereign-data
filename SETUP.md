@@ -12,7 +12,7 @@ Guide for a **second developer machine** working against the **same** Supabase p
 4. Run `npm run dev` → open `http://localhost:3000` (use the same port as in your env unless the team agrees otherwise).
 5. Sign in with magic link; confirm you can reach the dashboard and a project you’ve been added to.
 
-For behaviour gotchas (auth, RLS, webhooks, AI SDK), read [`HANDOVER.md`](./HANDOVER.md). Deep docs live under [`docs/`](./docs/).
+For behaviour gotchas (auth, RLS, webhooks, AI SDK), read [`HANDOVER.md`](./HANDOVER.md). Priorities live in [`docs/roadmaps/active-workstreams.md`](./docs/roadmaps/active-workstreams.md). Cursor agents: read [`AGENTS.md`](./AGENTS.md) first. Deep docs: [`docs/README.md`](./docs/README.md).
 
 ---
 
@@ -36,7 +36,7 @@ Your lead should give you, out of band:
 
 - Create a **new Supabase project** or database.
 - Sign up for **new** OpenAI, AssemblyAI, or Tavily accounts **for this task** (unless the lead explicitly asks you to use separate keys later).
-- **Provision** new infrastructure (Vercel, domains, etc.) — Phase 4 deployment is separate; see [`HANDOVER.md`](./HANDOVER.md).
+- **Provision** new infrastructure (Vercel, domains, etc.) unless the team prioritizes it — see [`HANDOVER.md`](./HANDOVER.md) §4 and [`active-workstreams.md`](./docs/roadmaps/active-workstreams.md).
 - Re-run the **full** migration history on the shared database **unless** the team is applying a **new** migration file from the repo (see below). The shared project should already be migrated.
 - Change Supabase **email templates** or auth model — the app relies on the **`token_hash`** magic-link flow; that is owned by whoever admins the shared Supabase project.
 
@@ -199,7 +199,11 @@ Requires **`dotenv`** (currently available via a transitive dev dependency when 
 
 ## Further reading
 
+- [`AGENTS.md`](./AGENTS.md) — Cursor agent workflow and doc precedence
 - [`HANDOVER.md`](./HANDOVER.md) — business context, env list, **critical gotchas**
-- [`README.md`](./README.md) — documentation hub index
-- [`docs/architecture/ingestion-pipeline.md`](./docs/architecture/ingestion-pipeline.md) — audio pipeline
+- [`docs/roadmaps/active-workstreams.md`](./docs/roadmaps/active-workstreams.md) — short execution snapshot
+- [`docs/features/README.md`](./docs/features/README.md) — feature specs lifecycle
+- [`README.md`](./README.md) — project entrypoint and documentation map
+- [`docs/README.md`](./docs/README.md) — index under `docs/`
+- [`docs/architecture/ingestion-pipeline.md`](./docs/architecture/ingestion-pipeline.md) — ingestion pipeline
 - [`docs/architecture/agentic-rag.md`](./docs/architecture/agentic-rag.md) — Intelligence Chat
