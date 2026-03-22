@@ -7,3 +7,12 @@ Start from **[`../feature-spec-template.md`](../feature-spec-template.md)** (cop
 When work starts, move the file to [`../on-going/`](../on-going/) and update frontmatter.
 
 See [`../README.md`](../README.md) for the full lifecycle.
+
+---
+
+## Specs in this folder
+
+| Doc | Summary |
+|-----|--------|
+| [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md) | Platform-level roles (`member` default, `platform_admin` elevated); naming rationale; MVP enforcement map. |
+| [`admin-entity-governance-dashboard.md`](./admin-entity-governance-dashboard.md) | Admin KB governance UI for canonical entities; MVP edit scope; gated by `platform_admin`. |

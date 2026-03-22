@@ -26,6 +26,7 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 ## Immediate next
 
 - **Derive from** product discussion and whatever sits in `to-do/` / `on-going/` — not from legacy phase tables.
+- **Parked specs (examples):** [`platform-user-roles-authorization.md`](../features/to-do/platform-user-roles-authorization.md), [`admin-entity-governance-dashboard.md`](../features/to-do/admin-entity-governance-dashboard.md) — platform roles + admin entity governance (docs only until prioritized).
 
 ---
 
