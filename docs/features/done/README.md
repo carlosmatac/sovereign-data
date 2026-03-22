@@ -9,5 +9,6 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [report-generation.md](./report-generation.md) | Reports, PDF, sharing |
 | [interview-ui-visibility.md](./interview-ui-visibility.md) | Demo toggles / interview UI flags |
 | [dashboard-sidebar-and-speaker-names.md](./dashboard-sidebar-and-speaker-names.md) | Sidebar, branding, `speaker_map` |
+| [time-aware-validated-positions-rag.md](./time-aware-validated-positions-rag.md) | `validated_positions`, chat time-aware, `lookupPositions`, API títulos |
 
 New completed features: add a row here when you move a spec into this folder.
