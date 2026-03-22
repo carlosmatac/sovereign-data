@@ -15,6 +15,14 @@ import {
   buildProjectIntelBrief,
   buildWorkspaceIntelBriefForUser,
 } from "@/lib/chat/intel-brief";
+import { classifyChatTemporalIntent } from "@/lib/ai/chat-temporal-classifier";
+import {
+  enrichPositionForTool,
+  fetchCurrentPositionsForPerson,
+  fetchPositionsForPersonAsOf,
+  fetchTimelineForPerson,
+  resolvePrefetchPositions,
+} from "@/lib/positions/query-validated-positions";
 
 interface RagChunk {
   chunk_id: string;
@@ -36,6 +44,63 @@ interface TavilyResult {
 
 interface TavilyResponse {
   results: TavilyResult[];
+}
+
+async function loadInterviewTimesForChunks(
+  admin: ReturnType<typeof createAdminClient>,
+  chunks: RagChunk[]
+): Promise<Map<string, number>> {
+  const ids = [...new Set(chunks.map((c) => c.interview_id))];
+  if (ids.length === 0) return new Map();
+  const { data } = await admin
+    .from("interviews")
+    .select("id, conducted_at, created_at")
+    .in("id", ids);
+  const map = new Map<string, number>();
+  for (const row of data ?? []) {
+    const raw = row.conducted_at ?? row.created_at;
+    const ms = raw ? Date.parse(raw) : 0;
+    map.set(row.id, Number.isNaN(ms) ? 0 : ms);
+  }
+  return map;
+}
+
+function rerankRagChunksForTemporal(
+  chunks: RagChunk[],
+  times: Map<string, number>,
+  intent:
+    | "current_state"
+    | "point_in_time"
+    | "timeline"
+    | "general_background",
+  targetDateIso: string | null
+): RagChunk[] {
+  if (intent === "general_background" || chunks.length === 0) return chunks;
+  const copy = [...chunks];
+  const targetMs =
+    targetDateIso && /^\d{4}-\d{2}-\d{2}$/.test(targetDateIso)
+      ? Date.parse(`${targetDateIso}T12:00:00.000Z`)
+      : NaN;
+  if (intent === "current_state") {
+    copy.sort(
+      (a, b) =>
+        (times.get(b.interview_id) ?? 0) - (times.get(a.interview_id) ?? 0)
+    );
+  } else if (intent === "point_in_time" && !Number.isNaN(targetMs)) {
+    copy.sort((a, b) => {
+      const ta = times.get(a.interview_id) ?? 0;
+      const tb = times.get(b.interview_id) ?? 0;
+      return (
+        Math.abs(ta - targetMs) - Math.abs(tb - targetMs) || tb - ta
+      );
+    });
+  } else if (intent === "timeline") {
+    copy.sort(
+      (a, b) =>
+        (times.get(a.interview_id) ?? 0) - (times.get(b.interview_id) ?? 0)
+    );
+  }
+  return copy;
 }
 
 async function tavilySearch(
@@ -130,6 +195,8 @@ export async function POST(request: NextRequest) {
     return new Response("Empty query", { status: 400 });
   }
 
+  const temporalClassification = await classifyChatTemporalIntent(queryText);
+
   // ── Scope detection ─────────────────────────────────────────────
   const admin = createAdminClient();
   const scopeIntent = detectScopeIntent(queryText);
@@ -154,6 +221,39 @@ export async function POST(request: NextRequest) {
   console.log(
     `[chat-scope] intent=${scopeIntent} explicitInterview=${effectiveInterviewId ?? "none"} scopedToInterview=${scopedToInterview}`
   );
+
+  let resolvedPersonEntityId: string | null = null;
+  let resolvedOrgEntityId: string | null = null;
+  if (temporalClassification.person_name?.trim()) {
+    const match = await findEntity(
+      admin,
+      temporalClassification.person_name.trim(),
+      projectId
+    );
+    if (match?.type === "PERSON") resolvedPersonEntityId = match.id;
+  }
+  if (temporalClassification.organization_name?.trim()) {
+    const match = await findEntity(
+      admin,
+      temporalClassification.organization_name.trim(),
+      projectId
+    );
+    if (
+      match &&
+      (match.type === "COMPANY" ||
+        match.type === "ORGANIZATION" ||
+        match.type === "GOVERNMENT")
+    ) {
+      resolvedOrgEntityId = match.id;
+    }
+  }
+
+  const { block: positionsBlock } = await resolvePrefetchPositions(admin, {
+    temporalIntent: temporalClassification.temporal_intent,
+    personEntityId: resolvedPersonEntityId,
+    organizationEntityId: resolvedOrgEntityId,
+    targetDateIso: temporalClassification.target_date_iso,
+  });
 
   const dbIntelBrief = projectId
     ? await buildProjectIntelBrief(admin, projectId)
@@ -183,7 +283,14 @@ The user may refer to a project by its display name (e.g. "Nigeria 2026"). That 
     match_count: scopedToInterview ? 30 : 20,
   });
 
-  const ragChunks = (chunks ?? []) as RagChunk[];
+  let ragChunks = (chunks ?? []) as RagChunk[];
+  const interviewTimes = await loadInterviewTimesForChunks(admin, ragChunks);
+  ragChunks = rerankRagChunksForTemporal(
+    ragChunks,
+    interviewTimes,
+    temporalClassification.temporal_intent,
+    temporalClassification.target_date_iso
+  );
 
   const contextBlock = ragChunks
     .map((chunk, i) => {
@@ -204,56 +311,78 @@ The user may refer to a project by its display name (e.g. "Nigeria 2026"). That 
     })
     .join("\n");
 
+  const validatedPositionsSection =
+    positionsBlock.trim().length > 0
+      ? `
+═══════════════════════════════════════════════════════
+VALIDATED POSITIONS (authoritative for roles / titles)
+═══════════════════════════════════════════════════════
+${positionsBlock}
+
+Human-validated global records. For leadership, job title, or employer questions, prefer this over isolated transcript lines. If a quote conflicts, keep validated facts as the anchor and describe interview wording as something that was "mentioned" or "said in an interview" rather than proof of org chart.
+`
+      : temporalClassification.temporal_intent !== "general_background"
+        ? `
+═══════════════════════════════════════════════════════
+VALIDATED POSITIONS
+═══════════════════════════════════════════════════════
+None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPositions\` when the user asks about roles, employers, or titles.
+`
+        : "";
+
   // ── Grounding-first system prompt ─────────────────────────────
   const systemPrompt = `You are "Sovereign", the Business Intelligence Copilot for "The Business Year" (TBY).
 
 IDENTITY:
 TBY is a media/consulting firm producing economic reviews across emerging markets. The team in each country has a Country Manager (CM — sales) and Editor (content). Products: Full page + interview, Half page, Logo placement, Interview, Barter. Key jargon: "pitch", "drop-off", "all-in-one", "follow-up".
 
+Internal routing hint (do not read aloud): temporal_intent=${temporalClassification.temporal_intent}.
+
 ═══════════════════════════════════════════════════════
 GROUNDING RULES — NON-NEGOTIABLE
 ═══════════════════════════════════════════════════════
 
-1. **NEVER invent facts about people, companies, roles, or relationships.** Every factual claim about "who manages what", "who is connected to whom", or "what entity does X" MUST be backed by:
-   (a) An entity_relationships evidence_text returned by the \`lookupRelationships\` tool, OR
-   (b) A direct transcript chunk citation from the RETRIEVED CONTEXT below, OR
-   (c) A mention returned by the \`lookupMentions\` tool.
+1. **Validated positions** (VALIDATED POSITIONS section above or \`lookupPositions\` tool) are the **strongest source** for who holds or held a role. Among active positions, prefer the one marked **MAIN** when multiple exist. If transcript excerpts [n] conflict with validated positions, **keep the validated fact** and treat conflicting transcript lines as older or contextual mention—not as overriding the validated record.
 
-2. **When asked about a person or company you are not sure about**: ALWAYS call \`lookupEntity\` first. If the entity is found, follow up with \`lookupRelationships\` and/or \`lookupMentions\` to get evidence. Only then make claims.
+2. **Claims without a validated position** (only interviews / mentions / relationships): phrase carefully—e.g. someone was "mentioned as" or "referred to in an interview as"—not as a confirmed current org-chart fact.
 
-3. **If no evidence is found** after using the tools, respond with:
-   "I cannot confirm this from our interview database. Here is what I do know: [any partial matches]. Could you clarify the project or full name?"
+3. **Relationships** (\`lookupRelationships\`): edges are **not** validated job titles; they are interview-derived links with evidence text. Use for connections, not as a substitute for \`lookupPositions\`.
 
-4. **Response structure** (mandatory for factual queries):
+4. **When unsure about an entity name**: call \`lookupEntity\` first, then other tools.
+
+5. **If no evidence is found** after tools, say what is missing and offer clarifications.
+
+6. **Response structure** (mandatory for factual queries):
    **Section 1 — What Sovereign Knows (from interviews)**
-   Ground every claim with citation markers [1], [2]… or tool results. Quote exact evidence_text when available.
+   Ground claims with [1], [2]… or tool results. Quote evidence_text when available.
 
    **Section 2 — Recommended Approach**
-   Only after presenting evidence, give strategic advice tied to that evidence.
+   Strategic advice tied to evidence.
 
    **Sources**
    List internal citations used.
 
-5. **Second-Order Thinking for Lead Generation** still applies:
-   Step 1 (Orbit): Extract third-party entities mentioned in transcripts.
-   Step 2 (Market Gap): Deduce sectors from bottlenecks/trends.
-   Step 3 (Ideal Target Profile): If no names found, output a structured profile. NEVER hallucinate company names.
+   Do **not** add extra rigid sub-headings for "validated vs contextual"; instead weave the distinction naturally in sentences (validated record vs interview mention).
+
+7. **Second-Order Thinking for Lead Generation** still applies (Orbit → Market Gap → Ideal Target Profile). NEVER hallucinate company names.
 
 TOOL USE PRIORITY:
-1. \`lookupEntity\` — Use FIRST whenever a query mentions a specific person, company, or organization by name.
-2. \`lookupRelationships\` — Use after finding an entity to get relationship edges with evidence.
-3. \`lookupMentions\` — Use to get interview contexts where an entity was discussed.
-4. \`webSearch\` — Use ONLY when internal data is insufficient AND the user needs current events or external context. Internal evidence always takes priority.
+1. \`lookupPositions\` — When discussing jobs, titles, leadership, or employer for a **PERSON** (use entity_id from \`lookupEntity\`). Modes: current, as_of (YYYY-MM-DD), timeline.
+2. \`lookupEntity\` — Resolve names to IDs before other lookups.
+3. \`lookupRelationships\` — Graph edges (interview-sourced; ordered by recent interviews, not role validity).
+4. \`lookupMentions\` — Interview snippets (ordered for recency / time relevance when applicable).
+5. \`webSearch\` — Last resort; internal validated positions and transcripts win over the open web.
 
-If DATABASE INTEL lists interviews and summaries, you DO know something about the workspace/project — do not say you have "no data" when that section is non-empty. Combine it with RETRIEVED CONTEXT and tools for a complete answer.
+If DATABASE INTEL lists interviews and summaries, you DO know something about the workspace/project — do not say you have "no data" when that section is non-empty.
 
 CITATION RULES:
 - Transcript chunks: cite as [1], [2], etc.
-- Entity tool results: cite as "According to our entity database: …"
-- Web results: cite as inline markdown links. List in a separate "Web Sources" section.
+- Entity / position tools: cite naturally in prose.
+- Web results: inline markdown links + "Web Sources" when used.
 
 ${buildScopeBlock(scopedToInterview, interviewMeta, scopeWarning)}
 ${dbIntelSection}
+${validatedPositionsSection}
 ${
   contextBlock
     ? `RETRIEVED CONTEXT (from interview transcripts):\n\n${contextBlock}\n\nSOURCE REFERENCES:\n${citationsSummary}`
@@ -278,6 +407,47 @@ ${
     system: systemPrompt,
     messages: chatMessages,
     tools: {
+      lookupPositions: tool({
+        description:
+          "Look up human-validated global positions for a person (PERSON entity_id from lookupEntity). Use for current role, historical as-of date, or career timeline. Prefer over inferring titles only from transcript excerpts.",
+        inputSchema: z.object({
+          personEntityId: z
+            .string()
+            .describe("UUID of a PERSON entity from lookupEntity"),
+          mode: z
+            .enum(["current", "as_of", "timeline"])
+            .describe("current = active roles; as_of = roles valid on a date; timeline = ordered history"),
+          asOfDate: z
+            .string()
+            .nullable()
+            .describe("YYYY-MM-DD when mode is as_of; otherwise null"),
+        }),
+        execute: async ({ personEntityId, mode, asOfDate }) => {
+          usedInternalTools = true;
+          const wantsExactHistorical =
+            temporalClassification.temporal_intent === "point_in_time";
+          let rows = await fetchCurrentPositionsForPerson(admin, personEntityId);
+          if (mode === "as_of") {
+            const d = asOfDate?.trim() ?? "";
+            rows = /^\d{4}-\d{2}-\d{2}$/.test(d)
+              ? await fetchPositionsForPersonAsOf(admin, personEntityId, d)
+              : await fetchCurrentPositionsForPerson(admin, personEntityId);
+          } else if (mode === "timeline") {
+            rows = await fetchTimelineForPerson(admin, personEntityId);
+          }
+          return {
+            found: rows.length > 0,
+            count: rows.length,
+            positions: rows.map((r) =>
+              enrichPositionForTool(r, {
+                asOfIsoDate: asOfDate ?? undefined,
+                wantsExactHistorical: wantsExactHistorical,
+              })
+            ),
+          };
+        },
+      }),
+
       lookupEntity: tool({
         description:
           "Look up a person, company, or organization in the Sovereign intelligence database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
@@ -313,7 +483,10 @@ ${
         }),
         execute: async ({ entityId }) => {
           usedInternalTools = true;
-          const edges = await getRelationships(admin, entityId, projectId);
+          const edges = await getRelationships(admin, entityId, projectId, {
+            sortByInterviewRecency:
+              temporalClassification.temporal_intent !== "general_background",
+          });
           if (edges.length === 0) {
             return {
               found: false,
@@ -343,7 +516,12 @@ ${
         }),
         execute: async ({ entityId }) => {
           usedInternalTools = true;
-          const mentions = await getMentions(admin, entityId, projectId);
+          const mentions = await getMentions(admin, entityId, projectId, {
+            targetDateIso: temporalClassification.target_date_iso,
+            prioritizeTemporalProximity:
+              temporalClassification.temporal_intent === "point_in_time" &&
+              !!temporalClassification.target_date_iso,
+          });
           if (mentions.length === 0) {
             return {
               found: false,
@@ -392,7 +570,7 @@ ${
     async onFinish({ text }) {
       const citationsUsed = (text.match(/\[\d+\]/g) ?? []).length;
       console.log(
-        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent}`
+        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent} temporal=${temporalClassification.temporal_intent}`
       );
     },
   });
