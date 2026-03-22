@@ -51,6 +51,14 @@ export type ReportTemplate =
 
 export type TranscriptReviewStatus = "none" | "draft" | "ready" | "reprocessing";
 
+export type PositionState =
+  | "active"
+  | "ended"
+  | "pending_review"
+  | "uncertain";
+
+export type DatePrecision = "exact" | "approximate" | "unknown";
+
 // ============================================
 // JSON Column Types
 // ============================================
@@ -778,6 +786,69 @@ export interface Database {
           },
         ];
       };
+      validated_positions: {
+        Row: {
+          id: string;
+          person_entity_id: string;
+          organization_entity_id: string | null;
+          title: string;
+          is_main: boolean;
+          state: PositionState;
+          valid_from_date: string | null;
+          valid_from_precision: DatePrecision;
+          valid_to_date: string | null;
+          valid_to_precision: DatePrecision;
+          validated_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          person_entity_id: string;
+          organization_entity_id?: string | null;
+          title: string;
+          is_main?: boolean;
+          state?: PositionState;
+          valid_from_date?: string | null;
+          valid_from_precision?: DatePrecision;
+          valid_to_date?: string | null;
+          valid_to_precision?: DatePrecision;
+          validated_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          person_entity_id?: string;
+          organization_entity_id?: string | null;
+          title?: string;
+          is_main?: boolean;
+          state?: PositionState;
+          valid_from_date?: string | null;
+          valid_from_precision?: DatePrecision;
+          valid_to_date?: string | null;
+          valid_to_precision?: DatePrecision;
+          validated_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "validated_positions_person_entity_id_fkey";
+            columns: ["person_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "validated_positions_organization_entity_id_fkey";
+            columns: ["organization_entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -806,6 +877,10 @@ export interface Database {
         Args: { p_interview_id: string };
         Returns: undefined;
       };
+      list_distinct_position_titles: {
+        Args: { p_limit?: number | null };
+        Returns: Array<{ title: string }>;
+      };
     };
     Enums: {
       interview_status: InterviewStatus;
@@ -819,6 +894,8 @@ export interface Database {
       report_status: ReportStatus;
       report_template: ReportTemplate;
       transcript_review_status: TranscriptReviewStatus;
+      position_state: PositionState;
+      date_precision: DatePrecision;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -845,3 +922,4 @@ export type EntityRelationship = Tables<"entity_relationships">;
 export type ContentSnippet = Tables<"content_snippets">;
 export type Report = Tables<"reports">;
 export type InterviewReviewEntity = Tables<"interview_review_entities">;
+export type ValidatedPosition = Tables<"validated_positions">;
