@@ -1,6 +1,6 @@
 ---
 title: "Admin entity governance dashboard"
-status: to-do
+status: on-going
 owner: carlos mata
 priority: high
 last_updated: 2026-03-22
@@ -49,7 +49,7 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
   - **`name`** (with corresponding **`normalized_name`** maintenance per existing conventions).
   - **`description`**.
   - **`type`** (`entity_type` enum), if product accepts manual correction of misclassified entities.
-  - **`metadata` (JSONB)** — only if we define **allowed keys** or a minimal structured form; otherwise defer (see out of scope).
+  - **`metadata` (JSONB)** — deferred (free-form is error-prone).
 
 **MVP — closely related, if low-risk:**
 
@@ -67,20 +67,21 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 ## Approach (strategy)
 
 1. **Ship after** (or in tight parallel with) **platform roles** so the route and APIs are not guesswork ([`platform-user-roles-authorization.md`](../done/platform-user-roles-authorization.md)).
-2. **New admin section** in the app (e.g. `/admin/entities` — exact path TBD) with server-side checks on every loader/action.
-3. **Service role writes** only through validated server actions or route handlers, with explicit field allowlists for MVP.
-4. **Auditability (stretch for MVP):** log actor, entity id, before/after for edits; if omitted in v1, document as known gap.
+2. **New admin section** at **`/admin/entities`** (list + **`/admin/entities/[id]`** detail) with server-side checks on every loader/action.
+3. **Service role writes** only through validated server actions, with explicit field allowlists for MVP.
+4. **Auditability (stretch for MVP):** omitted in v1 — known gap.
 
 ## User experience (optional)
 
 - **Operator-first** UI: fast search, clear entity type badge, warning when editing **global** (`project_id` IS NULL) vs **project-scoped** entities.
-- **Confirmation** on destructive-adjacent actions when they appear in later phases; MVP edits should be mostly reversible (e.g. name/description) but still confirmed for large surfaces if needed.
+- **Confirmation** on destructive-adjacent actions when they appear in later phases; MVP edits are mostly reversible (e.g. name/description).
 
-## Technical notes (optional)
+## Technical notes (implementation)
 
-- Schema reference: [`entities`](../../infrastructure/database-schema.md), `entity_aliases`, relations to mentions/relationships.
-- **Global entities:** nullable `project_id` requires UI and authorization clarity — admins may need to edit global rows; enforce explicit rules at implementation.
-- Reuse patterns from [`../done/human-in-the-loop.md`](../done/human-in-the-loop.md) where they apply (normalization, alias learning), without duplicating the interview-only UX.
+- **List loader:** `src/lib/admin/load-governance-entities.ts` — canonical rows only (`canonical_entity_id IS NULL`), pagination, filters, nested counts for aliases and mentions.
+- **Mutations:** `src/app/actions/admin-entity-governance.ts` — `requireEntityGovernanceCaller()` (mirror `platform-role-management` pattern), admin client after auth.
+- **UI:** `src/app/(dashboard)/admin/entities/page.tsx`, `src/app/(dashboard)/admin/entities/[id]/page.tsx`, components under `src/components/admin/governance-*.tsx`.
+- **Admin rename:** does **not** trigger merge (unlike interview `updateEntityName`); adds previous display name as alias with `source: admin_governance` when the name changes.
 
 ## Dependencies & related docs
 
@@ -90,17 +91,18 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 
 ## Risks & open questions
 
-- **Transcript display vs canonical name:** updating `entities.name` may not update `transcript_display` or historical strings — need a product rule (acceptable for MVP vs must trigger something).
-- **`metadata` JSONB:** free-form editing is error-prone; prefer structured fields or defer.
-- **Performance:** listing “all entities” on large tenants may require pagination and indexes (implementation detail).
+- **Transcript display vs canonical name:** updating `entities.name` may not update `transcript_display` or historical strings — acceptable for MVP.
+- **`metadata` JSONB:** deferred.
+- **Performance:** listing uses indexes + pagination; very large tenants may need further tuning.
 
 ## Acceptance / how to validate (for implementation phase)
 
-- **`member`** (platform role) cannot open admin routes or call admin mutations (consistent 403).
+- **`member`** (platform role) cannot open admin routes or call admin mutations (consistent 403 / Forbidden).
 - **`platform_admin`** can perform allowed edits; disallowed operations remain impossible from UI and API.
-- Edits persist correctly; `normalized_name` (and any invariants documented in schema) remain consistent.
+- Edits persist correctly; `normalized_name` (and DB invariants) remain consistent.
 - No regression to **`token_hash`** flow, SECURITY DEFINER helpers, or admin client discipline.
 
-## Implementation log (optional)
+## Implementation log
 
-- _Empty until work moves to `on-going/`._
+- **2026-03-22:** Moved to `on-going/`; implemented list/detail UI, server actions (core field edits, aliases), canonical-only scope, no admin merge.
+- **2026-03-22 (ux):** Detail load uses split queries (fixes false 404s from PostgREST embeds); governance flow avoids HTTP 404 — invalid id redirects to list; missing/error states are in-app pages. List filters aligned on a grid; explicit **Edit** actions; detail page = overview (read-only) + edit section (name/type/description) + read-only alias preview + relationship count.

@@ -19,14 +19,13 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 ## Right now
 
-- **In progress:** *(none listed — add a pointer to `on-going/` when applicable.)*
+- **In progress:** [`admin-entity-governance-dashboard.md`](../features/on-going/admin-entity-governance-dashboard.md) — entity governance UI at `/admin/entities`.
 
 ---
 
 ## Immediate next
 
 - **Derive from** product discussion and whatever sits in `to-do/` / `on-going/` — not from legacy phase tables.
-- **Parked:** [`admin-entity-governance-dashboard.md`](../features/to-do/admin-entity-governance-dashboard.md).
 
 ---
 

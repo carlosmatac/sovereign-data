@@ -229,6 +229,8 @@ Knowledge graph nodes. Supports both project-scoped and global entities.
 
 **Migrations**: `00001`, `00009`
 
+**Operator edits**: Canonical fields and aliases may be updated from **`/admin/entities`** by users with **`platform_admin`** or **`superuser`** (server actions use the service role after session verification; see [`admin-entity-governance-dashboard.md`](../features/on-going/admin-entity-governance-dashboard.md)). Alias rows may use `source = admin_governance`.
+
 ### `entity_aliases`
 
 Maps alternative names to canonical entities. Used for ASR word boost and entity resolution.

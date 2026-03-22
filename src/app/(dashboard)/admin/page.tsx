@@ -76,9 +76,8 @@ export default async function AdminHomePage() {
               </div>
               <CardTitle className="text-lg">Entity & knowledge governance</CardTitle>
               <CardDescription>
-                Canonical entities and structured knowledge (e.g. leadership
-                changes, org metadata). Full tooling ships with the entity
-                governance feature; this entry is available now for navigation.
+                Search canonical entities, edit names/descriptions/types, and
+                manage aliases (platform admin or superuser).
               </CardDescription>
             </CardHeader>
           </Card>

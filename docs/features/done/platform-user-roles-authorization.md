@@ -90,7 +90,7 @@ ON CONFLICT (user_id, role) DO NOTHING;
 ## Dependencies & related docs
 
 - [`platform-user-role-management.md`](./platform-user-role-management.md) (superuser-only).
-- [`admin-entity-governance-dashboard.md`](../to-do/admin-entity-governance-dashboard.md) (`platform_admin` + `superuser`).
+- [`admin-entity-governance-dashboard.md`](../on-going/admin-entity-governance-dashboard.md) (`platform_admin` + `superuser`).
 
 ## Implementation log
 
