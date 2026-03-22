@@ -1,3 +1,15 @@
+---
+title: Entity Editor (Human-in-the-Loop)
+status: done
+owner: team
+priority: medium
+last_updated: 2026-03-21
+related_architecture:
+  - docs/architecture/ingestion-pipeline.md
+related_infrastructure:
+  - docs/infrastructure/database-schema.md
+---
+
 # Human-in-the-Loop: Entity Editor
 
 > Rename, merge, and teach the system — every correction improves future accuracy

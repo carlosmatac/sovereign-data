@@ -1,9 +1,11 @@
 # SOVEREIGN DATA — HANDOVER DOCUMENT
 
-**Date**: March 3, 2026
-**Repo**: `git@github.com:carlosmatac/sovereign-data.git`
-**Branch**: `main`
+**Date**: March 3, 2026  
+**Repo**: `git@github.com:carlosmatac/sovereign-data.git`  
+**Branch**: `main`  
 **Runtime**: Next.js dev server on `http://localhost:3000`
+
+> **Priorities & “what’s next”:** maintain with [`docs/roadmaps/active-workstreams.md`](./docs/roadmaps/active-workstreams.md) (short snapshot). **Per-feature** intent and implementation notes live under [`docs/features/`](./docs/features/README.md) (`to-do` / `on-going` / `done`). This handover stays the place for **continuity, gotchas, and constraints**. Agents: read [`AGENTS.md`](./AGENTS.md) first for workflow and doc precedence.
 
 ---
 
@@ -17,7 +19,7 @@
 2. **Editorial Strategy** — Data-driven trend detection across all interviews to inform market entry and editorial decisions. Architecture prepared for multi-modal ingestion (PDFs, prep docs).
 3. **Push Marketing** — Auto-generated content (LinkedIn, Twitter, Newsletter) from processed interviews. Zero manual effort.
 
-> For deep technical documentation on any system, see the [Documentation Hub](./README.md#-documentation-hub) in README.md.
+> For deep technical documentation on any system, see the [documentation map](./README.md#documentation-map) in README.md and [`docs/README.md`](./docs/README.md).
 
 ---
 
@@ -34,6 +36,8 @@
 | Phase 3: Team Management & Reports | COMPLETE |
 | Phase 3.5: Intelligence Chat Upgrades & War Room | COMPLETE |
 | **Phase 4: Production Deployment** | **NOT STARTED** |
+
+*The table above is a **historical phased snapshot**. It does not decide what the team works on this week — see [`active-workstreams.md`](./docs/roadmaps/active-workstreams.md).*
 
 ### What's Built
 
@@ -58,7 +62,7 @@
 |-------|-----------|
 | Frontend | Next.js 16.1.6 (App Router), TypeScript, Tailwind CSS v4, Shadcn/ui |
 | Auth | Supabase Auth — Magic Links via `token_hash` flow |
-| Database | Supabase PostgreSQL 16 + pgvector, 10 tables, 11 migrations |
+| Database | Supabase PostgreSQL 16 + pgvector, 12 tables, 15 migrations |
 | AI | Vercel AI SDK v6, GPT-4o-mini (extraction), GPT-4o (reports), `text-embedding-3-small` |
 | Transcription | AssemblyAI Universal-2 |
 | Web Search | Tavily (optional) |
@@ -89,7 +93,9 @@
 
 ---
 
-## 4. IMMEDIATE MISSION: PHASE 4 — Production Deployment
+## 4. Production deployment checklist (backlog only)
+
+**Not** a current execution priority in [`active-workstreams.md`](./docs/roadmaps/active-workstreams.md). When the team **explicitly** decides to ship to production, typical work includes:
 
 | Task | Priority | Description |
 |------|----------|-------------|
@@ -103,6 +109,8 @@
 | Zero retention audit | Medium | Verify AssemblyAI + OpenAI data handling policies |
 | Backup strategy | Low | Supabase daily backups + point-in-time recovery |
 | Performance optimization | Low | Edge caching, image optimization, bundle analysis |
+
+**Whether this is “next”** is a **product decision** — see [`active-workstreams.md`](./docs/roadmaps/active-workstreams.md) (deployment is explicitly *not* current execution there). When the team prioritizes go-live, consider adding a **feature spec** under [`docs/features/to-do/`](./docs/features/to-do/) so it follows the same lifecycle as other work. Legacy phased docs labeled Phase 4 as “not started”; that is **historical**, not an automatic mission.
 
 ---
 
@@ -126,17 +134,24 @@ TAVILY_API_KEY=<set>  # Optional — web search disabled gracefully if missing
 Copy-paste this to bootstrap a new AI agent:
 
 ```
-Read HANDOVER.md for business context, gotchas, and your current mission.
-For deep technical details, read the relevant file from docs/:
+Read AGENTS.md, then HANDOVER.md, then docs/roadmaps/active-workstreams.md.
+If I give you a feature spec, read docs/features/on-going/<file>.md or to-do/<file>.md next.
+If I ask you to create a new feature spec, use docs/features/feature-spec-template.md as the structure.
 
-- docs/architecture/ingestion-pipeline.md — Audio processing pipeline
-- docs/architecture/agentic-rag.md — Intelligence Chat system
-- docs/infrastructure/database-schema.md — Multi-tenant DB design
-- docs/infrastructure/cost-model-finops.md — Cost model per service
-- docs/features/human-in-the-loop.md — Entity Editor
-- docs/features/report-generation.md — Report generation + PDF + sharing
+For deep technical details, read only what your task needs, e.g.:
 
-Current state: Phases 0–3.5 ALL COMPLETE. Phase 4 (Production Deployment) NOT STARTED.
+- docs/architecture/ingestion-pipeline.md — Ingestion / transcription / pipeline
+- docs/architecture/agentic-rag.md — Intelligence Chat
+- docs/infrastructure/database-schema.md — Multi-tenant DB, RLS
+- docs/infrastructure/cost-model-finops.md — Cost model
+- docs/features/done/human-in-the-loop.md — Entity Editor (shipped reference)
+- docs/features/done/report-generation.md — Reports + PDF + sharing (shipped reference)
+- docs/features/done/interview-transcript-review.md — Transcript review + reprocess (shipped reference)
+
+Update the feature doc (and architecture docs if needed) as you implement — do not leave docs behind the code.
+
+Do NOT treat docs/roadmaps/phased-delivery-history.md or intelligence-commercial-copilot.md
+as the current task list unless I explicitly say so.
 
 CRITICAL: Do NOT break existing features. The admin client pattern, token_hash
 auth, and SECURITY DEFINER RLS helpers are sacred — use them, don't replace them.

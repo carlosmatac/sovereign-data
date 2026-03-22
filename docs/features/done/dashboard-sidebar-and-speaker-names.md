@@ -1,3 +1,15 @@
+---
+title: Dashboard sidebar & speaker display names
+status: done
+owner: team
+priority: medium
+last_updated: 2026-03-21
+related_architecture:
+  - docs/architecture/ingestion-pipeline.md
+related_infrastructure:
+  - docs/infrastructure/database-schema.md
+---
+
 # Dashboard sidebar & interview speaker display names
 
 > **Ventura / UX track** — collapsible app navigation plus human-in-the-loop **display names** for diarized speakers, persisted on `interviews.speaker_map`, with optional autocomplete from **PERSON** entities.

@@ -1,8 +1,26 @@
+# Intelligence & commercial copilot — execution plan (feature roadmap)
+
+> **Product / architecture roadmap — not the repo’s day-to-day execution list.**  
+> **Current team priorities:** [`active-workstreams.md`](./active-workstreams.md) + [`HANDOVER.md`](../../HANDOVER.md).  
+> **Agent workflow:** [`AGENTS.md`](../../AGENTS.md).
+
+## Status snapshot (maintain when reality drifts)
+
+| Area | Notes |
+|------|--------|
+| **P1 — Chunk & ingestion quality** | Described below as implemented in code (chunk overlap, sentence split, retries, batch embeddings). **Treat as “in codebase”;** validate against a fresh upload if acceptance is unclear. |
+| **P2–P6 — Critical path** | Documented as **planned / partially overlapping** with work already shipped under the phased roadmap (e.g. chat, graph, reports). **Do not assume** P2 is the next ticket without checking `active-workstreams.md`. |
+| **H1–H7 — Hardening** | Deferred items; some themes (security, hygiene) intersect production readiness — see `active-workstreams.md` under *Later* / *Out of scope*. |
+
+This file stays valuable for **CEO-demo narrative**, scope boundaries, and **explicit deferrals**. It is **reference / planning**, not a substitute for `active-workstreams.md`.
+
+---
+
 # Sovereign — Intelligence & Commercial Copilot: Execution Plan v2
 
-**Date**: March 8, 2026
-**Author**: Principal Product Architect + Technical Lead
-**Status**: P1 COMPLETE — P2 next
+**Date**: March 8, 2026  
+**Author**: Principal Product Architect + Technical Lead  
+**Status (original doc)**: P1 COMPLETE — P2 next *(see status table above for repo alignment)*  
 **Revision**: v2 — Restructured for shortest credible path to CEO demo
 
 ---
@@ -336,7 +354,7 @@ These are ordered by priority within the hardening track, not by dependency on t
 
 **Why deferred**: These are security and data integrity issues. They are tolerable during demo/pilot with a small trusted user group. They become critical before opening access to a wider team or before any production deployment with real client data.
 
-**When to do it**: Before production deployment (Phase 4 in the original ROADMAP.md). Non-negotiable before real multi-tenant usage.
+**When to do it**: Before production deployment with real multi-tenant / client data (see also [phased delivery history](./phased-delivery-history.md) Phase 4 notes). Non-negotiable before widening access.
 
 ---
 
@@ -467,7 +485,7 @@ This makes the next planning conversation after the CEO demo straightforward: pi
 ### How to Continue — P2: Entity Resolution & Relationship Fix
 
 **Read these files first** (they are the working context for P2):
-- `HANDOVER.md` — full system context, architecture, constraints
+- [`HANDOVER.md`](../../HANDOVER.md) — full system context, architecture, constraints
 - `src/lib/ai/pipeline.ts` — the orchestrator that calls extraction → resolution → persistence
 - `src/lib/ai/entity-resolution.ts` — current resolution logic (aliases, normalization, matching)
 - `src/lib/ai/persistence.ts` — where entities, relationships, and mentions are written to Supabase
@@ -479,7 +497,7 @@ This makes the next planning conversation after the CEO demo straightforward: pi
 3. Deduplicate entities at extraction time: merge entities with the same normalized name before resolution.
 4. Protect entity descriptions from regression: never overwrite a description with one that has fewer factual keywords (title, CEO, Minister, Director, headquartered, founded, etc.).
 
-**Critical architectural constraint**: The app uses a Supabase admin client pattern — writes go through `createAdminClient()` to bypass RLS. Auth uses `token_hash` flow. See `HANDOVER.md` for details.
+**Critical architectural constraint**: The app uses a Supabase admin client pattern — writes go through `createAdminClient()` to bypass RLS. Auth uses `token_hash` flow. See [`HANDOVER.md`](../../HANDOVER.md) for details.
 
 **Execution protocol**: Work phase by phase, break each phase into sub-steps. After each sub-step: stop, explain what changed, explain how to test, wait for user feedback. The user speaks Spanish sometimes. Robustness > speed.
 

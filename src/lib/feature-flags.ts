@@ -2,7 +2,7 @@
  * Product / demo UI toggles.
  *
  * These flags do not change ingestion, RAG, or generation logic — only what
- * the dashboard shows. See docs/features/interview-ui-visibility.md.
+ * the dashboard shows. See docs/features/done/interview-ui-visibility.md.
  */
 export const FEATURE_FLAGS = {
   /**

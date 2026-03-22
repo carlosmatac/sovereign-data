@@ -275,3 +275,13 @@ Assistant message bodies are rendered with **`IntelligenceBriefMarkdown`** (`src
 | AI config constants | `src/lib/constants.ts` |
 | Hybrid search SQL | `supabase/migrations/00001_initial_schema.sql` |
 | Entity trigram index | `supabase/migrations/00009_entity_normalization.sql` |
+
+---
+
+## See also
+
+- [Ingestion pipeline](./ingestion-pipeline.md) — where chunks and entities originate  
+- [Database schema](../infrastructure/database-schema.md)  
+- [Intelligence commercial copilot roadmap](../roadmaps/intelligence-commercial-copilot.md) — *planning* for retrieval/evidence upgrades (align with code before execution)  
+- [Active workstreams](../roadmaps/active-workstreams.md) — current team priorities  
+- [HANDOVER.md](../../HANDOVER.md) — gotchas (AI SDK v6, similarity threshold, etc.)  

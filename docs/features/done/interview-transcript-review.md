@@ -1,3 +1,15 @@
+---
+title: Interview Transcript Review & Reviewed Reprocessing
+status: done
+owner: team
+priority: high
+last_updated: 2026-03-21
+related_architecture:
+  - docs/architecture/ingestion-pipeline.md
+related_infrastructure:
+  - docs/infrastructure/database-schema.md
+---
+
 # Interview Transcript Review & Reviewed Reprocessing
 
 > Human-corrected transcripts and structured seed entities drive a second, authoritative ingestion pass — without erasing immutable ASR output.

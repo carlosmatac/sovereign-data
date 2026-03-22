@@ -1,3 +1,15 @@
+---
+title: Report Generation & PDF Export
+status: done
+owner: team
+priority: medium
+last_updated: 2026-03-21
+related_architecture:
+  - docs/architecture/agentic-rag.md
+related_infrastructure:
+  - docs/infrastructure/database-schema.md
+---
+
 # Report Generation & PDF Export
 
 > GPT-4o streaming reports with professional PDF export and password-protected sharing

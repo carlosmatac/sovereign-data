@@ -83,7 +83,7 @@ export default async function InterviewDetailPage({
     .select("*")
     .eq("interview_id", id);
 
-  // Marketing snippets (optional UI — see FEATURE_FLAGS + docs/features/interview-ui-visibility.md)
+  // Marketing snippets (optional UI — see FEATURE_FLAGS + docs/features/done/interview-ui-visibility.md)
   const { data: snippets } = FEATURE_FLAGS.interviewMarketingAssetsUi
     ? await supabase
         .from("content_snippets")
