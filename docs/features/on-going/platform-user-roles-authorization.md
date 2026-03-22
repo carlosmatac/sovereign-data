@@ -1,7 +1,7 @@
 ---
 title: "Platform user roles & authorization layer"
-status: to-do
-owner: team
+status: on-going
+owner: carlos mata
 priority: high
 last_updated: 2026-03-22
 related_architecture: []
@@ -29,7 +29,7 @@ Without this, features such as an **admin entity governance** UI either ship as 
 - **Default for all new and existing users:** the **standard / non-admin** role only, until explicitly promoted.
 - **Clear naming** that does not collide with SQL/RLS vocabulary or existing **`user_role`** on `project_members`.
 - **Documented** map of which **areas and actions** are restricted by platform role (MVP list + placeholders for growth).
-- Implementation later must respect sacred patterns from [`HANDOVER.md`](../../../HANDOVER.md): **admin client after `getUser()`**, **`token_hash` auth**, **SECURITY DEFINER RLS helpers** (this spec does not prescribe replacing them).
+- Implementation respects sacred patterns from [`HANDOVER.md`](../../../HANDOVER.md): **admin client after `getUser()`**, **`token_hash` auth**, **SECURITY DEFINER RLS helpers** (not replaced).
 
 ## Non-goals (this feature doc / initial delivery)
 
@@ -73,56 +73,65 @@ Future extensions (not MVP): e.g. `billing_admin`, `support`, read-only auditor,
 
 ## Areas / actions to restrict by platform role (MVP map)
 
-Documented here as **product intent**; exact enforcement (RLS, route guards, server actions) comes at implementation time.
+**Implemented (initial):**
+
+- **`/admin`**: `layout.tsx` allows content only if the user has `platform_admin`; otherwise an access-restricted message (project owners are **not** auto-granted).
+- **Sidebar**: “Platform admin” link only when `platform_admin` is present.
+- **DB**: `user_platform_roles` with RLS **SELECT** own rows; no user-facing INSERT/UPDATE (promotion via service role / SQL).
+
+**Still to wire (as other features land):**
+
+- Admin entity governance dashboard mutations should call `requirePlatformAdminUser` (or equivalent) and use the **admin client** pattern for writes per [`HANDOVER.md`](../../../HANDOVER.md).
 
 **Likely `member`-only (no `platform_admin` required)** — unchanged from today, still gated by **project** role where applicable:
 
 - Dashboard, interviews, chat, network explorer, reports, transcript review, **Entity Editor** on interview pages (editor/owner on that project per current behavior).
 
-**Likely `platform_admin`-only (new or tightened)**:
+**Likely `platform_admin`-only (new or tightened)**
 
-- **Admin entity governance dashboard** (see [`admin-entity-governance-dashboard.md`](./admin-entity-governance-dashboard.md)): search/list entities across the knowledge base, edit canonical fields outside the normal interview-scoped UX, and other governance actions defined there.
+- **Admin entity governance dashboard** (see [`admin-entity-governance-dashboard.md`](../to-do/admin-entity-governance-dashboard.md)).
 - Any future **global config**, **impersonation**, **bulk data repair**, or **cross-project merge** tools should default to this tier unless given their own role.
-
-**Explicitly not decided in this doc (open at implementation):**
-
-- Whether `platform_admin` bypasses project RLS for reads/writes or must still be a member of a project for some tables — product/security choice; likely “admin tools use **service role + explicit checks**” per existing admin client pattern rather than weakening RLS for all users.
 
 ## Approach (strategy)
 
-1. **Model** platform roles in the database (e.g. join table `user_platform_roles` or array/column on `profiles`) and/or propagate a **claim** to the session if we adopt JWT custom claims — **tradeoffs** to be decided in `on-going` (source of truth should be single and auditable).
-2. **Server-side enforcement** for every sensitive mutation: after `getUser()`, verify platform role, then use established **service role** patterns where `auth.uid()` is null in PostgREST.
-3. **UI**: hide admin navigation entries unless the user has `platform_admin`; server remains the authority.
-4. **Tests / validation**: matrix of “member vs platform_admin” × critical routes.
+1. **Model** platform roles in the database — **implemented:** `platform_role` enum + `user_platform_roles` (unique `(user_id, role)`); source of truth is the DB (not JWT claims for MVP).
+2. **Server-side enforcement** for sensitive mutations: after `getUser()`, verify platform role; use **service role** where required for admin tools.
+3. **UI**: hide admin navigation unless `platform_admin`; server remains the authority.
+4. **Tests / validation**: matrix of “member vs platform_admin” × critical routes — optional follow-up.
 
-## User experience (optional)
+## Technical notes (shipped)
 
-- No dedicated “role management” UI in MVP unless trivial (e.g. internal-only page). Users see no difference except absence/presence of **Admin** entry points.
-- Copy should say **“Platform admin”** or **“Administrator”** in UI, not “sysadmin.”
+- **Migration:** `supabase/migrations/00016_platform_user_roles.sql` — enum, table, RLS, `handle_new_user` assigns `member`, backfill for existing `profiles`.
+- **Helper:** `public.is_platform_admin()` SECURITY DEFINER (for future RLS / RPC; app currently reads roles via `user_platform_roles` with session client).
+- **App:** `src/lib/auth/platform-roles.ts` — `fetchPlatformRolesForUser`, `hasPlatformAdminRole`, `requirePlatformAdminUser`.
+- **Types:** `PlatformRole`, table `user_platform_roles` in `src/types/database.ts`.
 
-## Technical notes (optional, non-binding)
+### Promote a user to `platform_admin` (operators)
 
-- **Naming collision:** PostgreSQL enum `user_role` already means project member role — platform roles should use a **different enum/type name** (e.g. `platform_role`).
-- **Multi-role:** schema should allow multiple rows or an array; MVP product behavior might treat “has any `platform_admin`” as admin.
-- Link for schema context: [`database-schema.md`](../../infrastructure/database-schema.md) (`profiles`, `project_members`, `entities`).
+Use the **service role** or Supabase SQL editor (not the anon key):
+
+```sql
+INSERT INTO user_platform_roles (user_id, role)
+VALUES ('<profile uuid>', 'platform_admin')
+ON CONFLICT (user_id, role) DO NOTHING;
+```
 
 ## Dependencies & related docs
 
-- **Blocks (conceptually)** clean gating of [`admin-entity-governance-dashboard.md`](./admin-entity-governance-dashboard.md) — that feature should assume **`platform_admin`** (or successor) exists.
-- Related shipped behavior: [`../done/human-in-the-loop.md`](../done/human-in-the-loop.md) (Entity Editor — project-scoped, not a substitute for this).
+- **Blocks (conceptually)** clean gating of [`admin-entity-governance-dashboard.md`](../to-do/admin-entity-governance-dashboard.md).
+- Related shipped behavior: [`../done/human-in-the-loop.md`](../done/human-in-the-loop.md) (Entity Editor — project-scoped).
 
 ## Risks & open questions
 
-- **Source of truth:** DB-only vs JWT claims — consistency and revocation when roles change.
-- **Overlap with project owner:** CEOs may expect “owner = god mode”; product must clarify **project power ≠ platform power**.
-- **Global vs project-scoped entities:** `entities.project_id` nullable — admin tools need clear rules for **global** rows.
+- **JWT claims:** not used in MVP; role changes are effective on next request when reading from DB.
+- **Overlap with project owner:** UI copy on `/admin` denial states project ownership does not grant platform admin.
 
-## Acceptance / how to validate (for implementation phase)
+## Acceptance / how to validate
 
 - New user receives **only** default (`member`) platform role.
-- User promoted to `platform_admin` can reach admin-only surfaces; `member` cannot (API returns 403 / consistent denial).
-- No regression to magic-link auth or RLS helper patterns without an explicit architecture review.
+- User with `platform_admin` can open `/admin` and see the sidebar link; `member` cannot (denial page, no nav link).
+- Magic-link auth and existing RLS helpers unchanged.
 
-## Implementation log (optional)
+## Implementation log
 
-- _Empty until work moves to `on-going/`._
+- **2026-03-22:** Migration `00016_platform_user_roles.sql`; app helpers; dashboard layout + sidebar gating; `/admin` placeholder layout + page; types updated; `database-schema.md` updated.

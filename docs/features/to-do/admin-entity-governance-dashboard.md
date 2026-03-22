@@ -1,7 +1,7 @@
 ---
 title: "Admin entity governance dashboard"
 status: to-do
-owner: team
+owner: carlos mata
 priority: high
 last_updated: 2026-03-22
 related_architecture:
@@ -23,7 +23,7 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 ## Goals
 
 - Provide a **dedicated admin experience** to **find** and **update** canonical entity records (and closely related data where safe) when business reality changes.
-- **Strong access control:** only **platform-level administrators** (see [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md)) can use this panel.
+- **Strong access control:** only **platform-level administrators** (see [`platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md)) can use this panel.
 - **Predictable MVP scope:** clear list of **what is editable** vs **explicitly out of scope** for v1.
 - **Alignment with existing architecture:** mutations continue to follow **`getUser()` verification + service role / admin client** patterns; no casual weakening of RLS for normal users ([`HANDOVER.md`](../../../HANDOVER.md)).
 
@@ -36,7 +36,7 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 
 ## Who can access
 
-- Users with the **`platform_admin`** platform role (name per [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md)).
+- Users with the **`platform_admin`** platform role (name per [`platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md)).
 - **Not** granted by `project_members.role` alone (a project **owner** is not automatically a platform admin unless also promoted at platform level).
 
 ## What admins can do (product intent)
@@ -66,7 +66,7 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 
 ## Approach (strategy)
 
-1. **Ship after** (or in tight parallel with) **platform roles** so the route and APIs are not guesswork ([`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md)).
+1. **Ship after** (or in tight parallel with) **platform roles** so the route and APIs are not guesswork ([`platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md)).
 2. **New admin section** in the app (e.g. `/admin/entities` — exact path TBD) with server-side checks on every loader/action.
 3. **Service role writes** only through validated server actions or route handlers, with explicit field allowlists for MVP.
 4. **Auditability (stretch for MVP):** log actor, entity id, before/after for edits; if omitted in v1, document as known gap.
@@ -84,7 +84,7 @@ We need an **admin governance tool** framed as **knowledge-base stewardship**, *
 
 ## Dependencies & related docs
 
-- **Depends on:** [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md) for gating.
+- **Depends on:** [`platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md) for gating.
 - **Related shipped:** [`../done/human-in-the-loop.md`](../done/human-in-the-loop.md) (interview-scoped entity corrections).
 - **Related:** [`../done/interview-transcript-review.md`](../done/interview-transcript-review.md) when source text, not just canonical records, must change.
 

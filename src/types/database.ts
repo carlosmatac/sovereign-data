@@ -23,6 +23,9 @@ export type EntityType =
 
 export type UserRole = "owner" | "editor" | "viewer";
 
+/** Platform-wide role (distinct from `project_members.role`). */
+export type PlatformRole = "member" | "platform_admin";
+
 export type RelationType =
   | "business_partner"
   | "competitor"
@@ -852,9 +855,42 @@ export interface Database {
           },
         ];
       };
+      user_platform_roles: {
+        Row: {
+          id: string;
+          user_id: string;
+          role: PlatformRole;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          role: PlatformRole;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          role?: PlatformRole;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_platform_roles_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
+      is_platform_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       hybrid_search: {
         Args: {
           query_embedding: string;
@@ -899,6 +935,7 @@ export interface Database {
       transcript_review_status: TranscriptReviewStatus;
       position_state: PositionState;
       date_precision: DatePrecision;
+      platform_role: PlatformRole;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -926,3 +963,4 @@ export type ContentSnippet = Tables<"content_snippets">;
 export type Report = Tables<"reports">;
 export type InterviewReviewEntity = Tables<"interview_review_entities">;
 export type ValidatedPosition = Tables<"validated_positions">;
+export type UserPlatformRole = Tables<"user_platform_roles">;

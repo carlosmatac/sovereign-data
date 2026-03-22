@@ -2,7 +2,7 @@
 
 > Multi-tenant PostgreSQL with pgvector, RLS, and Knowledge Graph
 
-This document details Sovereign's database design: multi-tenant isolation via `project_id`, Row Level Security with SECURITY DEFINER helpers, and the entity/alias canonical merge system. **Table count**: 10 core tables in migrations `00001`–`00012`; **Phase 3.6** adds `interview_review_entities` and interview review columns (migration `00013_interview_transcript_review.sql`).
+This document details Sovereign's database design: multi-tenant isolation via `project_id`, Row Level Security with SECURITY DEFINER helpers, and the entity/alias canonical merge system. **Table count**: 10 core tables in migrations `00001`–`00012`; **Phase 3.6** adds `interview_review_entities` and interview review columns (migration `00013_interview_transcript_review.sql`). **`user_platform_roles`** (platform-level roles, distinct from `project_members.role`) is added in `00016_platform_user_roles.sql`.
 
 ---
 
@@ -25,6 +25,7 @@ Defined in `supabase/migrations/00001_initial_schema.sql`:
 ```mermaid
 erDiagram
     profiles ||--o{ project_members : "user_id"
+    profiles ||--o{ user_platform_roles : "user_id"
     projects ||--o{ project_members : "project_id"
     projects ||--o{ interviews : "project_id"
     projects ||--o{ reports : "project_id"
@@ -95,6 +96,27 @@ Many-to-many join between users and projects, with role-based access.
 **Trigger**: `claim_pending_invites()` — when a new profile is created, any pending invites matching the email are claimed (sets `user_id`, clears `invited_email`).
 
 **Migrations**: `00001`, `00005`
+
+### `user_platform_roles`
+
+Platform-wide roles for authenticated users (**not** the same as `project_members.role` / `user_role`).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` | PK |
+| `user_id` | `UUID` | FK → `profiles`, CASCADE delete |
+| `role` | `platform_role` | `member` (default) or `platform_admin` |
+| `created_at` | `TIMESTAMPTZ` | |
+
+**Unique**: `(user_id, role)` — a user may hold multiple roles (e.g. `member` + `platform_admin`).
+
+**RLS**: `SELECT` allowed for `auth.uid() = user_id`. No `INSERT`/`UPDATE`/`DELETE` for the `authenticated` role; promotions use the service role or SQL as an operator.
+
+**Triggers**: `handle_new_user()` (on `auth.users` insert) inserts a `member` row alongside the new `profiles` row. Existing profiles are backfilled with `member` in migration `00016`.
+
+**Helper**: `is_platform_admin()` — `SECURITY DEFINER`, returns true if the current user has a `platform_admin` row (for future RLS / RPC; see migration `00016`).
+
+**Migration**: `00016`
 
 ### `interviews`
 
@@ -342,9 +364,10 @@ flowchart TD
 ### Access Control Flow
 
 1. User authenticates via Supabase Auth (Magic Link / token_hash).
-2. `project_members` defines which projects a user can access, and with what role.
-3. RLS policies on every table check membership via SECURITY DEFINER helper functions.
-4. Write operations use the admin client pattern: verify user server-side with `getUser()`, then use the service role client for mutations.
+2. `project_members` defines which projects a user can access, and with what role (`owner` / `editor` / `viewer`).
+3. `user_platform_roles` defines **platform-wide** capabilities (`member`, `platform_admin`) — orthogonal to project roles.
+4. RLS policies on tenant tables check membership via SECURITY DEFINER helper functions (`is_project_member`, etc.).
+5. Write operations use the admin client pattern: verify user server-side with `getUser()`, then use the service role client for mutations.
 
 ---
 
@@ -398,11 +421,18 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 | `is_project_editor` | `(p_project_id UUID) → BOOLEAN` | User is editor or owner |
 | `get_interview_project` | `(p_interview_id UUID) → UUID` | Returns the project_id for an interview |
 
+Added in `00016_platform_user_roles.sql`:
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `is_platform_admin` | `() → BOOLEAN` | Current user has `platform_admin` in `user_platform_roles` |
+
 ### Policies by Table
 
 | Table | SELECT | INSERT | UPDATE | DELETE |
 |-------|--------|--------|--------|--------|
 | `profiles` | Own profile | — | Own profile | — |
+| `user_platform_roles` | Own rows | — | — | — |
 | `projects` | Member | Authenticated | Owner | Owner |
 | `project_members` | Member | Owner | Owner | Owner |
 | `interviews` | Member | Editor | Editor | — |
@@ -421,13 +451,14 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 
 ---
 
-## Enums (12 Total)
+## Enums (13 Total)
 
 | Enum | Values | Migration |
 |------|--------|-----------|
 | `interview_status` | `PROCESSING`, `TRANSCRIBING`, `EXTRACTING`, `EMBEDDING`, `COMPLETED`, `FAILED` | `00001` |
 | `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` | `00001` |
 | `user_role` | `owner`, `editor`, `viewer` | `00001` |
+| `platform_role` | `member`, `platform_admin` | `00016` |
 | `relation_type` | `business_partner`, `competitor`, `regulator`, `critic`, `ally`, `subsidiary`, `investor`, `advisor`, `supplier`, `acquirer` | `00004` |
 | `source_type` | `audio`, `pdf`, `text` | `00004` |
 | `snippet_platform` | `linkedin`, `twitter`, `newsletter`, `summary` | `00004` |
@@ -456,6 +487,9 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 | `00011_transcript_display.sql` | `interviews.transcript_display` |
 | `00012_interview_scoped_search.sql` | Interview-scoped search RPC (if present in repo) |
 | `00013_interview_transcript_review.sql` | `reviewed_utterances`, `transcript_review_status`, `last_intel_source` on `interviews`; `interview_review_entities` + RLS |
+| `00014_interview_source_utterances.sql` | `interviews.source_utterances` |
+| `00015_interview_anchor_entity_ids.sql` | Anchor entity FK columns on `interviews` |
+| `00016_platform_user_roles.sql` | `platform_role` enum, `user_platform_roles`, RLS, `is_platform_admin()`, `handle_new_user` assigns `member`, backfill |
 
 ---
 

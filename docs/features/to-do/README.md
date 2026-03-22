@@ -14,5 +14,6 @@ See [`../README.md`](../README.md) for the full lifecycle.
 
 | Doc | Summary |
 |-----|--------|
-| [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md) | Platform-level roles (`member` default, `platform_admin` elevated); naming rationale; MVP enforcement map. |
 | [`admin-entity-governance-dashboard.md`](./admin-entity-governance-dashboard.md) | Admin KB governance UI for canonical entities; MVP edit scope; gated by `platform_admin`. |
+
+Platform roles (in progress): [`../on-going/platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md).

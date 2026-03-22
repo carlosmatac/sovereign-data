@@ -30,6 +30,7 @@ import {
   MessageSquare,
   Network,
   Settings,
+  Shield,
   LogOut,
   ChevronUp,
 } from "lucide-react";
@@ -80,9 +81,14 @@ interface AppSidebarProps {
     email?: string;
     name?: string;
   };
+  /** Platform administrator — sees governance / admin navigation. */
+  isPlatformAdmin?: boolean;
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({
+  user,
+  isPlatformAdmin = false,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { state, isMobile } = useSidebar();
@@ -167,6 +173,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isPlatformAdmin ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith("/admin")}
+                    tooltip="Platform admin"
+                  >
+                    <Link href="/admin">
+                      <Shield className="h-4 w-4" />
+                      <span>Platform admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
