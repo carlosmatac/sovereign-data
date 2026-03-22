@@ -62,7 +62,8 @@ npm run dev
 | **[`HANDOVER.md`](./HANDOVER.md)** | Operational continuity, gotchas, env list, sacred architecture patterns |
 | **[`SETUP.md`](./SETUP.md)** | Local onboarding and machine setup |
 | **[`docs/roadmaps/active-workstreams.md`](./docs/roadmaps/active-workstreams.md)** | **Short** execution snapshot (points at feature lifecycle dirs) |
-| **[`docs/features/README.md`](./docs/features/README.md)** | Feature specs: `to-do` / `on-going` / `done` + workflow |
+| **[`docs/features/README.md`](./docs/features/README.md)** | Feature lifecycle (`to-do` / `on-going` / `done`) |
+| **[`docs/features/feature-spec-template.md`](./docs/features/feature-spec-template.md)** | Default structure for new feature specs |
 | **[`ROADMAP.md`](./ROADMAP.md)** | Pointer only — links legacy and planning roadmaps (not operative truth) |
 | **[`docs/README.md`](./docs/README.md)** | Index of everything under `docs/` |
 

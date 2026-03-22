@@ -47,7 +47,8 @@ Technical documentation for **Sovereign Data**. The repository entrypoint is [`R
 
 | Path | Description |
 |------|-------------|
-| [features/README.md](./features/README.md) | Lifecycle rules + frontmatter template |
+| [features/README.md](./features/README.md) | Lifecycle rules |
+| [features/feature-spec-template.md](./features/feature-spec-template.md) | **Flexible spec template** (Problem, Approach, Acceptance, …) |
 | [features/to-do/](./features/to-do/) | Parked / not started |
 | [features/on-going/](./features/on-going/) | Active implementation |
 | [features/done/](./features/done/) | Shipped — see [done/README.md](./features/done/README.md) |

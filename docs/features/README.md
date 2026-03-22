@@ -14,31 +14,19 @@ Meaningful product work is tracked as **markdown specs** under `docs/features/`,
 
 ---
 
-## Standard feature doc header
+## Feature spec template
 
-Every feature spec MUST start with YAML frontmatter (copy and adjust):
+**New or updated specs** should follow **[`feature-spec-template.md`](./feature-spec-template.md)** — flexible sections (Problem, Goals, Approach, Acceptance, …) plus YAML frontmatter. Copy that file into `to-do/` or `on-going/`, rename, remove the callout, unwrap frontmatter (see template instructions), and fill in.
 
-```yaml
----
-title: Short feature name
-status: to-do | on-going | done   # mirror folder; update when you move the file
-owner: team                        # or named owner
-priority: low | medium | high
-last_updated: YYYY-MM-DD
-related_architecture:
-  - docs/architecture/ingestion-pipeline.md
-related_infrastructure:
-  - docs/infrastructure/database-schema.md
----
-```
+**Cursor agents:** if asked to **write a feature document**, use [`feature-spec-template.md`](./feature-spec-template.md) as the default structure unless the human specifies otherwise.
 
-Then the narrative body (goals, scope, UX, APIs, migration notes). **One doc = one feature.** Link to architecture/infra docs instead of pasting duplicate pipeline explanations.
+**One doc = one feature.** Link to architecture/infra docs instead of pasting duplicate pipeline explanations.
 
 ---
 
 ## Human + Cursor workflow
 
-1. **Author** a short spec in `to-do/` (or move an idea from chat into a new `.md` file there).  
+1. **Author** a spec in `to-do/` by copying [`feature-spec-template.md`](./feature-spec-template.md) (or move an idea from chat into a new file using that structure).  
 2. **Update** [`HANDOVER.md`](../../HANDOVER.md) only if continuity or gotchas change — not for full feature prose (link the feature doc instead).  
 3. **Start work:** move the file to `on-going/` and set `status: on-going` in frontmatter.  
 4. **Brief the agent** with: [`AGENTS.md`](../../AGENTS.md) → `HANDOVER.md` → this feature doc → narrow `docs/architecture` / `docs/infrastructure` files.  

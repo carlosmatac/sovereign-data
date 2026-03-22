@@ -26,6 +26,7 @@ Do **not** treat **`docs/roadmaps/phased-delivery-history.md`** or **`docs/roadm
 | **Execution snapshot** (short) | [`docs/roadmaps/active-workstreams.md`](./docs/roadmaps/active-workstreams.md) |
 | **Per-feature spec** (how/what for that feature) | [`docs/features/on-going/`](./docs/features/on-going/) or [`to-do/`](./docs/features/to-do/) while building; [`done/`](./docs/features/done/) when shipped |
 | Feature lifecycle rules | [`docs/features/README.md`](./docs/features/README.md) |
+| **Feature spec template** | [`docs/features/feature-spec-template.md`](./docs/features/feature-spec-template.md) |
 | Agent workflow | **`AGENTS.md`** (this file) |
 | System design (pipelines, chat, schema) | `docs/architecture/*`, `docs/infrastructure/*` |
 | Historical phased delivery | [`phased-delivery-history.md`](./docs/roadmaps/phased-delivery-history.md) *(legacy)* |
@@ -97,6 +98,8 @@ Agents follow **explicit user instructions**; do not insist on branch-per-task.
 ```
 Read AGENTS.md, HANDOVER.md, docs/roadmaps/active-workstreams.md.
 Then read the feature spec I point to under docs/features/on-going/ or to-do/.
+If I ask you to write a new feature spec, structure it from docs/features/feature-spec-template.md.
+
 For system design, read only the linked docs/architecture or docs/infrastructure files.
 
 Update the feature doc and relevant docs as you implement. Do not leave docs behind the code.

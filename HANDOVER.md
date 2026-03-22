@@ -136,6 +136,7 @@ Copy-paste this to bootstrap a new AI agent:
 ```
 Read AGENTS.md, then HANDOVER.md, then docs/roadmaps/active-workstreams.md.
 If I give you a feature spec, read docs/features/on-going/<file>.md or to-do/<file>.md next.
+If I ask you to create a new feature spec, use docs/features/feature-spec-template.md as the structure.
 
 For deep technical details, read only what your task needs, e.g.:
 
