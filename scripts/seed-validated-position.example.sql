@@ -1,0 +1,28 @@
+-- Example: insert one validated position after migration 00017.
+-- Replace :person_id and :org_id with real UUIDs from your `entities` table
+-- (PERSON and COMPANY/ORGANIZATION/GOVERNMENT respectively).
+--
+--   SELECT id, name, type FROM entities WHERE type = 'PERSON' LIMIT 5;
+--   SELECT id, name, type FROM entities WHERE type IN ('COMPANY','ORGANIZATION') LIMIT 5;
+--
+-- INSERT INTO validated_positions (
+--   person_entity_id,
+--   organization_entity_id,
+--   title,
+--   is_main,
+--   state,
+--   valid_from_date,
+--   valid_from_precision,
+--   valid_to_date,
+--   valid_to_precision
+-- ) VALUES (
+--   '00000000-0000-0000-0000-000000000001',
+--   '00000000-0000-0000-0000-000000000002',
+--   'Chief Executive Officer',
+--   true,
+--   'active',
+--   '2024-01-15',
+--   'exact',
+--   NULL,
+--   'unknown'
+-- );

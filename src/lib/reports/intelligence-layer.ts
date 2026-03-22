@@ -47,6 +47,7 @@ export interface ReportInterviewRecord {
   } | null;
   intervieweeName: string | null;
   intervieweeOrg: string | null;
+  intervieweeTitle: string | null;
 }
 
 export interface ReportEvidenceRecord {
@@ -172,7 +173,7 @@ export async function buildReportIntelligenceLayer(args: {
       admin
         .from("interviews")
         .select(
-          "id, title, summary, topics, sentiment, interviewee_name, interviewee_org, projects(country)"
+          "id, title, summary, topics, sentiment, interviewee_name, interviewee_org, interviewee_title, projects(country)"
         )
         .in("id", interviewIds)
         .eq("project_id", projectId)
@@ -211,6 +212,7 @@ export async function buildReportIntelligenceLayer(args: {
       sentiment: row.sentiment as { overall?: string; score?: number } | null,
       intervieweeName: row.interviewee_name,
       intervieweeOrg: row.interviewee_org,
+      intervieweeTitle: row.interviewee_title,
     };
   });
 
@@ -333,7 +335,7 @@ async function synthesizeIntelligence(args: {
           `- Country: ${interview.country ?? "Unknown"}`,
           `- Topics: ${interview.topics.join(", ") || "None tagged"}`,
           `- Sentiment: ${interview.sentiment?.overall ?? "Unknown"} (${String(interview.sentiment?.score ?? "n/a")})`,
-          `- Primary anchors: ${[interview.intervieweeName, interview.intervieweeOrg].filter(Boolean).join(" | ") || "None"}`,
+          `- Primary anchors: ${[interview.intervieweeName, interview.intervieweeOrg, interview.intervieweeTitle].filter(Boolean).join(" | ") || "None"}`,
           `- Summary: ${interview.summary ?? "No interview summary stored."}`,
         ].join("\n")
     )

@@ -19,7 +19,7 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 ## Right now
 
-- **In progress:** *(none listed — add a one-line pointer to a file in `on-going/` when applicable, e.g. “See `on-going/foo.md`”.)*
+- **In progress:** *(none listed — add a one-line pointer to a file in `on-going/` when applicable.)*
 
 ---
 

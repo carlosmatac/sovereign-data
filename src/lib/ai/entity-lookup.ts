@@ -26,6 +26,7 @@ export interface MentionRecord {
   interview_title: string;
   sentiment: string | null;
   chunk_content: string | null;
+  interview_time_ms: number | null;
 }
 
 /**
@@ -99,7 +100,8 @@ export async function findEntity(
 export async function getRelationships(
   admin: AdminClient,
   entityId: string,
-  projectId?: string | null
+  projectId?: string | null,
+  options?: { sortByInterviewRecency?: boolean }
 ): Promise<RelationshipEdge[]> {
   const edges: RelationshipEdge[] = [];
 
@@ -145,6 +147,7 @@ export async function getRelationships(
   }
 
   // Optional: filter by project if projectId provided
+  let filtered = edges;
   if (projectId && edges.length > 0) {
     const interviewIds = [...new Set(edges.map((e) => e.interview_id))];
     const { data: interviews } = await admin
@@ -153,10 +156,29 @@ export async function getRelationships(
       .in("id", interviewIds)
       .eq("project_id", projectId);
     const validIds = new Set((interviews ?? []).map((i) => i.id));
-    return edges.filter((e) => validIds.has(e.interview_id));
+    filtered = edges.filter((e) => validIds.has(e.interview_id));
   }
 
-  return edges;
+  if (options?.sortByInterviewRecency && filtered.length > 0) {
+    const interviewIds = [...new Set(filtered.map((e) => e.interview_id))];
+    const { data: meta } = await admin
+      .from("interviews")
+      .select("id, conducted_at, created_at")
+      .in("id", interviewIds);
+    const timeByInterview = new Map<string, number>();
+    for (const row of meta ?? []) {
+      const raw = row.conducted_at ?? row.created_at;
+      const ms = raw ? Date.parse(raw) : 0;
+      timeByInterview.set(row.id, Number.isNaN(ms) ? 0 : ms);
+    }
+    filtered = [...filtered].sort(
+      (a, b) =>
+        (timeByInterview.get(b.interview_id) ?? 0) -
+        (timeByInterview.get(a.interview_id) ?? 0)
+    );
+  }
+
+  return filtered;
 }
 
 /**
@@ -165,14 +187,20 @@ export async function getRelationships(
 export async function getMentions(
   admin: AdminClient,
   entityId: string,
-  projectId?: string | null
+  projectId?: string | null,
+  options?: {
+    targetDateIso?: string | null;
+    prioritizeTemporalProximity?: boolean;
+  }
 ): Promise<MentionRecord[]> {
   const { data: mentions } = await admin
     .from("entity_mentions")
-    .select("interview_id, sentiment, chunk_id, interviews!entity_mentions_interview_id_fkey(title, project_id)")
+    .select(
+      "interview_id, sentiment, chunk_id, interviews!entity_mentions_interview_id_fkey(title, project_id, conducted_at, created_at)"
+    )
     .eq("entity_id", entityId)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(60);
   if (!mentions || mentions.length === 0) return [];
 
   const results: MentionRecord[] = [];
@@ -192,20 +220,51 @@ export async function getMentions(
     }
   }
 
+  const targetMs =
+    options?.targetDateIso &&
+    options.prioritizeTemporalProximity &&
+    /^\d{4}-\d{2}-\d{2}$/.test(options.targetDateIso)
+      ? Date.parse(`${options.targetDateIso}T12:00:00.000Z`)
+      : null;
+
   for (const m of mentions) {
-    const interview = unwrapBasicInterview(m.interviews);
+    const interview = unwrapInterviewWithDates(m.interviews);
     if (projectId && interview?.project_id && interview.project_id !== projectId) {
       continue;
     }
+    const timeRaw = interview?.conducted_at ?? interview?.created_at ?? null;
+    const interviewTimeMs = timeRaw ? Date.parse(timeRaw) : null;
     results.push({
       interview_id: m.interview_id,
       interview_title: interview?.title ?? "Unknown Interview",
       sentiment: m.sentiment,
       chunk_content: m.chunk_id ? (chunkMap.get(m.chunk_id) ?? null) : null,
+      interview_time_ms: interviewTimeMs !== null && !Number.isNaN(interviewTimeMs)
+        ? interviewTimeMs
+        : null,
     });
   }
 
-  return results;
+  if (targetMs !== null && !Number.isNaN(targetMs)) {
+    results.sort((a, b) => {
+      const da =
+        a.interview_time_ms !== null
+          ? Math.abs(a.interview_time_ms - targetMs)
+          : Number.POSITIVE_INFINITY;
+      const db =
+        b.interview_time_ms !== null
+          ? Math.abs(b.interview_time_ms - targetMs)
+          : Number.POSITIVE_INFINITY;
+      if (da !== db) return da - db;
+      return (b.interview_time_ms ?? 0) - (a.interview_time_ms ?? 0);
+    });
+  } else {
+    results.sort(
+      (a, b) => (b.interview_time_ms ?? 0) - (a.interview_time_ms ?? 0)
+    );
+  }
+
+  return results.slice(0, 30);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -271,8 +330,20 @@ function unwrapBasicEntity(value: unknown): BasicEntity | null {
   return value as BasicEntity;
 }
 
-function unwrapBasicInterview(value: unknown): { title: string; project_id?: string | null } | null {
+function unwrapInterviewWithDates(
+  value: unknown
+): {
+  title: string;
+  project_id?: string | null;
+  conducted_at?: string | null;
+  created_at?: string | null;
+} | null {
   if (!value) return null;
   if (Array.isArray(value)) return value[0] ?? null;
-  return value as { title: string; project_id?: string | null };
+  return value as {
+    title: string;
+    project_id?: string | null;
+    conducted_at?: string | null;
+    created_at?: string | null;
+  };
 }

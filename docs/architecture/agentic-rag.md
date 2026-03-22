@@ -12,19 +12,24 @@ This document details Sovereign's Intelligence Chat architecture: a multi-step A
 flowchart TD
     U[User Message] --> A[POST /api/chat]
     A --> B[Extract query text from AI SDK v6 parts]
-    B --> C[generateEmbeddings — OpenAI]
+    B --> TC[classifyChatTemporalIntent — GPT-4o-mini]
+    TC --> C[generateEmbeddings — OpenAI]
     C --> D[hybrid_search RPC — pgvector]
-    D --> E[Build context block + citations]
-    E --> F[Construct system prompt]
+    D --> DR[Rerank chunks by interview date when temporal]
+    DR --> E[Build context block + citations]
+    E --> VP[Prefetch validated_positions block]
+    VP --> F[Construct system prompt]
     F --> G[streamText — GPT-4o-mini]
 
     G --> H{Tool call needed?}
+    H -->|lookupPositions| P[validated_positions — global roles]
     H -->|lookupEntity| I[findEntity — exact + fuzzy]
     H -->|lookupRelationships| J[getRelationships — graph edges]
     H -->|lookupMentions| K[getMentions — interview context]
     H -->|webSearch| L[Tavily Search API]
     H -->|No| M[Final response]
 
+    P --> G
     I --> G
     J --> G
     K --> G
@@ -44,7 +49,11 @@ flowchart TD
 
 The route requires an authenticated user via Supabase `getUser()`. It parses `messages` and an optional `projectId` from the request body, then extracts the last user message text from the AI SDK v6 `parts` format.
 
-### 2. RAG Retrieval (Pre-Injection)
+### 2. Temporal classification (pre-RAG)
+
+`src/lib/ai/chat-temporal-classifier.ts` runs `generateObject` (GPT-4o-mini) on the latest user message to produce `temporal_intent` (`current_state` | `point_in_time` | `timeline` | `general_background`), `focus`, optional `person_name` / `organization_name`, and optional `target_date_iso`. That drives prefetch of `validated_positions`, chunk reranking by interview date, and mention ordering (recency + proximity to target date when applicable).
+
+### 3. RAG Retrieval (Pre-Injection)
 
 Before the LLM is invoked, the route always runs a vector similarity search:
 
@@ -69,11 +78,11 @@ queryText → generateEmbeddings([queryText]) → [queryEmbedding]
 
 **Why 0.25?** `text-embedding-3-small` returns cosine similarities in the 0.3–0.6 range for related content. The default 0.7 threshold from most tutorials would return zero results.
 
-### 3. Context Construction
+### 4. Context Construction
 
 Retrieved chunks are formatted into a numbered context block with speaker attribution and timestamps. A citations summary is built with interview URLs for source tracing.
 
-### 4. System Prompt
+### 5. System Prompt
 
 The system prompt is injected with every request and consists of four sections:
 
@@ -90,10 +99,48 @@ Five strict rules that prevent hallucination:
 5. **Second-Order Thinking** — 3-step lead generation cascade: Orbit (extract third-party entities) → Market Gap (deduce sectors from bottlenecks) → Ideal Target Profile (structured profile, never hallucinated company names).
 
 #### Tool Use Priority
-1. `lookupEntity` — use first when a query mentions a specific entity by name.
-2. `lookupRelationships` — follow up after finding an entity.
-3. `lookupMentions` — gather interview context for an entity.
-4. `webSearch` — last resort, only when internal data is insufficient.
+1. `lookupPositions` — validated global person–organization roles (current / as_of / timeline); strongest source for titles and reporting lines.
+2. `lookupEntity` — use when a query mentions a specific entity by name.
+3. `lookupRelationships` — graph edges (interview-sourced; ordered by recent interview when not `general_background`).
+4. `lookupMentions` — interview context; ordered by recency and, for point-in-time queries, proximity to `target_date_iso`.
+5. `webSearch` — last resort, only when internal data is insufficient.
+
+#### Validated positions (data layer)
+
+Table `validated_positions` (migration `00017_validated_positions.sql`): global rows linking `person_entity_id` → optional `organization_entity_id`, free-text `title`, `is_main` among `active` rows, `state`, date bounds with per-end `date_precision` (`exact` | `approximate` | `unknown`), and `validated_at` for internal freshness buckets. Populated outside this chat path (admin / SQL). Distinct titles for future admin UIs: `GET /api/positions/titles` or RPC `list_distinct_position_titles`.
+
+**Active row ordering (implementation):**
+
+| Query | Sort order |
+|-------|------------|
+| Current positions for a **person** | `is_main DESC`, then `validated_at DESC`. Postgres puts `true` before `false` on `is_main DESC`. If no row has `is_main = true`, ordering is by **most recent `validated_at` first**. |
+| **As-of** (after filter) | In memory: `is_main` true first, then `validated_at` descending. |
+| Active positions for an **organization** | `is_main DESC` only (no `validated_at` tie-break in code). |
+
+The system prompt tells the model to prefer **MAIN** among actives when several exist, matching list order.
+
+**Degradation signals (tool output + prompt):**
+
+| Case | Code behavior | Expected model behavior |
+|------|----------------|-------------------------|
+| `point_in_time` intent + `valid_from_precision` or `valid_to_precision` is **`unknown`** | `confidence_degraded: true` + `confidence_note` on that position | Treat historical placement as **approximate**, not a pinpoint date. |
+| Only **`approximate`** precision (no `unknown` on either end) | No `confidence_degraded` flag | Nuance using `valid_from` / `valid_to` precision fields in the tool JSON. |
+| **Unknown organization** (`organization_entity_id` null) | Prefetch line uses `(organization unknown)`; tool returns `organization_name: null` | Do not invent an employer; title may still be validated. |
+| **`freshness_bucket: old`** (≥12 calendar months since `validated_at`) | Always exposed in tool; prompt still treats validated rows as **authoritative vs transcripts** | Model *may* warn about staleness; code does **not** downgrade validated precedence automatically. |
+
+**Temporal classifier latency (per user turn):**
+
+- `classifyChatTemporalIntent` runs **one** `generateObject` (GPT-4o-mini) **before** embeddings and `hybrid_search`.
+- Settings: `timeout: 10_000` ms, `maxRetries: 1`, `maxOutputTokens: 256` (`src/lib/ai/chat-temporal-classifier.ts`).
+- Adds typical sub-second to a few seconds wall time; on failure/timeout → safe fallback (`general_background`), then the rest of the pipeline runs.
+
+**Manual QA — no validated row:**
+
+1. Use a **PERSON** with **no** `validated_positions` rows (or a question where prefetch returns empty).
+2. Ask about **current role / employer / leadership**.
+3. Expect **no** authoritative validated block for that fact; answers should use **interview-style attribution** (“mentioned as”, “referred to in an interview as”) per GROUNDING RULES §2 in `route.ts`, not as confirmed org-chart truth.
+
+Full narrative (Spanish) and checklist: [`docs/features/done/time-aware-validated-positions-rag.md`](../features/done/time-aware-validated-positions-rag.md) § “Comportamiento operativo”.
 
 #### Retrieved Context
 The pre-fetched `contextBlock` and `citationsSummary` are appended to the system prompt so the model has grounding data from the first token.
@@ -101,6 +148,14 @@ The pre-fetched `contextBlock` and `citationsSummary` are appended to the system
 ---
 
 ## Tool Definitions
+
+### `lookupPositions`
+
+**Purpose**: Return human-validated positions for a **PERSON** `entity_id` (from `lookupEntity`).
+
+**Implementation**: `src/lib/positions/query-validated-positions.ts` (modes: `current`, `as_of` + `YYYY-MM-DD`, `timeline`).
+
+**Returns**: Positions with `freshness_bucket`, per-end date + `precision`, and `confidence_degraded` + `confidence_note` only when the **chat turn** was classified as `point_in_time` **and** `valid_from_precision` or `valid_to_precision` is `unknown` (not merely `approximate`).
 
 ### `lookupEntity`
 
@@ -125,6 +180,7 @@ The pre-fetched `contextBlock` and `citationsSummary` are appended to the system
 
 - Queries `entity_relationships` for both outgoing (`source_entity_id`) and incoming (`target_entity_id`) edges.
 - Optional project filter via `interviews.project_id`.
+- Optional `sortByInterviewRecency` (chat enables when `temporal_intent !== general_background`).
 - Returns up to 30 edges per direction.
 
 **Returns per edge**: `{ direction, relation_type, other_entity (name + type), confidence, evidence_text, interview_id }`.
@@ -135,8 +191,9 @@ The pre-fetched `contextBlock` and `citationsSummary` are appended to the system
 
 **Implementation**: `src/lib/ai/entity-lookup.ts` → `getMentions()`
 
-- Queries `entity_mentions` joined with `interviews`.
+- Queries `entity_mentions` joined with `interviews` (`conducted_at`, `created_at`).
 - Batch-fetches chunk content from `interview_chunks`.
+- Optional reorder: recency and temporal proximity to classifier `target_date_iso` for point-in-time questions.
 - Returns up to 30 mentions.
 
 **Returns per mention**: `{ interview_title, interview_id, sentiment, chunk_content (first 500 chars) }`.
@@ -167,7 +224,7 @@ streamText({
   model: openai("gpt-4o-mini"),
   system: systemPrompt,
   messages,
-  tools: { lookupEntity, lookupRelationships, lookupMentions, webSearch },
+  tools: { lookupPositions, lookupEntity, lookupRelationships, lookupMentions, webSearch },
   stopWhen: stepCountIs(5),
   onFinish: logGroundingMetrics
 })

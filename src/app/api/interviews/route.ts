@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 import { parseExpectedSpeakers } from "@/lib/constants";
 import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
+import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 const MAX_ANCHOR_LENGTH = 120;
 const HONORIFIC_PREFIX_REGEX = /^\s*(mr|mrs|ms|dr|prof)\.?\s+/i;
@@ -133,6 +134,7 @@ export async function POST(request: NextRequest) {
     expectedSpeakers: rawExpectedSpeakers,
     interviewee_name: rawIntervieweeName,
     interviewee_org: rawIntervieweeOrg,
+    interviewee_title: rawIntervieweeTitle,
     interviewee_entity_id: rawIntervieweeEntityId,
     interviewee_org_entity_id: rawIntervieweeOrgEntityId,
   } = body as {
@@ -144,6 +146,7 @@ export async function POST(request: NextRequest) {
     expectedSpeakers?: unknown;
     interviewee_name?: unknown;
     interviewee_org?: unknown;
+    interviewee_title?: unknown;
     interviewee_entity_id?: unknown;
     interviewee_org_entity_id?: unknown;
   };
@@ -169,6 +172,7 @@ export async function POST(request: NextRequest) {
 
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
   const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
   const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
 
@@ -219,6 +223,7 @@ export async function POST(request: NextRequest) {
       expected_speakers: expectedSpeakers,
       interviewee_name: intervieweeName,
       interviewee_org: intervieweeOrg,
+      interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
     })

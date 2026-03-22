@@ -10,6 +10,7 @@ const pdfParse = require("pdf-parse/lib/pdf-parse") as (
 import { processDocument } from "@/lib/ai/document-pipeline";
 import { MAX_PDF_SIZE_BYTES, MIN_PDF_TEXT_LENGTH } from "@/lib/constants";
 import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
+import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 // Force Node.js runtime — pdf-parse requires Node APIs (not Edge compatible)
 export const runtime = "nodejs";
@@ -48,6 +49,7 @@ function sanitizeOptionalAnchor(value: FormDataEntryValue | null): string | null
  *   - language: string (optional, default "en")
  *   - interviewee_name: string (optional)
  *   - interviewee_org: string (optional)
+ *   - interviewee_title: string (optional, job title / role metadata only)
  *   - interviewee_entity_id: UUID string (optional, must match a PERSON in project/global)
  *   - interviewee_org_entity_id: UUID string (optional, COMPANY/ORGANIZATION/GOVERNMENT)
  *
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
   const rawLanguage = formData.get("language");
   const rawIntervieweeName = formData.get("interviewee_name");
   const rawIntervieweeOrg = formData.get("interviewee_org");
+  const rawIntervieweeTitle = formData.get("interviewee_title");
   const rawIntervieweeEntityId = formData.get("interviewee_entity_id");
   const rawIntervieweeOrgEntityId = formData.get("interviewee_org_entity_id");
 
@@ -110,6 +113,7 @@ export async function POST(request: NextRequest) {
 
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
+  const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
   const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
   const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
   const language =
@@ -187,6 +191,7 @@ export async function POST(request: NextRequest) {
       created_by: user.id,
       interviewee_name: intervieweeName,
       interviewee_org: intervieweeOrg,
+      interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
     })

@@ -65,6 +65,7 @@ export default function UploadInterviewPage() {
   const [language, setLanguage] = useState("en");
   const [intervieweeName, setIntervieweeName] = useState("");
   const [intervieweeOrg, setIntervieweeOrg] = useState("");
+  const [intervieweeTitle, setIntervieweeTitle] = useState("");
   const [intervieweeEntityId, setIntervieweeEntityId] = useState<string | null>(
     null
   );
@@ -245,6 +246,7 @@ export default function UploadInterviewPage() {
               : parseInt(expectedSpeakers, 10),
           interviewee_name: intervieweeName.trim() || undefined,
           interviewee_org: intervieweeOrg.trim() || undefined,
+          interviewee_title: intervieweeTitle.trim() || undefined,
           ...(intervieweeEntityId
             ? { interviewee_entity_id: intervieweeEntityId }
             : {}),
@@ -293,6 +295,8 @@ export default function UploadInterviewPage() {
         formData.append("interviewee_name", intervieweeName.trim());
       if (intervieweeOrg.trim())
         formData.append("interviewee_org", intervieweeOrg.trim());
+      if (intervieweeTitle.trim())
+        formData.append("interviewee_title", intervieweeTitle.trim());
       if (intervieweeEntityId)
         formData.append("interviewee_entity_id", intervieweeEntityId);
       if (intervieweeOrgEntityId)
@@ -619,6 +623,22 @@ export default function UploadInterviewPage() {
                     onSelectedEntityIdChange={setIntervieweeOrgEntityId}
                     disabled={loading}
                     aria-label="Organization or company"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="interviewee-title">
+                    Interviewee role / title{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </Label>
+                  <Input
+                    id="interviewee-title"
+                    placeholder="e.g., CEO"
+                    value={intervieweeTitle}
+                    onChange={(e) => setIntervieweeTitle(e.target.value)}
+                    disabled={loading}
+                    autoComplete="off"
                   />
                 </div>
               </div>

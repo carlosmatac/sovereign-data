@@ -239,6 +239,15 @@ export default async function InterviewDetailPage({
         {interview.description && (
           <p className="mt-3 text-muted-foreground">{interview.description}</p>
         )}
+        {interview.interviewee_title?.trim() && (
+          <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <Briefcase className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-medium text-foreground">Role (upload):</span>{" "}
+              {interview.interviewee_title.trim()}
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Audio Player — only for audio source interviews */}
