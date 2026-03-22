@@ -252,6 +252,7 @@ export interface Database {
           language: string;
           interviewee_name: string | null;
           interviewee_org: string | null;
+          interviewee_title: string | null;
           interviewee_entity_id: string | null;
           interviewee_org_entity_id: string | null;
           source_type: SourceType;
@@ -284,6 +285,7 @@ export interface Database {
           language?: string;
           interviewee_name?: string | null;
           interviewee_org?: string | null;
+          interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
           source_type?: SourceType;
@@ -316,6 +318,7 @@ export interface Database {
           language?: string;
           interviewee_name?: string | null;
           interviewee_org?: string | null;
+          interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
           source_type?: SourceType;

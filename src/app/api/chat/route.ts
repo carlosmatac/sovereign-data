@@ -202,11 +202,16 @@ export async function POST(request: NextRequest) {
   const scopeIntent = detectScopeIntent(queryText);
   const effectiveInterviewId = explicitInterviewId ?? null;
 
-  let interviewMeta: { title: string; interviewee_name: string | null; interviewee_org: string | null } | null = null;
+  let interviewMeta: {
+    title: string;
+    interviewee_name: string | null;
+    interviewee_org: string | null;
+    interviewee_title: string | null;
+  } | null = null;
   if (effectiveInterviewId) {
     const { data } = await admin
       .from("interviews")
-      .select("title, interviewee_name, interviewee_org")
+      .select("title, interviewee_name, interviewee_org, interviewee_title")
       .eq("id", effectiveInterviewId)
       .maybeSingle();
     interviewMeta = data;
@@ -605,7 +610,12 @@ function detectScopeIntent(query: string): ScopeIntent {
 
 function buildScopeBlock(
   scopedToInterview: boolean,
-  interviewMeta: { title: string; interviewee_name: string | null; interviewee_org: string | null } | null,
+  interviewMeta: {
+    title: string;
+    interviewee_name: string | null;
+    interviewee_org: string | null;
+    interviewee_title: string | null;
+  } | null,
   scopeWarning: string | null
 ): string {
   if (scopeWarning) {
@@ -613,10 +623,17 @@ function buildScopeBlock(
   }
 
   if (scopedToInterview && interviewMeta) {
-    const interviewee = [interviewMeta.interviewee_name, interviewMeta.interviewee_org]
+    const interviewee = [
+      interviewMeta.interviewee_name,
+      interviewMeta.interviewee_org,
+      interviewMeta.interviewee_title,
+    ]
       .filter(Boolean)
       .join(" — ");
-    return `\n═══════════════════════════════════════════════════════\nSCOPE: SINGLE INTERVIEW\n═══════════════════════════════════════════════════════\nThe user is asking about a SPECIFIC interview. ALL evidence below comes ONLY from this interview:\n- Title: "${interviewMeta.title}"\n${interviewee ? `- Interviewee: ${interviewee}\n` : ""}\nCRITICAL: Do NOT use general knowledge, web search, or information from other interviews to answer this question. If the answer is not in the retrieved context below, say "This was not discussed in this interview" rather than supplementing from other sources.\n`;
+    const titleNote = interviewMeta.interviewee_title?.trim()
+      ? " (upload metadata only — not validated org-chart truth)"
+      : "";
+    return `\n═══════════════════════════════════════════════════════\nSCOPE: SINGLE INTERVIEW\n═══════════════════════════════════════════════════════\nThe user is asking about a SPECIFIC interview. ALL evidence below comes ONLY from this interview:\n- Title: "${interviewMeta.title}"\n${interviewee ? `- Interviewee: ${interviewee}${titleNote}\n` : ""}\nCRITICAL: Do NOT use general knowledge, web search, or information from other interviews to answer this question. If the answer is not in the retrieved context below, say "This was not discussed in this interview" rather than supplementing from other sources.\n`;
   }
 
   return "";

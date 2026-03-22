@@ -32,7 +32,7 @@ ${buildTemplateSections(intelligenceLayer.template)}`;
           `- Country: ${interview.country ?? "Unknown"}`,
           `- Topics: ${interview.topics.join(", ") || "None tagged"}`,
           `- Sentiment: ${interview.sentiment?.overall ?? "Unknown"} (${String(interview.sentiment?.score ?? "n/a")})`,
-          `- Primary anchors: ${[interview.intervieweeName, interview.intervieweeOrg].filter(Boolean).join(" | ") || "None"}`,
+          `- Primary anchors: ${[interview.intervieweeName, interview.intervieweeOrg, interview.intervieweeTitle].filter(Boolean).join(" | ") || "None"}`,
           `- Stored summary: ${interview.summary ?? "No summary available."}`,
         ].join("\n")
     )

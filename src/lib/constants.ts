@@ -225,6 +225,9 @@ export const MAX_PDF_SIZE_MB = 50;
 export const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
 export const MIN_PDF_TEXT_LENGTH = 100;
 
+/** Max length for optional interviewee job title on upload (metadata only). */
+export const MAX_INTERVIEWEE_TITLE_LENGTH = 200;
+
 // Report templates
 export const REPORT_TEMPLATES = {
   country_risk: {
