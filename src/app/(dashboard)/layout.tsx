@@ -5,7 +5,7 @@ import { DashboardInsetHeader } from "@/components/dashboard/dashboard-inset-hea
 import { createClient } from "@/lib/supabase/server";
 import {
   fetchPlatformRolesForUser,
-  hasPlatformAdminRole,
+  hasPlatformAdministrationAccess,
 } from "@/lib/auth/platform-roles";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -30,7 +30,9 @@ export default async function DashboardLayout({
   ]);
 
   const profile = profileRes.data;
-  const isPlatformAdmin = hasPlatformAdminRole(platformRoles);
+  const showPlatformAdministration = hasPlatformAdministrationAccess(
+    platformRoles
+  );
 
   const cookieStore = await cookies();
   const sidebarCookie = cookieStore.get("sidebar_state")?.value;
@@ -50,7 +52,7 @@ export default async function DashboardLayout({
           email: user.email,
           name: profile?.full_name ?? undefined,
         }}
-        isPlatformAdmin={isPlatformAdmin}
+        showPlatformAdministration={showPlatformAdministration}
       />
       <SidebarInset className="flex min-h-svh min-w-0 flex-col">
         <DashboardInsetHeader />

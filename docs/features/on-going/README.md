@@ -12,4 +12,4 @@ See [`../README.md`](../README.md) for the full lifecycle.
 
 | Doc | Summary |
 |-----|--------|
-| [`platform-user-roles-authorization.md`](./platform-user-roles-authorization.md) | Platform roles (`member` / `platform_admin`), DB + `/admin` gating — see doc for current status. |
+| *(none)* | Move specs here from `to-do/` when implementation starts. |

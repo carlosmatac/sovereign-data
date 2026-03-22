@@ -105,18 +105,26 @@ Platform-wide roles for authenticated users (**not** the same as `project_member
 |--------|------|-------|
 | `id` | `UUID` | PK |
 | `user_id` | `UUID` | FK → `profiles`, CASCADE delete |
-| `role` | `platform_role` | `member` (default) or `platform_admin` |
+| `role` | `platform_role` | `member` (default), `platform_admin`, or `superuser` |
 | `created_at` | `TIMESTAMPTZ` | |
 
-**Unique**: `(user_id, role)` — a user may hold multiple roles (e.g. `member` + `platform_admin`).
+**Semantics** (orthogonal to project `user_role`):
 
-**RLS**: `SELECT` allowed for `auth.uid() = user_id`. No `INSERT`/`UPDATE`/`DELETE` for the `authenticated` role; promotions use the service role or SQL as an operator.
+| `platform_role` | Capability (summary) |
+|-----------------|----------------------|
+| `member` | Normal authenticated product use (still gated by project membership). |
+| `platform_admin` | **Entity / knowledge governance** only (e.g. `/admin/entities`); **cannot** manage global roles or users. |
+| `superuser` | **User & global role management** (`/admin/users`) **and** entity governance (superset of `platform_admin` for admin surfaces). |
 
-**Triggers**: `handle_new_user()` (on `auth.users` insert) inserts a `member` row alongside the new `profiles` row. Existing profiles are backfilled with `member` in migration `00016`.
+**Unique**: `(user_id, role)` — a user may hold multiple rows (e.g. `member` + `superuser`).
 
-**Helper**: `is_platform_admin()` — `SECURITY DEFINER`, returns true if the current user has a `platform_admin` row (for future RLS / RPC; see migration `00016`).
+**RLS**: `SELECT` allowed for `auth.uid() = user_id`. No `INSERT`/`UPDATE`/`DELETE` for the `authenticated` role. **Bootstrap** and break-glass use the service role or SQL; **ongoing** grant/revoke of `platform_admin` / `superuser` goes through **trusted server code** (admin client after `getUser()`), per [`platform-user-role-management.md`](../features/done/platform-user-role-management.md) (**superuser** callers only).
 
-**Migration**: `00016`
+**Triggers**: `handle_new_user()` inserts `member` alongside the new profile (`00016`).
+
+**Helpers** (`00018`): `is_superuser()`, `has_entity_governance_access()` (`platform_admin` **or** `superuser`). `is_platform_admin()` removed.
+
+**Migrations**: `00016` (table + enum base), `00018` (add `superuser`, migrate legacy `platform_admin` rows to `superuser`, new helpers).
 
 ### `interviews`
 
@@ -365,7 +373,7 @@ flowchart TD
 
 1. User authenticates via Supabase Auth (Magic Link / token_hash).
 2. `project_members` defines which projects a user can access, and with what role (`owner` / `editor` / `viewer`).
-3. `user_platform_roles` defines **platform-wide** capabilities (`member`, `platform_admin`) — orthogonal to project roles.
+3. `user_platform_roles` defines **platform-wide** capabilities (`member`, `platform_admin`, `superuser`) — orthogonal to project roles.
 4. RLS policies on tenant tables check membership via SECURITY DEFINER helper functions (`is_project_member`, etc.).
 5. Write operations use the admin client pattern: verify user server-side with `getUser()`, then use the service role client for mutations.
 
@@ -421,11 +429,12 @@ Defined in `supabase/migrations/00002_fix_rls_recursion.sql` to avoid infinite r
 | `is_project_editor` | `(p_project_id UUID) → BOOLEAN` | User is editor or owner |
 | `get_interview_project` | `(p_interview_id UUID) → UUID` | Returns the project_id for an interview |
 
-Added in `00016_platform_user_roles.sql`:
+Added in `00018_platform_role_superuser.sql` (replaces `is_platform_admin` from `00016`):
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `is_platform_admin` | `() → BOOLEAN` | Current user has `platform_admin` in `user_platform_roles` |
+| `is_superuser` | `() → BOOLEAN` | Current user has `superuser` in `user_platform_roles` |
+| `has_entity_governance_access` | `() → BOOLEAN` | Current user has `platform_admin` **or** `superuser` |
 
 ### Policies by Table
 
@@ -458,7 +467,7 @@ Added in `00016_platform_user_roles.sql`:
 | `interview_status` | `PROCESSING`, `TRANSCRIBING`, `EXTRACTING`, `EMBEDDING`, `COMPLETED`, `FAILED` | `00001` |
 | `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` | `00001` |
 | `user_role` | `owner`, `editor`, `viewer` | `00001` |
-| `platform_role` | `member`, `platform_admin` | `00016` |
+| `platform_role` | `member`, `platform_admin`, `superuser` | `00016`, `00018` |
 | `relation_type` | `business_partner`, `competitor`, `regulator`, `critic`, `ally`, `subsidiary`, `investor`, `advisor`, `supplier`, `acquirer` | `00004` |
 | `source_type` | `audio`, `pdf`, `text` | `00004` |
 | `snippet_platform` | `linkedin`, `twitter`, `newsletter`, `summary` | `00004` |
@@ -489,7 +498,8 @@ Added in `00016_platform_user_roles.sql`:
 | `00013_interview_transcript_review.sql` | `reviewed_utterances`, `transcript_review_status`, `last_intel_source` on `interviews`; `interview_review_entities` + RLS |
 | `00014_interview_source_utterances.sql` | `interviews.source_utterances` |
 | `00015_interview_anchor_entity_ids.sql` | Anchor entity FK columns on `interviews` |
-| `00016_platform_user_roles.sql` | `platform_role` enum, `user_platform_roles`, RLS, `is_platform_admin()`, `handle_new_user` assigns `member`, backfill |
+| `00016_platform_user_roles.sql` | `platform_role` enum, `user_platform_roles`, RLS, `handle_new_user` assigns `member`, backfill |
+| `00018_platform_role_superuser.sql` | Add `superuser`; migrate existing `platform_admin` → `superuser`; `is_superuser()`, `has_entity_governance_access()`; drop `is_platform_admin()` |
 
 ---
 

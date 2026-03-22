@@ -3,7 +3,7 @@ import type { Database } from "@/types/database";
 
 /**
  * Admin client with service_role key.
- * ONLY use in server-side code (API routes, webhooks).
+ * ONLY use in server-side code (API routes, webhooks, server actions after `getUser()`).
  * This bypasses RLS — use with extreme caution.
  */
 export function createAdminClient() {

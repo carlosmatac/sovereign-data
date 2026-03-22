@@ -16,4 +16,4 @@ See [`../README.md`](../README.md) for the full lifecycle.
 |-----|--------|
 | [`admin-entity-governance-dashboard.md`](./admin-entity-governance-dashboard.md) | Admin KB governance UI for canonical entities; MVP edit scope; gated by `platform_admin`. |
 
-Platform roles (in progress): [`../on-going/platform-user-roles-authorization.md`](../on-going/platform-user-roles-authorization.md).
+Shipped platform roles: [`../done/platform-user-roles-authorization.md`](../done/platform-user-roles-authorization.md), [`../done/platform-user-role-management.md`](../done/platform-user-role-management.md).

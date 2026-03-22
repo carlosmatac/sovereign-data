@@ -19,14 +19,13 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 ## Right now
 
-- **In progress:** *(none listed — add a one-line pointer to a file in `on-going/` when applicable.)*
+- **In progress:** *(none listed — add a pointer to `on-going/` when applicable.)*
 
 ---
 
 ## Immediate next
 
 - **Derive from** product discussion and whatever sits in `to-do/` / `on-going/` — not from legacy phase tables.
-- **In progress:** [`platform-user-roles-authorization.md`](../features/on-going/platform-user-roles-authorization.md) — platform roles / `/admin` gating (see spec for status).
 - **Parked:** [`admin-entity-governance-dashboard.md`](../features/to-do/admin-entity-governance-dashboard.md).
 
 ---

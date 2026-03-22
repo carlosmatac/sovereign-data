@@ -68,7 +68,7 @@ const navItems = [
   // Reports hidden for demo — route still exists, remove comment to restore
 ];
 
-const bottomItems = [
+const systemItems = [
   {
     title: "Settings",
     href: "/settings",
@@ -81,13 +81,13 @@ interface AppSidebarProps {
     email?: string;
     name?: string;
   };
-  /** Platform administrator — sees governance / admin navigation. */
-  isPlatformAdmin?: boolean;
+  /** Entity governance or superuser — shows System → Platform Administration. */
+  showPlatformAdministration?: boolean;
 }
 
 export function AppSidebar({
   user,
-  isPlatformAdmin = false,
+  showPlatformAdministration = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -99,6 +99,19 @@ export function AppSidebar({
     toast.success("Signed out");
     router.push("/login");
   };
+
+  const systemNavItems = [
+    ...(showPlatformAdministration
+      ? [
+          {
+            title: "Platform Administration",
+            href: "/admin",
+            icon: Shield,
+          },
+        ]
+      : []),
+    ...systemItems,
+  ];
 
   const initials = user.name
     ? user.name
@@ -173,20 +186,6 @@ export function AppSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {isPlatformAdmin ? (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith("/admin")}
-                    tooltip="Platform admin"
-                  >
-                    <Link href="/admin">
-                      <Shield className="h-4 w-4" />
-                      <span>Platform admin</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -195,7 +194,7 @@ export function AppSidebar({
           <SidebarGroupLabel>System</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {bottomItems.map((item) => (
+              {systemNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild

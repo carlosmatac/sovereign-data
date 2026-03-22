@@ -24,7 +24,7 @@ export type EntityType =
 export type UserRole = "owner" | "editor" | "viewer";
 
 /** Platform-wide role (distinct from `project_members.role`). */
-export type PlatformRole = "member" | "platform_admin";
+export type PlatformRole = "member" | "platform_admin" | "superuser";
 
 export type RelationType =
   | "business_partner"
@@ -887,7 +887,11 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
-      is_platform_admin: {
+      is_superuser: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      has_entity_governance_access: {
         Args: Record<string, never>;
         Returns: boolean;
       };

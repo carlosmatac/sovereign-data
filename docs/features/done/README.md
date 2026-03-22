@@ -10,5 +10,7 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [interview-ui-visibility.md](./interview-ui-visibility.md) | Demo toggles / interview UI flags |
 | [dashboard-sidebar-and-speaker-names.md](./dashboard-sidebar-and-speaker-names.md) | Sidebar, branding, `speaker_map` |
 | [time-aware-validated-positions-rag.md](./time-aware-validated-positions-rag.md) | `validated_positions`, chat time-aware, `lookupPositions`, API títulos |
+| [platform-user-roles-authorization.md](./platform-user-roles-authorization.md) | Global roles (`member` / `platform_admin` / `superuser`), Platform Administration routing |
+| [platform-user-role-management.md](./platform-user-role-management.md) | `/admin/users` — superuser grants `platform_admin` / `superuser` |
 
 New completed features: add a row here when you move a spec into this folder.

@@ -21,14 +21,33 @@ export async function fetchPlatformRolesForUser(
   return (data ?? []).map((row) => row.role);
 }
 
-export function hasPlatformAdminRole(roles: PlatformRole[]): boolean {
-  return roles.includes("platform_admin");
+/** Global role management (grant/revoke platform_admin & superuser). Superuser only. */
+export function canManageGlobalPlatformRoles(roles: PlatformRole[]): boolean {
+  return roles.includes("superuser");
 }
 
 /**
- * For server actions / route handlers: after verifying the user, require platform admin or throw.
+ * Entity / knowledge governance (canonical entities, KB ops).
+ * platform_admin OR superuser (superuser includes this capability).
  */
-export async function requirePlatformAdminUser(
+export function hasEntityGovernanceAccess(roles: PlatformRole[]): boolean {
+  return roles.includes("platform_admin") || roles.includes("superuser");
+}
+
+/**
+ * Any Platform Administration area (sidebar link, /admin layout).
+ * Same as entity governance for route access; user/role UI adds superuser-only gate inside.
+ */
+export function hasPlatformAdministrationAccess(
+  roles: PlatformRole[]
+): boolean {
+  return hasEntityGovernanceAccess(roles);
+}
+
+/**
+ * Server actions / routes: caller must be superuser (user & role management).
+ */
+export async function requireSuperuser(
   supabase: SupabaseClient<Database>
 ): Promise<User> {
   const {
@@ -40,7 +59,29 @@ export async function requirePlatformAdminUser(
   }
 
   const roles = await fetchPlatformRolesForUser(supabase, user.id);
-  if (!hasPlatformAdminRole(roles)) {
+  if (!canManageGlobalPlatformRoles(roles)) {
+    throw new Error("Forbidden");
+  }
+
+  return user;
+}
+
+/**
+ * Server routes: caller must access entity/knowledge governance surfaces.
+ */
+export async function requireEntityGovernanceUser(
+  supabase: SupabaseClient<Database>
+): Promise<User> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  const roles = await fetchPlatformRolesForUser(supabase, user.id);
+  if (!hasEntityGovernanceAccess(roles)) {
     throw new Error("Forbidden");
   }
 
