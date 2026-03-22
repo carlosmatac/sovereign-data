@@ -62,6 +62,8 @@ export type PositionState =
 
 export type DatePrecision = "exact" | "approximate" | "unknown";
 
+export type ChatMessageRole = "user" | "assistant";
+
 // ============================================
 // JSON Column Types
 // ============================================
@@ -855,6 +857,132 @@ export interface Database {
           },
         ];
       };
+      chat_conversation_seq: {
+        Row: {
+          conversation_id: string;
+          next_val: number;
+        };
+        Insert: {
+          conversation_id: string;
+          next_val?: number;
+        };
+        Update: {
+          conversation_id?: string;
+          next_val?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversation_seq_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: true;
+            referencedRelation: "chat_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      chat_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string | null;
+          interview_id: string | null;
+          title: string;
+          title_user_set: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          project_id?: string | null;
+          interview_id?: string | null;
+          title?: string;
+          title_user_set?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          project_id?: string | null;
+          interview_id?: string | null;
+          title?: string;
+          title_user_set?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_conversations_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_conversations_interview_id_fkey";
+            columns: ["interview_id"];
+            isOneToOne: false;
+            referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: ChatMessageRole;
+          content: string;
+          sequence: number;
+          client_message_id: string | null;
+          user_message_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: ChatMessageRole;
+          content: string;
+          sequence: number;
+          client_message_id?: string | null;
+          user_message_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: ChatMessageRole;
+          content?: string;
+          sequence?: number;
+          client_message_id?: string | null;
+          user_message_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "chat_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_messages_user_message_id_fkey";
+            columns: ["user_message_id"];
+            isOneToOne: false;
+            referencedRelation: "chat_messages";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_platform_roles: {
         Row: {
           id: string;
@@ -924,6 +1052,10 @@ export interface Database {
         Args: { p_limit?: number | null };
         Returns: Array<{ title: string }>;
       };
+      next_chat_message_sequence: {
+        Args: { p_conversation_id: string };
+        Returns: number;
+      };
     };
     Enums: {
       interview_status: InterviewStatus;
@@ -940,6 +1072,7 @@ export interface Database {
       position_state: PositionState;
       date_precision: DatePrecision;
       platform_role: PlatformRole;
+      chat_message_role: ChatMessageRole;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -968,3 +1101,5 @@ export type Report = Tables<"reports">;
 export type InterviewReviewEntity = Tables<"interview_review_entities">;
 export type ValidatedPosition = Tables<"validated_positions">;
 export type UserPlatformRole = Tables<"user_platform_roles">;
+export type ChatConversation = Tables<"chat_conversations">;
+export type ChatMessage = Tables<"chat_messages">;
