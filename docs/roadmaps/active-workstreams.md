@@ -19,7 +19,7 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 ## Right now
 
-- **In progress:** *(none listed — add a one-line pointer to a file in `on-going/` when applicable.)*
+- **In progress:** [`admin-entity-governance-dashboard.md`](../features/on-going/admin-entity-governance-dashboard.md) — entity governance UI at `/admin/entities`.
 
 ---
 

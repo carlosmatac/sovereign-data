@@ -30,6 +30,7 @@ import {
   MessageSquare,
   Network,
   Settings,
+  Shield,
   LogOut,
   ChevronUp,
 } from "lucide-react";
@@ -67,7 +68,7 @@ const navItems = [
   // Reports hidden for demo — route still exists, remove comment to restore
 ];
 
-const bottomItems = [
+const systemItems = [
   {
     title: "Settings",
     href: "/settings",
@@ -80,9 +81,14 @@ interface AppSidebarProps {
     email?: string;
     name?: string;
   };
+  /** Entity governance or superuser — shows System → Platform Administration. */
+  showPlatformAdministration?: boolean;
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({
+  user,
+  showPlatformAdministration = false,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { state, isMobile } = useSidebar();
@@ -93,6 +99,19 @@ export function AppSidebar({ user }: AppSidebarProps) {
     toast.success("Signed out");
     router.push("/login");
   };
+
+  const systemNavItems = [
+    ...(showPlatformAdministration
+      ? [
+          {
+            title: "Platform Administration",
+            href: "/admin",
+            icon: Shield,
+          },
+        ]
+      : []),
+    ...systemItems,
+  ];
 
   const initials = user.name
     ? user.name
@@ -175,7 +194,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroupLabel>System</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {bottomItems.map((item) => (
+              {systemNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
