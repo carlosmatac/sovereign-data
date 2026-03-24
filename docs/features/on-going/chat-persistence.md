@@ -26,9 +26,10 @@ last_updated: 2026-03-22
 
 ## UX note (Intelligence Chat + sidebar)
 
-- **Thread list** is nested **under the Intelligence Chat row** in the global sidebar (`SidebarMenuSub`), ChatGPT-style: chevron toggles expand/collapse; **New chat** + **Recent** + conversation links with ⋯ → Rename (inline). Sidebar icon/collapsed mode hides the nested list (icon still links to `/chat`).
-- **Chat layout** is content-only (no second column rail).
-- **Rename / delete:** ⋯ menu — **Rename** (PATCH) or **Delete chat** (`window.confirm` then `DELETE`); if the open thread is deleted, redirect to `/chat`; list updates locally + `router.refresh()`.
+- **Thread list** is nested under **Intelligence Chat** only while the route is under `/chat/**` (no chevron; same row alignment as other Platform links). Submenu uses `SidebarMenuSub` (New chat, Recent, threads, ⋯ rename/delete). Collapsed sidebar hides the sub list via existing shadcn rules.
+- **`/chat` landing** shows **ChatInboxLanding**: recent conversations in the main pane + **New chat**, same API as the sidebar list.
+- **First message from `/chat/new`:** latest `UIMessage[]` is stashed in `sessionStorage` before `router.replace(/chat/[id], { scroll: false })` inside `startTransition`; the thread view applies the seed in `useLayoutEffect` and skips the initial GET to avoid a full reload spinner while keeping messages visible.
+- **Rename / delete:** unchanged (PATCH / DELETE + confirm + redirect if needed).
 
 ## Implementation note — automatic vs manual title
 

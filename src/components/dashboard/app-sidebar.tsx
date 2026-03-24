@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -33,17 +34,14 @@ import {
   Shield,
   LogOut,
   ChevronUp,
-  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { useCallback, useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 import { IntelligenceChatNavThreads } from "@/components/dashboard/intelligence-chat-nav-threads";
 
-const navItems = [
+const platformNavItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -60,11 +58,15 @@ const navItems = [
     icon: Mic,
   },
   {
+    title: "Intelligence Chat",
+    href: "/chat",
+    icon: MessageSquare,
+  },
+  {
     title: "Network Explorer",
     href: "/network",
     icon: Network,
   },
-  // Reports hidden for demo — route still exists, remove comment to restore
 ];
 
 const systemItems = [
@@ -91,17 +93,7 @@ export function AppSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { state, isMobile } = useSidebar();
-
   const inChatSection = pathname.startsWith("/chat");
-  const [chatThreadsOpen, setChatThreadsOpen] = useState(inChatSection);
-
-  useEffect(() => {
-    if (inChatSection) setChatThreadsOpen(true);
-  }, [inChatSection]);
-
-  const toggleChatThreads = useCallback(() => {
-    setChatThreadsOpen((o) => !o);
-  }, []);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -182,73 +174,42 @@ export function AppSidebar({
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.slice(0, 3).map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-
-              <SidebarMenuItem className="flex flex-col items-stretch gap-0">
-                <div className="flex w-full min-w-0 items-center gap-0.5">
-                  <button
-                    type="button"
-                    onClick={toggleChatThreads}
-                    aria-expanded={chatThreadsOpen}
-                    aria-label={
-                      chatThreadsOpen
-                        ? "Collapse chat list"
-                        : "Expand chat list"
-                    }
-                    className={cn(
-                      "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-md outline-hidden transition-colors focus-visible:ring-2",
-                      "group-data-[collapsible=icon]:hidden"
-                    )}
-                  >
-                    <ChevronRight
-                      className={cn(
-                        "size-4 shrink-0 transition-transform duration-200",
-                        chatThreadsOpen && "rotate-90"
-                      )}
-                    />
-                  </button>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={inChatSection}
-                    tooltip="Intelligence Chat"
-                    className="min-w-0 flex-1"
-                  >
-                    <Link href="/chat">
-                      <MessageSquare className="h-4 w-4" />
-                      <span>Intelligence Chat</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </div>
-                {chatThreadsOpen ? <IntelligenceChatNavThreads /> : null}
-              </SidebarMenuItem>
-
-              {navItems.slice(3).map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {platformNavItems.map((item) =>
+                item.href === "/chat" ? (
+                  <Fragment key="/chat">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={inChatSection}
+                        tooltip="Intelligence Chat"
+                      >
+                        <Link href="/chat">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    {inChatSection ? (
+                      <SidebarMenuItem className="list-none p-0">
+                        <IntelligenceChatNavThreads />
+                      </SidebarMenuItem>
+                    ) : null}
+                  </Fragment>
+                ) : (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.title}
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
