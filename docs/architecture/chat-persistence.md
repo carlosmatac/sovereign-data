@@ -44,7 +44,7 @@ On every `POST /api/chat`, the streamed response includes header **`X-Conversati
 
 ## UI shell
 
-- Conversation list is **nested under “Intelligence Chat”** in the dashboard **`AppSidebar`** (`SidebarMenuSub`: New chat, Recent, thread links). The `/chat` layout is **content-only** (full-width transcript next to the global sidebar), similar in spirit to ChatGPT’s sidebar hierarchy.
+- Conversation list is **nested under “Intelligence Chat”** in **`AppSidebar`** only when the route is **`/chat/**`** (`SidebarMenuSub`). The main row matches other Platform links (no chevron). **`/chat`** shows **`ChatInboxLanding`** (recent threads in the content area + New chat). **`/chat/new`** and **`/chat/[id]`** use **`IntelligenceChatView`**. First-turn navigation from new → thread uses a **sessionStorage seed** of `UIMessage[]` plus `router.replace(..., { scroll: false })` so the client does not flash the loading spinner over the just-finished reply.
 
 ## Client caps
 

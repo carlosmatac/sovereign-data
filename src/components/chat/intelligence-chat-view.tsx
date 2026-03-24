@@ -5,10 +5,12 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   memo,
+  startTransition,
 } from "react";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +18,10 @@ import { Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
 import { uiMessageFromDbRow } from "@/lib/chat/uimessage-from-db";
+import {
+  stashChatHydrateSeed,
+  takeChatHydrateSeed,
+} from "@/lib/chat/hydrate-seed-storage";
 import { Button } from "@/components/ui/button";
 
 const MAX_MESSAGES_CLIENT = 200;
@@ -74,6 +80,8 @@ export function IntelligenceChatView({
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingConversationIdRef = useRef<string | null>(null);
+  /** Skip initial GET /messages when we just navigated from /chat/new with in-memory seed. */
+  const hydratedFromSeedRef = useRef(false);
   /** Set from X-Conversation-Id as soon as the first bootstrap response arrives (before stream ends). */
   const [bootstrapConversationId, setBootstrapConversationId] = useState<
     string | null
@@ -121,11 +129,14 @@ export function IntelligenceChatView({
   const { messages, sendMessage, status, error, setMessages } = useChat({
     transport,
     experimental_throttle: 50,
-    onFinish: () => {
+    onFinish: ({ messages: latestMessages }) => {
       const cid = pendingConversationIdRef.current;
       if (cid && !conversationId) {
+        stashChatHydrateSeed(cid, latestMessages);
         pendingConversationIdRef.current = null;
-        router.replace(`/chat/${cid}`);
+        startTransition(() => {
+          router.replace(`/chat/${cid}`, { scroll: false });
+        });
       }
     },
   });
@@ -136,9 +147,30 @@ export function IntelligenceChatView({
     }
   }, [conversationId]);
 
+  useLayoutEffect(() => {
+    hydratedFromSeedRef.current = false;
+    if (!conversationId || hydrateSuspended) {
+      return;
+    }
+    const seeded = takeChatHydrateSeed(conversationId);
+    if (seeded && seeded.length > 0) {
+      setMessages(seeded);
+      setOldestSequence(null);
+      setHasMoreOlder(false);
+      setHydrateError(null);
+      setHydrated(true);
+      hydratedFromSeedRef.current = true;
+    }
+  }, [conversationId, hydrateSuspended, setMessages]);
+
   useEffect(() => {
     if (!conversationId || hydrateSuspended) {
       setHydrated(true);
+      return;
+    }
+
+    if (hydratedFromSeedRef.current) {
+      hydratedFromSeedRef.current = false;
       return;
     }
 
