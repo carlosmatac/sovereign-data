@@ -136,11 +136,11 @@ export function AppSidebar({
                 className="hover:bg-sidebar-accent/50 flex items-center rounded-md px-2 py-3 transition-colors"
               >
                 <Image
-                  src="/apaisado_con_logo_v2.svg"
+                  src="/sovereign_log_apaisado.svg"
                   alt="Sovereign Data — Intelligence Platform"
                   width={900}
                   height={200}
-                  className="w-full max-w-[200px] object-contain dark:brightness-110"
+                  className="w-full max-w-[200px] object-contain"
                   priority
                 />
               </Link>
@@ -156,11 +156,11 @@ export function AppSidebar({
                   className="flex w-full items-center justify-center"
                 >
                   <Image
-                    src="/SD_v2.svg"
+                    src="/sovereign_logo.svg"
                     alt=""
                     width={32}
                     height={32}
-                    className="size-8 object-contain dark:brightness-110"
+                    className="size-8 object-contain"
                   />
                 </Link>
               </SidebarMenuButton>
