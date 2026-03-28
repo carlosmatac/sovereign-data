@@ -53,21 +53,34 @@ const briefComponents: Components = {
     </blockquote>
   ),
   a: ({ href, children }) => {
-    const isInternal = href?.startsWith("/");
-    if (isInternal && href) {
+    const linkClass =
+      "font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50";
+
+    // Internal app route — use Next.js client-side navigation.
+    if (href?.startsWith("/")) {
       return (
-        <Link
-          href={href}
-          className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
-        >
+        <Link href={href} className={linkClass}>
           {children}
         </Link>
       );
     }
+
+    // The model sometimes generates thebusinessyear.com/interview/… URLs from
+    // training knowledge. Those don't exist inside the platform. Redirect to
+    // the All Interviews page so the user can find the interview there.
+    if (href && /thebusinessyear\.com\/interview/i.test(href)) {
+      return (
+        <Link href="/interviews" className={linkClass} title="Opens All Interviews — the direct link is not available in this view">
+          {children}
+        </Link>
+      );
+    }
+
+    // External URL — open in a new tab.
     return (
       <a
         href={href}
-        className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
+        className={linkClass}
         target="_blank"
         rel="noopener noreferrer"
       >
