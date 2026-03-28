@@ -2,6 +2,7 @@
 
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
+import Link from "next/link";
 
 /**
  * Editorial / brief styling for Intelligence Chat assistant output.
@@ -51,16 +52,47 @@ const briefComponents: Components = {
       {children}
     </blockquote>
   ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) => {
+    const linkClass =
+      "font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50";
+
+    // Internal app route — use Next.js client-side navigation.
+    if (href?.startsWith("/")) {
+      return (
+        <Link href={href} className={linkClass}>
+          {children}
+        </Link>
+      );
+    }
+
+    // The model sometimes generates thebusinessyear.com/interview/… URLs from
+    // training knowledge. The TBY slug embeds the internal UUID at the end
+    // (e.g. /interview/nigeria-7-{uuid}), so extract it and build the
+    // correct internal /interviews/{uuid} route directly.
+    if (href && /thebusinessyear\.com\/interview/i.test(href)) {
+      const uuidMatch = href.match(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      );
+      const internalHref = uuidMatch ? `/interviews/${uuidMatch[0]}` : "/interviews";
+      return (
+        <Link href={internalHref} className={linkClass}>
+          {children}
+        </Link>
+      );
+    }
+
+    // External URL — open in a new tab.
+    return (
+      <a
+        href={href}
+        className={linkClass}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {children}
+      </a>
+    );
+  },
   hr: () => <hr className="my-8 border-0 border-t border-border" />,
   strong: ({ children }) => (
     <strong className="font-semibold text-foreground">{children}</strong>

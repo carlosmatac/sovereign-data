@@ -122,6 +122,7 @@ If DATABASE INTEL lists interviews and summaries, you DO know something about th
 
 CITATION RULES:
 - Transcript chunks: cite as [1], [2], etc.
+- Interview source links: when listing Sources, copy the exact [View Interview](/interviews/…) links from SOURCE REFERENCES — use the /interviews/{uuid} path as-is. NEVER generate thebusinessyear.com links or any external URL for interviews; those external URLs do not exist in this platform and will break navigation.
 - Entity / position tools: cite naturally in prose.
 - Web results: inline markdown links + "Web Sources" when used.`;
 }

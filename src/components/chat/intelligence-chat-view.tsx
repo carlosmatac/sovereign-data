@@ -14,7 +14,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, MessageSquare, Shield, Plus, X, BookOpen, Briefcase } from "lucide-react";
+import { Loader2, Sparkles, MessageSquare, Shield, Plus, X, BookOpen, Briefcase, ArrowUp } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
 import { uiMessageFromDbRow } from "@/lib/chat/uimessage-from-db";
@@ -407,94 +407,87 @@ export function IntelligenceChatView({
         <footer className="shrink-0 bg-background px-6 pb-6 pt-1 md:px-10 md:pb-8">
           <form
             onSubmit={handleFormSubmit}
-            className="mx-auto max-w-3xl bg-background"
+            className="mx-auto max-w-3xl"
           >
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your interviews…"
-              className="min-h-[7.5rem] max-h-[min(40vh,280px)] resize-y rounded-2xl border border-sidebar-border/55 bg-sidebar px-4 py-4 text-[15px] leading-relaxed shadow-none placeholder:text-muted-foreground transition-[color,background-color,border-color,box-shadow] focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/15"
-              rows={5}
-              disabled={isLoading}
-              aria-busy={isLoading}
-            />
+            {/* Single composer box — textarea + inner controls */}
+            <div className="flex flex-col rounded-2xl border border-sidebar-border/55 bg-sidebar transition-[color,background-color,border-color,box-shadow] focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/15">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask anything about your interviews…"
+                className="min-h-[5.5rem] max-h-[min(40vh,260px)] resize-none rounded-t-2xl rounded-b-none border-0 bg-transparent px-4 pb-2 pt-4 text-[15px] leading-relaxed shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:outline-none"
+                disabled={isLoading}
+                aria-busy={isLoading}
+              />
 
-            {/* Mode selector row */}
-            <div className="mt-1.5 flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    aria-label="Select copilot mode"
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted/60 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-44">
-                  <DropdownMenuItem
-                    onSelect={() => setSelectedMode("general_context")}
-                    className="gap-2"
-                  >
-                    <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    General Context
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => setSelectedMode("sales")}
-                    className="gap-2"
-                  >
-                    <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    Sales
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Inner bottom bar */}
+              <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
+                {/* Left: mode selector + active chip */}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        aria-label="Select copilot mode"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted/60 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-44">
+                      <DropdownMenuItem
+                        onSelect={() => setSelectedMode("general_context")}
+                        className="gap-2"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        General Context
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setSelectedMode("sales")}
+                        className="gap-2"
+                      >
+                        <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        Sales
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-              {selectedMode !== null && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
-                  {selectedMode === "sales" ? (
-                    <Briefcase className="h-3 w-3 shrink-0" aria-hidden />
-                  ) : (
-                    <BookOpen className="h-3 w-3 shrink-0" aria-hidden />
+                  {selectedMode !== null && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+                      {selectedMode === "sales" ? (
+                        <Briefcase className="h-3 w-3 shrink-0" aria-hidden />
+                      ) : (
+                        <BookOpen className="h-3 w-3 shrink-0" aria-hidden />
+                      )}
+                      {COPILOT_MODE_LABELS[selectedMode]}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMode(null)}
+                        aria-label={`Remove ${COPILOT_MODE_LABELS[selectedMode]} mode`}
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
                   )}
-                  {COPILOT_MODE_LABELS[selectedMode]}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMode(null)}
-                    aria-label={`Remove ${COPILOT_MODE_LABELS[selectedMode]} mode`}
-                    className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </span>
-              )}
-            </div>
+                </div>
 
-            <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-              <span>
-                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
-                  Enter
-                </kbd>{" "}
-                to send ·{" "}
-                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
-                  Shift
-                </kbd>
-                +
-                <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">
-                  Enter
-                </kbd>{" "}
-                new line
-              </span>
-              {isLoading && (
-                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <Loader2
-                    className="h-3.5 w-3.5 shrink-0 animate-spin"
-                    aria-hidden
-                  />
-                  Working…
-                </span>
-              )}
+                {/* Right: send button */}
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading}
+                  aria-label="Send message"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" aria-hidden />
+                  )}
+                </button>
+              </div>
             </div>
           </form>
           {error && (
