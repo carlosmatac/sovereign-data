@@ -14,7 +14,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, MessageSquare, Shield } from "lucide-react";
+import { Loader2, Sparkles, MessageSquare, Shield, Plus, X, BookOpen, Briefcase } from "lucide-react";
 import { IntelligenceActivityStatus } from "@/components/chat/intelligence-activity-status";
 import { IntelligenceBriefMarkdown } from "@/components/chat/intelligence-brief-markdown";
 import { uiMessageFromDbRow } from "@/lib/chat/uimessage-from-db";
@@ -23,6 +23,18 @@ import {
   takeChatHydrateSeed,
 } from "@/lib/chat/hydrate-seed-storage";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { CopilotMode } from "@/lib/chat/prompt-builder";
+
+const COPILOT_MODE_LABELS: Record<CopilotMode, string> = {
+  general_context: "General Context",
+  sales: "Sales",
+};
 
 const MAX_MESSAGES_CLIENT = 200;
 const INITIAL_MESSAGE_LIMIT = 40;
@@ -92,6 +104,12 @@ export function IntelligenceChatView({
   const [oldestSequence, setOldestSequence] = useState<number | null>(null);
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  /**
+   * Explicitly selected copilot mode. null = no chip shown; effective mode is
+   * always "general_context" when null (sent to the backend that way too).
+   */
+  const [selectedMode, setSelectedMode] = useState<CopilotMode | null>(null);
+  const effectiveCopilotMode: CopilotMode = selectedMode ?? "general_context";
 
   const effectiveConversationId = conversationId ?? bootstrapConversationId;
 
@@ -116,6 +134,7 @@ export function IntelligenceChatView({
             : {}),
           ...(projectIdFromUrl ? { projectId: projectIdFromUrl } : {}),
           ...(interviewIdFromUrl ? { interviewId: interviewIdFromUrl } : {}),
+          copilotMode: effectiveCopilotMode,
         },
       }),
     [
@@ -123,6 +142,7 @@ export function IntelligenceChatView({
       effectiveConversationId,
       projectIdFromUrl,
       interviewIdFromUrl,
+      effectiveCopilotMode,
     ]
   );
 
@@ -399,6 +419,58 @@ export function IntelligenceChatView({
               disabled={isLoading}
               aria-busy={isLoading}
             />
+
+            {/* Mode selector row */}
+            <div className="mt-1.5 flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    aria-label="Select copilot mode"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted/60 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem
+                    onSelect={() => setSelectedMode("general_context")}
+                    className="gap-2"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    General Context
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setSelectedMode("sales")}
+                    className="gap-2"
+                  >
+                    <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    Sales
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {selectedMode !== null && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+                  {selectedMode === "sales" ? (
+                    <Briefcase className="h-3 w-3 shrink-0" aria-hidden />
+                  ) : (
+                    <BookOpen className="h-3 w-3 shrink-0" aria-hidden />
+                  )}
+                  {COPILOT_MODE_LABELS[selectedMode]}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMode(null)}
+                    aria-label={`Remove ${COPILOT_MODE_LABELS[selectedMode]} mode`}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              )}
+            </div>
+
             <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
               <span>
                 <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/80">

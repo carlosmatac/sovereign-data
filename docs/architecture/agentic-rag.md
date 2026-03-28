@@ -84,12 +84,31 @@ Retrieved chunks are formatted into a numbered context block with speaker attrib
 
 ### 5. System Prompt
 
-The system prompt is injected with every request and consists of four sections:
+The system prompt is assembled by `src/lib/chat/prompt-builder.ts` in five **modular layers** and injected on every request:
+
+```
+Layer 1 — Core identity        "Sovereign" persona, TBY context, jargon
+Layer 2 — Mode overlay         general_context | sales (emphasis / framing)
+Layer 3 — Grounding rules      non-negotiable, shared by all modes
+Layer 4 — Scope / runtime      scopeBlock, dbIntelSection, validatedPositionsSection
+Layer 5 — Retrieved context    RAG chunks + citations (or empty-context fallback)
+```
+
+#### Copilot Modes
+
+The active mode is sent by the client as `copilotMode: "general_context" | "sales"`. The backend parses it via `parseCopilotMode()` — any invalid or missing value defaults to `"general_context"`. The client always sends the field explicitly.
+
+| Mode | Key | Framing |
+|------|-----|---------|
+| **General Context** | `general_context` | Understanding, explanation, synthesis, clarity. Does not push every answer toward commercial recommendation. **Default.** |
+| **Sales** | `sales` | Commercially actionable: account intelligence, stakeholder motivations, pitch angles, commercial signals. Same grounding discipline — never invents opportunities or stakeholders. |
+
+To add a new mode: add its key to `COPILOT_MODES`, add a case to `buildModeOverlay`, and update the `CopilotMode` union in `src/lib/chat/prompt-builder.ts`.
 
 #### Identity Block
 Establishes the "Sovereign" persona as TBY's Business Intelligence Copilot. Includes team structure (Country Managers, Editors), product types (Full page, Half page, Logo, Interview, Barter), and domain jargon (pitch, drop-off, all-in-one, follow-up).
 
-#### Grounding Rules (Non-Negotiable)
+#### Grounding Rules (Non-Negotiable, all modes)
 Five strict rules that prevent hallucination:
 
 1. **Never invent facts** — every claim about people, companies, roles, or relationships must be backed by tool results or transcript citations.
@@ -323,6 +342,7 @@ Assistant message bodies are rendered with **`IntelligenceBriefMarkdown`** (`src
 | Responsibility | File Path |
 |----------------|-----------|
 | Chat API route | `src/app/api/chat/route.ts` |
+| Modular prompt builder | `src/lib/chat/prompt-builder.ts` |
 | Chat persistence (V1) | [chat-persistence.md](./chat-persistence.md) |
 | Chat UI (list + thread) | `src/app/(dashboard)/chat/*`, `src/components/chat/intelligence-chat-view.tsx` |
 | Chat loading / activity panel | `src/components/chat/intelligence-activity-status.tsx` |
