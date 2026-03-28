@@ -66,11 +66,16 @@ const briefComponents: Components = {
     }
 
     // The model sometimes generates thebusinessyear.com/interview/… URLs from
-    // training knowledge. Those don't exist inside the platform. Redirect to
-    // the All Interviews page so the user can find the interview there.
+    // training knowledge. The TBY slug embeds the internal UUID at the end
+    // (e.g. /interview/nigeria-7-{uuid}), so extract it and build the
+    // correct internal /interviews/{uuid} route directly.
     if (href && /thebusinessyear\.com\/interview/i.test(href)) {
+      const uuidMatch = href.match(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      );
+      const internalHref = uuidMatch ? `/interviews/${uuidMatch[0]}` : "/interviews";
       return (
-        <Link href="/interviews" className={linkClass} title="Opens All Interviews — the direct link is not available in this view">
+        <Link href={internalHref} className={linkClass}>
           {children}
         </Link>
       );
