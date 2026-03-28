@@ -2,6 +2,7 @@
 
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
+import Link from "next/link";
 
 /**
  * Editorial / brief styling for Intelligence Chat assistant output.
@@ -51,16 +52,29 @@ const briefComponents: Components = {
       {children}
     </blockquote>
   ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) => {
+    const isInternal = href?.startsWith("/");
+    if (isInternal && href) {
+      return (
+        <Link
+          href={href}
+          className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
+        >
+          {children}
+        </Link>
+      );
+    }
+    return (
+      <a
+        href={href}
+        className="font-medium text-primary underline decoration-primary/25 underline-offset-2 transition-colors hover:decoration-primary/50"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {children}
+      </a>
+    );
+  },
   hr: () => <hr className="my-8 border-0 border-t border-border" />,
   strong: ({ children }) => (
     <strong className="font-semibold text-foreground">{children}</strong>
