@@ -14,7 +14,7 @@ last_updated: 2026-03-22
 - POST: `src/app/api/chat/route.ts`
 - List / rename / delete / messages: `src/app/api/chat/conversations/route.ts`, `src/app/api/chat/conversations/[id]/route.ts` (PATCH + DELETE), `src/app/api/chat/conversations/[id]/messages/route.ts`
 - UI: `src/app/(dashboard)/chat/layout.tsx`, `page.tsx`, `new/page.tsx`, `[conversationId]/page.tsx`, `src/components/chat/intelligence-chat-view.tsx`
-- Sidebar threads (nested under Intelligence Chat): `src/components/dashboard/intelligence-chat-nav-threads.tsx`, `app-sidebar.tsx`
+- Sidebar threads (nested under Copilot): `src/components/dashboard/intelligence-chat-nav-threads.tsx`, `app-sidebar.tsx`
 - Helpers: `src/lib/chat/resolve-conversation.ts`, `persist-messages.ts`, `uimessage-from-db.ts`
 - Architecture: [`docs/architecture/chat-persistence.md`](../../architecture/chat-persistence.md)
 
@@ -24,9 +24,9 @@ last_updated: 2026-03-22
 2. Open `/chat` → **New chat** → send a message → URL should become `/chat/<uuid>`; refresh and history should reload.
 3. Optional: `/chat/new?project=<uuid>&interview=<uuid>` — first POST should persist scope; reopening the thread should keep scope from DB even if URL query is omitted.
 
-## UX note (Intelligence Chat + sidebar)
+## UX note (Copilot + sidebar)
 
-- **Thread list** is nested under **Intelligence Chat** only while the route is under `/chat/**` (no chevron; same row alignment as other Platform links). Submenu uses `SidebarMenuSub` (New chat, Recent, threads, ⋯ rename/delete). Collapsed sidebar hides the sub list via existing shadcn rules.
+- **Thread list** is nested under **Copilot** only while the route is under `/chat/**` (no chevron; same row alignment as other Platform links). Submenu uses `SidebarMenuSub` (New chat, Recent, threads, ⋯ rename/delete). Collapsed sidebar hides the sub list via existing shadcn rules.
 - **`/chat` landing** shows **ChatInboxLanding**: recent conversations in the main pane + **New chat**, same API as the sidebar list.
 - **First message from `/chat/new`:** latest `UIMessage[]` is stashed in `sessionStorage` before `router.replace(/chat/[id], { scroll: false })` inside `startTransition`; the thread view applies the seed in `useLayoutEffect` and skips the initial GET to avoid a full reload spinner while keeping messages visible.
 - **Rename / delete:** unchanged (PATCH / DELETE + confirm + redirect if needed).

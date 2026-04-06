@@ -1,8 +1,8 @@
-# Agentic RAG — Intelligence Chat
+# Agentic RAG — Copilot
 
 > Hybrid Search + Tool Calling + Grounded System Prompt
 
-This document details Sovereign's Intelligence Chat architecture: a multi-step Agentic RAG system that combines pre-injected vector search context with on-demand tool calling (entity lookup, relationship traversal, web search).
+This document details Sovereign's Copilot architecture: a multi-step Agentic RAG system that combines pre-injected vector search context with on-demand tool calling (entity lookup, relationship traversal, web search).
 
 ---
 

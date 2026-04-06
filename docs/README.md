@@ -30,7 +30,7 @@ Technical documentation for **Sovereign Data**. The repository entrypoint is [`R
 | Doc | Description |
 |-----|-------------|
 | [ingestion-pipeline.md](./architecture/ingestion-pipeline.md) | Ingestion, transcription, extraction, human review layer |
-| [agentic-rag.md](./architecture/agentic-rag.md) | Intelligence Chat, retrieval, tools |
+| [agentic-rag.md](./architecture/agentic-rag.md) | Copilot, retrieval, tools |
 
 ---
 

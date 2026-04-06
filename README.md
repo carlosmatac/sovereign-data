@@ -18,7 +18,7 @@
 
 ## What Sovereign does
 
-Sovereign supports media, consulting, and research teams working in **emerging markets**. It ingests long-form sources, extracts **entities, relationships, sentiment, and topics**, and exposes them through **search**, **Intelligence Chat**, **Network Explorer**, and **reports**.
+Sovereign supports media, consulting, and research teams working in **emerging markets**. It ingests long-form sources, extracts **entities, relationships, sentiment, and topics**, and exposes them through **search**, **Copilot**, **Network Explorer**, and **reports**.
 
 ### Core capabilities
 
@@ -72,7 +72,7 @@ npm run dev
 | Document | Description |
 |----------|-------------|
 | [Ingestion pipeline](./docs/architecture/ingestion-pipeline.md) | End-to-end ingestion and human review layer |
-| [Agentic RAG](./docs/architecture/agentic-rag.md) | Intelligence Chat, retrieval, tools |
+| [Agentic RAG](./docs/architecture/agentic-rag.md) | Copilot, retrieval, tools |
 
 ### Infrastructure
 

@@ -1,5 +1,5 @@
 /**
- * Modular system-prompt builder for Intelligence Chat.
+ * Modular system-prompt builder for Copilot.
  *
  * Architecture (layers, top to bottom):
  *   1. Core identity      — "Sovereign" persona, TBY context, jargon

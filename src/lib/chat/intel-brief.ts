@@ -1,5 +1,5 @@
 /**
- * Database-backed intel summaries for Intelligence Chat.
+ * Database-backed intel summaries for Copilot.
  * Vector RAG often misses meta-questions ("what do we know about project X?")
  * because project titles rarely appear verbatim in transcript chunks.
  */

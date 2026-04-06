@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Gabarito } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppThemeProvider } from "@/components/providers/app-theme-provider";
 import "./globals.css";
 
-const gabarito = Gabarito({
-  variable: "--font-gabarito",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -39,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${gabarito.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <AppThemeProvider>
           <TooltipProvider>

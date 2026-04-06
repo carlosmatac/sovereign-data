@@ -25,7 +25,7 @@ Your lead should give you, out of band:
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Same Supabase project as everyone else |
 | `OPENAI_API_KEY`, `ASSEMBLYAI_API_KEY` | Same provider accounts / keys the app already uses |
 | `WEBHOOK_SECRET` | Must match the value AssemblyAI sends in the **`x-webhook-secret`** header (same secret the API passes when submitting jobs) |
-| `TAVILY_API_KEY` (optional) | Enables web search in Intelligence Chat; app degrades gracefully if omitted |
+| `TAVILY_API_KEY` (optional) | Enables web search in Copilot; app degrades gracefully if omitted |
 | Access to the **Supabase project** (Dashboard) | Only if you need to run SQL migrations or operational scripts |
 | **Auth URL allow-list** | Supabase **Authentication → URL Configuration** must already include your dev origin (e.g. `http://localhost:3000/**`). If your machine uses another port or host, the lead must add it |
 | **Project membership** | After you sign up/sign in, an **owner** must add you to the relevant **project(s)** in the app; otherwise you will see no tenant data |
@@ -179,7 +179,7 @@ Requires **`dotenv`** (currently available via a transitive dev dependency when 
 - [ ] `npm run build` succeeds (catches many env/type issues).
 - [ ] `npm run dev` serves **`http://localhost:3000`** (or your configured port).
 - [ ] Magic link login completes and session persists across navigation.
-- [ ] You see **projects** after an owner adds you; opening **Intelligence Chat** works; optional: Tavily-dependent behaviour if `TAVILY_API_KEY` is set.
+- [ ] You see **projects** after an owner adds you; opening **Copilot** works; optional: Tavily-dependent behaviour if `TAVILY_API_KEY` is set.
 
 ---
 
@@ -206,4 +206,4 @@ Requires **`dotenv`** (currently available via a transitive dev dependency when 
 - [`README.md`](./README.md) — project entrypoint and documentation map
 - [`docs/README.md`](./docs/README.md) — index under `docs/`
 - [`docs/architecture/ingestion-pipeline.md`](./docs/architecture/ingestion-pipeline.md) — ingestion pipeline
-- [`docs/architecture/agentic-rag.md`](./docs/architecture/agentic-rag.md) — Intelligence Chat
+- [`docs/architecture/agentic-rag.md`](./docs/architecture/agentic-rag.md) — Copilot

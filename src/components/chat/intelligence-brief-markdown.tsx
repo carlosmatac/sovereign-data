@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import Link from "next/link";
 
 /**
- * Editorial / brief styling for Intelligence Chat assistant output.
+ * Editorial / brief styling for Copilot assistant output.
  * Uses semantic theme tokens (dark slate app default).
  */
 const briefComponents: Components = {

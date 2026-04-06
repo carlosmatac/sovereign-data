@@ -14,40 +14,37 @@ import {
   Mic,
   FolderKanban,
   Users,
-  TrendingUp,
   Clock,
   CheckCircle2,
   Loader2,
   XCircle,
   Upload,
-  ArrowRight,
+  ArrowUpRight,
   MessageSquare,
   Network,
-  Link2,
+  TrendingUp,
   Hash,
 } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
 import { IconWrapper } from "@/components/ui/icon-wrapper";
 import type { InterviewStatus } from "@/types/database";
+import { InterviewsByProjectChart } from "@/components/dashboard/interviews-by-project-chart";
+import { TopicDistributionChart } from "@/components/dashboard/topic-distribution-chart";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  // Verify auth
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return null;
 
-  // ── Fetch aggregate data ────────────────────────────────────────
-  // All queries in parallel
   const [
     projectsResult,
     interviewsResult,
-    chunksResult,
     entitiesResult,
     recentInterviewsResult,
     relationshipsResult,
@@ -55,9 +52,6 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     admin.from("projects").select("id, name, country", { count: "exact" }),
     admin.from("interviews").select("id, status", { count: "exact" }),
-    admin
-      .from("interview_chunks")
-      .select("id", { count: "exact", head: true }),
     admin.from("entities").select("id", { count: "exact", head: true }),
     admin
       .from("interviews")
@@ -76,13 +70,11 @@ export default async function DashboardPage() {
   const projectCount = projectsResult.count ?? 0;
   const interviews = interviewsResult.data ?? [];
   const interviewCount = interviewsResult.count ?? 0;
-  const chunkCount = chunksResult.count ?? 0;
   const entityCount = entitiesResult.count ?? 0;
   const recentInterviews = recentInterviewsResult.data ?? [];
   const relationshipCount = relationshipsResult.count ?? 0;
   const completedInterviews = allInterviewsResult.data ?? [];
 
-  // Compute status breakdown
   const statusCounts: Record<string, number> = {};
   interviews.forEach((i) => {
     statusCounts[i.status] = (statusCounts[i.status] ?? 0) + 1;
@@ -120,7 +112,6 @@ export default async function DashboardPage() {
   const projectBreakdown = Object.values(projectInterviewCounts)
     .filter((p) => p.total > 0)
     .sort((a, b) => b.total - a.total);
-  const maxProjectCount = Math.max(1, ...projectBreakdown.map((p) => p.total));
 
   // Topic distribution
   const topicCounts: Record<string, number> = {};
@@ -132,21 +123,29 @@ export default async function DashboardPage() {
   });
   const topTopics = Object.entries(topicCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 12);
-  const maxTopicCount = Math.max(1, ...topTopics.map(([, c]) => c));
+    .slice(0, 8)
+    .map(([topic, count]) => ({ topic, count }));
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">
-          Overview of your intelligence platform activity.
-        </p>
+    <div className="p-6 lg:p-8">
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+            Intelligence Platform
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        </div>
+        <Button size="sm" asChild className="gap-1.5">
+          <Link href="/interviews/upload">
+            <Upload className="h-3.5 w-3.5" />
+            Upload Interview
+          </Link>
+        </Button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ── KPI Row — 3 metrics ────────────────────────────────── */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <StatsCard
           title="Projects"
           value={projectCount}
@@ -160,16 +159,8 @@ export default async function DashboardPage() {
           value={interviewCount}
           icon={Mic}
           iconColor="indigo"
-          description={`${completedCount} completed, ${processingCount} processing`}
+          description={`${completedCount} completed · ${processingCount} processing`}
           href="/interviews"
-        />
-        <StatsCard
-          title="Knowledge Chunks"
-          value={chunkCount}
-          icon={MessageSquare}
-          iconColor="emerald"
-          description="Searchable transcript segments"
-          href="/chat"
         />
         <StatsCard
           title="Entities"
@@ -181,29 +172,32 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Two Column Layout */}
+      {/* ── Middle row: Recent + Side panel ───────────────────── */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Interviews */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
               <div>
-                <CardTitle className="text-base">Recent Interviews</CardTitle>
-                <CardDescription>
-                  Latest uploaded interview recordings
+                <CardTitle className="text-sm font-semibold tracking-tight">
+                  Recent Interviews
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Latest uploaded recordings
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/interviews/upload">
-                  <Upload className="mr-2 h-3.5 w-3.5" />
-                  Upload
-                </Link>
-              </Button>
+              <Link
+                href="/interviews"
+                className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                View all
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
             </CardHeader>
             <CardContent>
               {recentInterviews.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-center">
-                  <Mic className="mb-2 h-8 w-8 text-muted-foreground/50" />
+                <div className="flex flex-col items-center py-10 text-center">
+                  <Mic className="mb-3 h-7 w-7 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">
                     No interviews yet.{" "}
                     <Link
@@ -215,7 +209,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="divide-y divide-border/50">
                   {recentInterviews.map((interview) => {
                     const project = interview.projects as unknown as {
                       name: string;
@@ -230,31 +224,40 @@ export default async function DashboardPage() {
                       <Link
                         key={interview.id}
                         href={`/interviews/${interview.id}`}
-                        className="block"
+                        className="group flex items-center justify-between py-3 transition-colors hover:bg-muted/30 -mx-1 px-1 rounded"
                       >
-                        <div className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                          <div className="flex items-center gap-3">
-                            <StatusIcon status={interview.status as InterviewStatus} />
-                            <div>
-                              <p className="text-sm font-medium">
-                                {interview.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {project?.name}
-                                {project?.country
-                                  ? ` — ${project.country}`
-                                  : ""}
-                                {" · "}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <StatusIcon
+                            status={interview.status as InterviewStatus}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium leading-snug">
+                              {interview.title}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {project?.name}
+                              {project?.country
+                                ? ` · ${project.country}`
+                                : ""}
+                              {"  "}
+                              <span className="opacity-50">
                                 {new Date(
                                   interview.created_at
-                                ).toLocaleDateString()}
-                              </p>
-                            </div>
+                                ).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </p>
                           </div>
-                          <Badge variant={statusInfo.variant} className="text-[10px]">
-                            {statusInfo.label}
-                          </Badge>
                         </div>
+                        <Badge
+                          variant={statusInfo.variant}
+                          className="ml-3 shrink-0 text-[10px] font-medium tracking-wide"
+                        >
+                          {statusInfo.label}
+                        </Badge>
                       </Link>
                     );
                   })}
@@ -264,46 +267,62 @@ export default async function DashboardPage() {
           </Card>
         </div>
 
-        {/* Quick Actions + Status */}
-        <div className="space-y-6">
+        {/* Right column */}
+        <div className="flex flex-col gap-5">
           {/* Quick Actions */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Quick Actions</CardTitle>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Quick Actions
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <Button variant="outline" className="justify-start" asChild>
-                <Link href="/interviews/upload">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Interview
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start" asChild>
-                <Link href="/chat">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Intelligence Chat
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start" asChild>
-                <Link href="/network">
-                  <Network className="mr-2 h-4 w-4" />
-                  Network Explorer
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start" asChild>
-                <Link href="/projects/new">
-                  <FolderKanban className="mr-2 h-4 w-4" />
-                  New Project
-                </Link>
-              </Button>
+              {[
+                {
+                  href: "/interviews/upload",
+                  icon: Upload,
+                  label: "Upload Interview",
+                },
+                {
+                  href: "/chat",
+                  icon: MessageSquare,
+                  label: "Copilot",
+                },
+                {
+                  href: "/network",
+                  icon: Network,
+                  label: "Network Explorer",
+                },
+                {
+                  href: "/projects/new",
+                  icon: FolderKanban,
+                  label: "New Project",
+                },
+              ].map(({ href, icon: Icon, label }) => (
+                <Button
+                  key={href}
+                  variant="outline"
+                  className="justify-start gap-2 text-sm font-medium h-9"
+                  asChild
+                >
+                  <Link href={href}>
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    {label}
+                  </Link>
+                </Button>
+              ))}
             </CardContent>
           </Card>
 
           {/* Pipeline Status */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Pipeline Status</CardTitle>
-              <CardDescription>Interview processing overview</CardDescription>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Pipeline Status
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Interview processing
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -334,7 +353,7 @@ export default async function DashboardPage() {
                   label="Failed"
                   count={failedCount}
                 />
-                <Separator />
+                <Separator className="opacity-50" />
                 <StatusRow
                   icon={
                     <IconWrapper color="slate" size="sm">
@@ -351,98 +370,59 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Analytics Row */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        {/* Interviews by Project */}
-        {projectBreakdown.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <FolderKanban className="h-4 w-4 text-primary" />
-                <CardTitle className="text-base">
-                  Interviews by Project
-                </CardTitle>
-              </div>
-              <CardDescription>
-                Completed interviews per project
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {projectBreakdown.map((project) => (
-                  <div key={project.name} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium truncate max-w-[200px]">
-                        {project.name}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {project.country && (
-                          <span className="text-xs text-muted-foreground">
-                            {project.country}
-                          </span>
-                        )}
-                        <span className="text-xs font-medium tabular-nums">
-                          {project.total}
-                        </span>
-                      </div>
+      {/* ── Analytics Row — Charts ─────────────────────────────── */}
+      {(projectBreakdown.length > 0 || topTopics.length > 0) && (
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          {/* Interviews by Project — horizontal bar */}
+          {projectBreakdown.length > 0 && (
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-primary/70" />
+                      <CardTitle className="text-sm font-semibold tracking-tight">
+                        Interviews by Project
+                      </CardTitle>
                     </div>
-                    <div className="h-2 rounded-full bg-muted">
-                      <div
-                        className="h-2 rounded-full bg-primary transition-all"
-                        style={{
-                          width: `${(project.total / maxProjectCount) * 100}%`,
-                        }}
-                      />
-                    </div>
+                    <CardDescription className="mt-0.5 text-xs">
+                      Completed interviews per project
+                    </CardDescription>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </div>
+              </CardHeader>
+              <CardContent className="pb-5">
+                <InterviewsByProjectChart data={projectBreakdown} />
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Top Topics */}
-        {topTopics.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Hash className="h-4 w-4 text-primary" />
-                <CardTitle className="text-base">Topic Distribution</CardTitle>
-              </div>
-              <CardDescription>
-                Most frequent topics across all interviews
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2.5">
-                {topTopics.map(([topic, count]) => (
-                  <div key={topic} className="flex items-center gap-3">
-                    <span className="w-28 truncate text-sm">{topic}</span>
-                    <div className="flex-1">
-                      <div className="h-2 rounded-full bg-muted">
-                        <div
-                          className="h-2 rounded-full bg-emerald-500 transition-all"
-                          style={{
-                            width: `${(count / maxTopicCount) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">
-                      {count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          {/* Topic Distribution — donut */}
+          {topTopics.length > 0 && (
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Hash className="h-3.5 w-3.5 text-primary/70" />
+                  <CardTitle className="text-sm font-semibold tracking-tight">
+                    Topic Distribution
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  Top {topTopics.length} themes across all interviews
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pb-5">
+                <TopicDistributionChart data={topTopics} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────────────
+// ── Sub-components ───────────────────────────────────────────────────
 
 function StatsCard({
   title,
@@ -455,23 +435,41 @@ function StatsCard({
   title: string;
   value: number;
   icon: React.ComponentType<{ className?: string }>;
-  iconColor?: "blue" | "indigo" | "emerald" | "amber" | "rose" | "purple" | "slate" | "primary";
+  iconColor?:
+    | "blue"
+    | "indigo"
+    | "emerald"
+    | "amber"
+    | "rose"
+    | "purple"
+    | "slate"
+    | "primary";
   description: string;
   href?: string;
 }) {
   const content = (
-    <Card className={href ? "transition-colors hover:border-primary/50" : ""}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+    <Card
+      className={
+        href
+          ? "group transition-all duration-150 hover:border-primary/30 hover:bg-card/80"
+          : ""
+      }
+    >
+      <CardHeader className="flex flex-row items-start justify-between pb-2 pt-5">
+        <CardTitle className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
           {title}
         </CardTitle>
         <IconWrapper color={iconColor} size="sm">
           <Icon className="h-3.5 w-3.5" />
         </IconWrapper>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value.toLocaleString()}</div>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      <CardContent className="pb-5">
+        <div className="text-[28px] font-semibold tabular-nums leading-none tracking-tight">
+          {value.toLocaleString()}
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+          {description}
+        </p>
       </CardContent>
     </Card>
   );
@@ -494,9 +492,17 @@ function StatusRow({
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         {icon}
-        <span className={`text-sm ${bold ? "font-medium" : ""}`}>{label}</span>
+        <span
+          className={`text-sm ${bold ? "font-semibold" : "text-muted-foreground"}`}
+        >
+          {label}
+        </span>
       </div>
-      <span className={`text-sm tabular-nums ${bold ? "font-bold" : "text-muted-foreground"}`}>
+      <span
+        className={`text-sm tabular-nums ${
+          bold ? "font-semibold" : "text-muted-foreground"
+        }`}
+      >
         {count}
       </span>
     </div>

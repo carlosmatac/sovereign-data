@@ -25,7 +25,7 @@ This document preserves the **original phased roadmap** (Phases 0–4): complete
 | 2 | Conversational RAG & Analytics | COMPLETE | 100% |
 | 2.5 | Graph & Event-Driven Architecture | COMPLETE | 100% |
 | 3 | Team Management & Reports | COMPLETE | 100% |
-| 3.5 | Intelligence Chat Upgrades | COMPLETE | 100% |
+| 3.5 | Copilot Upgrades | COMPLETE | 100% |
 | 3.6 | Human Review & Interview Reprocessing | COMPLETE | 100% |
 | 4 | Production Deployment | NOT STARTED | 0% |
 
@@ -255,11 +255,11 @@ This document preserves the **original phased roadmap** (Phases 0–4): complete
 
 ---
 
-## Phase 3.5 — Intelligence Chat Upgrades & Sales War Room (COMPLETE)
+## Phase 3.5 — Copilot Upgrades & Sales War Room (COMPLETE)
 
-**Goal**: Transform the Intelligence Chat from a closed RAG into an Agentic RAG with TBY-specific persona and real-time web intelligence. Add a Sales War Room to the project dashboard.
+**Goal**: Transform the Copilot from a closed RAG into an Agentic RAG with TBY-specific persona and real-time web intelligence. Add a Sales War Room to the project dashboard.
 
-### Objective 1: Intelligence Chat Upgrades (COMPLETE)
+### Objective 1: Copilot Upgrades (COMPLETE)
 
 | Task | Status | Files | Notes |
 |------|--------|-------|-------|

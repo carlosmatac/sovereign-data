@@ -30,7 +30,7 @@ type ConversationRow = {
 const TITLE_MAX = 200;
 
 /**
- * Nested thread list under Intelligence Chat in the app sidebar (ChatGPT-style).
+ * Nested thread list under Copilot in the app sidebar (ChatGPT-style).
  */
 export function IntelligenceChatNavThreads() {
   const pathname = usePathname();

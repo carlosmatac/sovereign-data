@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Chat content only — conversation list lives under Intelligence Chat in the app sidebar.
+ * Chat content only — conversation list lives under Copilot in the app sidebar.
  */
 export default function ChatLayout({ children }: { children: ReactNode }) {
   return (

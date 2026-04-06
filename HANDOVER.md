@@ -34,7 +34,7 @@
 | Phase 2: Conversational RAG & Analytics | COMPLETE |
 | Phase 2.5: Graph & Event-Driven Architecture | COMPLETE |
 | Phase 3: Team Management & Reports | COMPLETE |
-| Phase 3.5: Intelligence Chat Upgrades & War Room | COMPLETE |
+| Phase 3.5: Copilot Upgrades & War Room | COMPLETE |
 | **Phase 4: Production Deployment** | **NOT STARTED** |
 
 *The table above is a **historical phased snapshot**. It does not decide what the team works on this week — see [`active-workstreams.md`](./docs/roadmaps/active-workstreams.md).*
@@ -141,7 +141,7 @@ If I ask you to create a new feature spec, use docs/features/feature-spec-templa
 For deep technical details, read only what your task needs, e.g.:
 
 - docs/architecture/ingestion-pipeline.md — Ingestion / transcription / pipeline
-- docs/architecture/agentic-rag.md — Intelligence Chat
+- docs/architecture/agentic-rag.md — Copilot
 - docs/infrastructure/database-schema.md — Multi-tenant DB, RLS
 - docs/infrastructure/cost-model-finops.md — Cost model
 - docs/features/done/human-in-the-loop.md — Entity Editor (shipped reference)

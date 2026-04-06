@@ -1,5 +1,5 @@
 -- ============================================
--- Intelligence Chat — persisted conversations & messages (V1)
+-- Copilot — persisted conversations & messages (V1)
 -- ============================================
 
 CREATE TYPE chat_message_role AS ENUM ('user', 'assistant');

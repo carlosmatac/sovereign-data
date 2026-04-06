@@ -12,7 +12,7 @@ related_infrastructure: []
 
 ## Problem
 
-Intelligence Chat had a single monolithic system prompt with no way for the user to tell the assistant what kind of help they needed. Sales-focused users wanted commercially actionable outputs; research/analysis users wanted synthesis and context. The single prompt tried to do both and did neither well.
+Copilot had a single monolithic system prompt with no way for the user to tell the assistant what kind of help they needed. Sales-focused users wanted commercially actionable outputs; research/analysis users wanted synthesis and context. The single prompt tried to do both and did neither well.
 
 ## Goals
 

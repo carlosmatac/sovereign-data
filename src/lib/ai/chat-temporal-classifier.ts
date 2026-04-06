@@ -58,7 +58,7 @@ export async function classifyChatTemporalIntent(
       maxOutputTokens: 256,
       maxRetries: 1,
       timeout: 10_000,
-      prompt: `Classify this user question for an intelligence chat system about interviews, people, and organizations.
+      prompt: `Classify this user question for an Copilot system about interviews, people, and organizations.
 
 User message:
 """${trimmed.slice(0, 4000)}"""

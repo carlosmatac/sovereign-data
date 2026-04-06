@@ -58,7 +58,7 @@ const platformNavItems = [
     icon: Mic,
   },
   {
-    title: "Intelligence Chat",
+    title: "Copilot",
     href: "/chat",
     icon: MessageSquare,
   },
@@ -140,7 +140,7 @@ export function AppSidebar({
                   alt="Sovereign Data — Intelligence Platform"
                   width={900}
                   height={200}
-                  className="w-full max-w-[200px] object-contain"
+                  className="w-full max-w-[148px] object-contain opacity-90"
                   priority
                 />
               </Link>
@@ -160,7 +160,7 @@ export function AppSidebar({
                     alt=""
                     width={32}
                     height={32}
-                    className="size-8 object-contain"
+                    className="size-7 object-contain opacity-90"
                   />
                 </Link>
               </SidebarMenuButton>
@@ -181,7 +181,7 @@ export function AppSidebar({
                       <SidebarMenuButton
                         asChild
                         isActive={inChatSection}
-                        tooltip="Intelligence Chat"
+                        tooltip="Copilot"
                       >
                         <Link href="/chat">
                           <item.icon className="h-4 w-4" />

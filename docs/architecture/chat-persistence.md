@@ -1,6 +1,6 @@
-# Chat persistence (Intelligence Chat) — V1
+# Chat persistence (Copilot) — V1
 
-Server-side storage for Intelligence Chat threads and text messages, with RLS and a short context window for the model.
+Server-side storage for Copilot threads and text messages, with RLS and a short context window for the model.
 
 ## Schema
 
@@ -44,7 +44,7 @@ On every `POST /api/chat`, the streamed response includes header **`X-Conversati
 
 ## UI shell
 
-- Conversation list is **nested under “Intelligence Chat”** in **`AppSidebar`** only when the route is **`/chat/**`** (`SidebarMenuSub`). The main row matches other Platform links (no chevron). **`/chat`** shows **`ChatInboxLanding`** (recent threads in the content area + New chat). **`/chat/new`** and **`/chat/[id]`** use **`IntelligenceChatView`**. First-turn navigation from new → thread uses a **sessionStorage seed** of `UIMessage[]` plus `router.replace(..., { scroll: false })` so the client does not flash the loading spinner over the just-finished reply.
+- Conversation list is **nested under “Copilot”** in **`AppSidebar`** only when the route is **`/chat/**`** (`SidebarMenuSub`). The main row matches other Platform links (no chevron). **`/chat`** shows **`ChatInboxLanding`** (recent threads in the content area + New chat). **`/chat/new`** and **`/chat/[id]`** use **`IntelligenceChatView`**. First-turn navigation from new → thread uses a **sessionStorage seed** of `UIMessage[]` plus `router.replace(..., { scroll: false })` so the client does not flash the loading spinner over the just-finished reply.
 
 ## Client caps
 

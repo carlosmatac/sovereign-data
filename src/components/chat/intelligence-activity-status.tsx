@@ -5,7 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * User-facing activity list while Intelligence Chat is working.
+ * User-facing activity list while Copilot is working.
  * Copy is illustrative (not live tool telemetry) — never exposes chain-of-thought.
  */
 const PREP_STEPS = [
@@ -49,7 +49,7 @@ export function IntelligenceActivityStatus({
       className={cn("w-full max-w-md rounded-2xl border px-5 py-4", surface)}
       aria-busy="true"
       aria-live="polite"
-      aria-label="Intelligence chat is working on your question"
+      aria-label="Copilot is working on your question"
     >
       <p
         className={cn(
