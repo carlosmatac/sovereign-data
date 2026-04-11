@@ -1,5 +1,5 @@
 -- Optional interviewee job title / role captured at upload (metadata only).
--- Not used for validated_positions, extraction prompts, or AssemblyAI word_boost.
+-- Not used for validated_positions, extraction prompts, or AssemblyAI keyterms_prompt.
 
 ALTER TABLE interviews
   ADD COLUMN IF NOT EXISTS interviewee_title TEXT;

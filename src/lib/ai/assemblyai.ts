@@ -12,7 +12,7 @@ interface TranscriptionRequest {
   webhook_auth_header_value?: string;
   speaker_labels: boolean;
   speakers_expected?: number;
-  word_boost?: string[];
+  keyterms_prompt?: string[];
   language_code?: string;
   language_detection?: boolean;
 }
@@ -52,7 +52,7 @@ export async function submitTranscription({
   webhookSecret,
   languageCode,
   speakersExpected,
-  wordBoost,
+  keytermsPrompt,
 }: {
   audioUrl: string;
   webhookUrl: string;
@@ -60,8 +60,8 @@ export async function submitTranscription({
   languageCode?: string;
   /** Hint for diarization: reduces over-segmentation when the speaker count is known. */
   speakersExpected?: number | null;
-  /** Project/global entity aliases to bias ASR decoding. */
-  wordBoost?: string[];
+  /** Project/global entity aliases to bias ASR decoding. Replaces deprecated word_boost (removed May 2026). */
+  keytermsPrompt?: string[];
 }): Promise<{ transcriptId: string }> {
   const body: TranscriptionRequest = {
     audio_url: audioUrl,
@@ -73,7 +73,7 @@ export async function submitTranscription({
     language_detection: !languageCode,
     ...(languageCode && { language_code: languageCode }),
     ...(speakersExpected != null && { speakers_expected: speakersExpected }),
-    ...(wordBoost && wordBoost.length > 0 && { word_boost: wordBoost }),
+    ...(keytermsPrompt && keytermsPrompt.length > 0 && { keyterms_prompt: keytermsPrompt }),
   };
 
   const response = await fetch(`${ASSEMBLYAI_BASE_URL}/transcript`, {

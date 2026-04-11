@@ -79,6 +79,8 @@
 
 3. **AssemblyAI webhooks cannot reach localhost** — Polling fallback at `/api/interviews/[id]/poll` checks AssemblyAI directly and triggers the pipeline. Status tracker polls every 10s.
 
+3b. **AssemblyAI `word_boost` removed (May 2026)** — AssemblyAI deprecated `word_boost` in favour of `keyterms_prompt`. The API parameter, the `TranscriptionRequest` interface, and the internal helpers (`getWordBoostAliases` → `getKeytermsPrompt`, `buildAnchorWordBoost` → `buildAnchorKeyterms`) have all been updated. Passing `word_boost` after May 11 2026 returns an error.
+
 4. **Similarity threshold is 0.25** (not 0.7) — `text-embedding-3-small` returns cosine similarities in the 0.3–0.6 range. Configured in `AI_CONFIG` in `src/lib/constants.ts`.
 
 5. **AI SDK v6 breaking changes** — `useChat` returns `{ messages, sendMessage, status, error }`. Messages use `.parts` array (not `.content`). Server uses `toUIMessageStreamResponse()`.
