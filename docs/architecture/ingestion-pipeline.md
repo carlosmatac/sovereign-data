@@ -69,10 +69,12 @@ The `POST /api/interviews` handler performs three operations:
 2. **Insert**: Creates an `interviews` row with `status: PROCESSING`, including `title`, `project_id`, `audio_url`, `language`, `expected_speakers`, `interviewee_name`, `interviewee_org`.
 3. **Submit to AssemblyAI**: Calls `submitTranscription()` from `src/lib/ai/assemblyai.ts`.
 
-**Word Boost (ASR accuracy)**:  
-Before submitting, the route builds a `word_boost` array from two sources:
-- `getWordBoostAliases()` — queries `entity_aliases` for the project and globally to feed known names to the ASR engine.
-- `buildAnchorWordBoost()` — generates variants of the interviewee name and organization (honorifics, role prefixes).
+**Keyterms Prompt (ASR accuracy)**:  
+Before submitting, the route builds a `keyterms_prompt` array from two sources:
+- `getKeytermsPrompt()` — queries `entity_aliases` for the project and globally to feed known names to the ASR engine.
+- `buildAnchorKeyterms()` — generates variants of the interviewee name and organization (honorifics, role prefixes).
+
+> **Note**: AssemblyAI deprecated `word_boost` in favour of `keyterms_prompt` (effective May 2026). The parameter name in the API request and all internal helpers have been updated accordingly. Behaviour is identical.
 
 After successful submission, the interview is updated with the `assemblyai_id` and `status: TRANSCRIBING`.
 
@@ -86,6 +88,7 @@ After successful submission, the interview is updated with the `assemblyai_id` a
 | Speech model | `universal-2` (via `speech_models: ["universal-2"]`) |
 | Speaker diarization | `speaker_labels: true` |
 | Language | Auto-detection enabled, or explicit code |
+| Keyterms | `keyterms_prompt` array (entity aliases + anchor variants) |
 | Callback | Webhook URL with `x-webhook-secret` header |
 
 AssemblyAI processes the audio asynchronously and signals completion via webhook or direct polling.

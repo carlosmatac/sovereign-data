@@ -31,7 +31,7 @@ function sanitizeOptionalAnchor(value: unknown): string | null {
   return cleaned;
 }
 
-function buildAnchorWordBoost(anchor: string): string[] {
+function buildAnchorKeyterms(anchor: string): string[] {
   const out = new Set<string>();
   const trimmed = anchor.trim();
   if (!trimmed) return [];
@@ -45,7 +45,7 @@ function buildAnchorWordBoost(anchor: string): string[] {
   return [...out].filter(Boolean);
 }
 
-async function getWordBoostAliases(
+async function getKeytermsPrompt(
   admin: ReturnType<typeof createAdminClient>,
   projectId: string,
   anchors: { intervieweeName: string | null; intervieweeOrg: string | null }
@@ -66,40 +66,40 @@ async function getWordBoostAliases(
   ]);
 
   if (projectAliasesRes.error) {
-    console.error("Failed to fetch project aliases for word_boost:", projectAliasesRes.error);
+    console.error("Failed to fetch project aliases for keyterms_prompt:", projectAliasesRes.error);
   }
   if (globalAliasesRes.error) {
-    console.error("Failed to fetch global aliases for word_boost:", globalAliasesRes.error);
+    console.error("Failed to fetch global aliases for keyterms_prompt:", globalAliasesRes.error);
   }
 
   const out: string[] = [];
   const seen = new Set<string>();
-  const MAX_WORD_BOOST = 220;
+  const MAX_KEYTERMS = 220;
 
   const anchorCandidates = [
-    ...(anchors.intervieweeName ? buildAnchorWordBoost(anchors.intervieweeName) : []),
-    ...(anchors.intervieweeOrg ? buildAnchorWordBoost(anchors.intervieweeOrg) : []),
+    ...(anchors.intervieweeName ? buildAnchorKeyterms(anchors.intervieweeName) : []),
+    ...(anchors.intervieweeOrg ? buildAnchorKeyterms(anchors.intervieweeOrg) : []),
   ];
 
   for (const term of anchorCandidates) {
     if (!term || seen.has(term)) continue;
     seen.add(term);
     out.push(term);
-    if (out.length >= MAX_WORD_BOOST) return out;
+    if (out.length >= MAX_KEYTERMS) return out;
   }
 
   for (const alias of projectAliasesRes.data ?? []) {
     if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
     seen.add(alias.alias_normalized);
     out.push(alias.alias_normalized);
-    if (out.length >= MAX_WORD_BOOST) return out;
+    if (out.length >= MAX_KEYTERMS) return out;
   }
 
   for (const alias of globalAliasesRes.data ?? []) {
     if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
     seen.add(alias.alias_normalized);
     out.push(alias.alias_normalized);
-    if (out.length >= MAX_WORD_BOOST) break;
+    if (out.length >= MAX_KEYTERMS) break;
   }
 
   return out;
@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
     const webhookUrl = `${appUrl}/api/webhooks/transcription`;
-    const wordBoost = await getWordBoostAliases(admin, project_id, {
+    const keytermsPrompt = await getKeytermsPrompt(admin, project_id, {
       intervieweeName,
       intervieweeOrg,
     });
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       webhookSecret: process.env.WEBHOOK_SECRET!,
       languageCode: language,
       speakersExpected: expectedSpeakers,
-      wordBoost,
+      keytermsPrompt,
     });
 
     // Update with AssemblyAI ID

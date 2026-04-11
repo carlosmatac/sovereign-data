@@ -14,7 +14,7 @@ related_infrastructure:
 
 > Rename, merge, and teach the system — every correction improves future accuracy
 
-This document details Sovereign's Entity Editor, the human-in-the-loop system that allows users to correct entity names extracted by the AI pipeline. Corrections feed back into the knowledge graph as aliases, improving both future entity matching and ASR word boost accuracy.
+This document details Sovereign's Entity Editor, the human-in-the-loop system that allows users to correct entity names extracted by the AI pipeline. Corrections feed back into the knowledge graph as aliases, improving both future entity matching and ASR keyterms accuracy.
 
 **Related (different concern)**: [Interview transcript review](./interview-transcript-review.md) — **before** or alongside graph fixes, editors can correct **`reviewed_utterances`**, add **structured seed entities** (`interview_review_entities`), and **reprocess** so chunks, embeddings, mentions, and relationships are rebuilt from reviewed text. The Entity Editor here fixes **canonical identity** (rename/merge) on entities that already exist in the graph; transcript review fixes **source text** and **strongly steers** the next extraction pass.
 
@@ -138,14 +138,16 @@ When a future interview is processed:
 - The 5-tier matching algorithm checks aliases at steps 2 and 4 (project-scoped and global).
 - This means the corrected name will be automatically resolved to the canonical entity.
 
-### 2. ASR Word Boost
+### 2. ASR Keyterms Prompt
 
-**File**: `src/app/api/interviews/route.ts` → `getWordBoostAliases()`
+**File**: `src/app/api/interviews/route.ts` → `getKeytermsPrompt()`
 
 When a new interview is submitted for transcription:
 - The route queries `entity_aliases` for the project and globally.
-- User-corrected aliases are included in the `word_boost` array sent to AssemblyAI.
+- User-corrected aliases are included in the `keyterms_prompt` array sent to AssemblyAI.
 - This improves ASR accuracy for names that were previously mis-transcribed.
+
+> **Migration note**: AssemblyAI replaced `word_boost` with `keyterms_prompt` (effective May 2026). The internal helper was renamed from `getWordBoostAliases` to `getKeytermsPrompt` and the API parameter updated. Behaviour is unchanged.
 
 ### 3. RAG Entity Lookup
 
@@ -199,5 +201,5 @@ The Network Explorer does not support editing — all corrections are done on th
 | Entity normalization | `src/lib/entities/normalize.ts` |
 | Entity lookup (RAG tools) | `src/lib/ai/entity-lookup.ts` |
 | Network Explorer (UI) | `src/components/network/network-explorer.tsx` |
-| ASR word boost | `src/app/api/interviews/route.ts` |
+| ASR keyterms prompt | `src/app/api/interviews/route.ts` |
 | Entity aliases schema | `supabase/migrations/00009_entity_normalization.sql` |
