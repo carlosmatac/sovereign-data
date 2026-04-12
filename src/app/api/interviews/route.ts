@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
       interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
+      semantic_source_type: "interview",
     })
     .select()
     .single();

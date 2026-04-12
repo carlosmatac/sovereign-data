@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
   const rawIntervieweeTitle = formData.get("interviewee_title");
   const rawIntervieweeEntityId = formData.get("interviewee_entity_id");
   const rawIntervieweeOrgEntityId = formData.get("interviewee_org_entity_id");
+  const rawSemanticSourceType = formData.get("semantic_source_type");
 
   // Validate required fields
   if (!pdfFile || !(pdfFile instanceof File)) {
@@ -120,6 +121,10 @@ export async function POST(request: NextRequest) {
     typeof rawLanguage === "string" && rawLanguage.trim()
       ? rawLanguage.trim()
       : "en";
+  const semanticSourceType =
+    typeof rawSemanticSourceType === "string" && rawSemanticSourceType.trim()
+      ? rawSemanticSourceType.trim()
+      : "interview";
 
   // 3. Extract text from PDF
   let extractedText: string;
@@ -188,6 +193,7 @@ export async function POST(request: NextRequest) {
       language,
       status: "PROCESSING",
       source_type: "document",
+      semantic_source_type: semanticSourceType,
       created_by: user.id,
       interviewee_name: intervieweeName,
       interviewee_org: intervieweeOrg,

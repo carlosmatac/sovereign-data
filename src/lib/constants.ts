@@ -88,6 +88,18 @@ export const MIN_PDF_TEXT_LENGTH = 100;
 /** Max length for optional interviewee job title on upload (metadata only). */
 export const MAX_INTERVIEWEE_TITLE_LENGTH = 200;
 
+/** Semantic classification values for interviews — stored in interviews.semantic_source_type. */
+export const SEMANTIC_SOURCE_TYPES = {
+  INTERVIEW: "interview",
+  REPORT: "report",
+  INTERNAL_NOTE: "internal_note",
+  PUBLISHED_ARTICLE: "published_article",
+  OTHER: "other",
+} as const;
+
+export type SemanticSourceType =
+  (typeof SEMANTIC_SOURCE_TYPES)[keyof typeof SEMANTIC_SOURCE_TYPES];
+
 // Report templates
 export const REPORT_TEMPLATES = {
   country_risk: {
