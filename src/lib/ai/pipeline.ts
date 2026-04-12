@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTranscription } from "./assemblyai";
 import { extractIntelligence, type ExtractionResult } from "./extraction";
 import { chunkTranscript, chunkPlainText, type TranscriptUtterance } from "./chunking";
+import { chunkTextInterview, type TextStructureType } from "./chunking-text-interview";
 import { generateEmbeddings } from "./embeddings";
 import { generateContentSnippets } from "./content-generation";
 import type { ChunkMetadata, EntityType, InterviewStatus, SpeakerMap } from "@/types/database";
@@ -213,6 +214,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   /** Plain transcript for GPT only. Reviewed pass: derive only from reviewed utterances. */
   extractionTranscript: string;
   chunkUtterances: TranscriptUtterance[];
+  /** Source type from DB — controls which chunking strategy is used. Defaults to 'audio'. */
+  sourceType?: "audio" | "document" | "text";
+  /** Optional structure hint for text sources (auto-detected when absent). */
+  sourceMetadata?: Record<string, unknown>;
   reviewerSeedsForExtraction?: Array<{ displayName: string; type: EntityType }>;
   reviewerSeedsForMerge?: Array<{
     display_name: string;
@@ -232,6 +237,8 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     speakerMap,
     extractionTranscript,
     chunkUtterances,
+    sourceType = "audio",
+    sourceMetadata,
     reviewerSeedsForExtraction,
     reviewerSeedsForMerge,
     clearDerivedBeforeInsert,
@@ -258,7 +265,12 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   const chunks =
     chunkUtterances.length > 0
       ? chunkTranscript(chunkUtterances)
-      : chunkPlainText(extractionTranscript);
+      : sourceType === "text"
+        ? chunkTextInterview(
+            extractionTranscript,
+            sourceMetadata?.structure_type as TextStructureType | undefined
+          )
+        : chunkPlainText(extractionTranscript);
 
   const chunkAnchors = {
     intervieweeName: interview.interviewee_name ?? null,

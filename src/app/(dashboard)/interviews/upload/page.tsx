@@ -31,6 +31,7 @@ import {
   FileText,
   X,
   Mic,
+  Type,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -45,7 +46,7 @@ import {
 import type { Project } from "@/types/database";
 import { InterviewAnchorEntityInput } from "@/components/interviews/interview-anchor-entity-input";
 
-type SourceType = "audio" | "document";
+type SourceType = "audio" | "document" | "text";
 
 export default function UploadInterviewPage() {
   const router = useRouter();
@@ -82,6 +83,10 @@ export default function UploadInterviewPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfDragActive, setPdfDragActive] = useState(false);
 
+  // Text-specific state
+  const [textContent, setTextContent] = useState("");
+  const [structureHint, setStructureHint] = useState<string>("auto");
+
   // Load only projects where user has upload permission (editor/owner)
   useEffect(() => {
     async function loadProjects() {
@@ -115,6 +120,8 @@ export default function UploadInterviewPage() {
     setSourceType(type);
     setAudioFile(null);
     setPdfFile(null);
+    setTextContent("");
+    setStructureHint("auto");
   };
 
   // ── Audio file handling ──────────────────────────────────────────
@@ -183,19 +190,32 @@ export default function UploadInterviewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const currentFile = sourceType === "audio" ? audioFile : pdfFile;
-
-    if (!currentFile || !title.trim() || !projectId) {
-      toast.error("Please fill in all required fields and select a file");
+    if (!title.trim() || !projectId) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    setLoading(true);
-
     if (sourceType === "audio") {
-      await handleAudioSubmit(currentFile as File);
+      if (!audioFile) {
+        toast.error("Please select an audio file");
+        return;
+      }
+      setLoading(true);
+      await handleAudioSubmit(audioFile);
+    } else if (sourceType === "document") {
+      if (!pdfFile) {
+        toast.error("Please select a PDF file");
+        return;
+      }
+      setLoading(true);
+      await handlePdfSubmit(pdfFile);
     } else {
-      await handlePdfSubmit(currentFile as File);
+      if (textContent.trim().length < 100) {
+        toast.error("Text must be at least 100 characters");
+        return;
+      }
+      setLoading(true);
+      await handleTextSubmit();
     }
   };
 
@@ -332,13 +352,84 @@ export default function UploadInterviewPage() {
     }
   };
 
+  const handleTextSubmit = async () => {
+    setStep("processing");
+
+    try {
+      const body: Record<string, unknown> = {
+        title: title.trim(),
+        project_id: projectId,
+        text: textContent,
+        language,
+      };
+      if (structureHint && structureHint !== "auto")
+        body.structure_hint = structureHint;
+      if (intervieweeName.trim()) body.interviewee_name = intervieweeName.trim();
+      if (intervieweeOrg.trim()) body.interviewee_org = intervieweeOrg.trim();
+      if (intervieweeTitle.trim()) body.interviewee_title = intervieweeTitle.trim();
+      if (intervieweeEntityId) body.interviewee_entity_id = intervieweeEntityId;
+      if (intervieweeOrgEntityId)
+        body.interviewee_org_entity_id = intervieweeOrgEntityId;
+
+      const response = await fetch("/api/interviews/from-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create interview");
+      }
+
+      const interview = await response.json();
+
+      toast.success("Text interview submitted for processing", {
+        description: "Intelligence extraction has started.",
+      });
+
+      router.push(`/interviews/${interview.id}`);
+    } catch (error) {
+      console.error("Text submit error:", error);
+      toast.error("Submission failed", {
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      });
+      setStep("form");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTxtFileLoad = useCallback(
+    (file: File) => {
+      if (!file.name.endsWith(".txt") && file.type !== "text/plain") {
+        toast.error("Please upload a .txt file");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        setTextContent(text ?? "");
+      };
+      reader.readAsText(file);
+    },
+    []
+  );
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const currentFile = sourceType === "audio" ? audioFile : pdfFile;
-  const isFormReady = !!currentFile && !!title.trim() && !!projectId;
+  const isFormReady =
+    !!title.trim() &&
+    !!projectId &&
+    (sourceType === "audio"
+      ? !!audioFile
+      : sourceType === "document"
+        ? !!pdfFile
+        : textContent.trim().length >= 100);
 
   return (
     <div className="p-6">
@@ -373,12 +464,14 @@ export default function UploadInterviewPage() {
                       ? "Uploading audio..."
                       : sourceType === "document"
                         ? "Extracting text and submitting for processing..."
-                        : "Submitting for processing..."}
+                        : sourceType === "text"
+                          ? "Submitting text for processing..."
+                          : "Submitting for processing..."}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {step === "uploading"
                       ? "Securely transferring to encrypted storage"
-                      : sourceType === "document"
+                      : sourceType === "document" || sourceType === "text"
                         ? "Starting AI intelligence pipeline"
                         : "Starting AI transcription pipeline"}
                   </p>
@@ -393,7 +486,7 @@ export default function UploadInterviewPage() {
               {/* Source type toggle */}
               <div className="space-y-2">
                 <Label>Interview Source</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => handleSourceTypeChange("audio")}
@@ -405,7 +498,7 @@ export default function UploadInterviewPage() {
                     disabled={loading}
                   >
                     <Mic className="h-4 w-4" />
-                    Audio Recording
+                    Audio
                   </button>
                   <button
                     type="button"
@@ -418,13 +511,31 @@ export default function UploadInterviewPage() {
                     disabled={loading}
                   >
                     <FileText className="h-4 w-4" />
-                    PDF Transcript
+                    PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSourceTypeChange("text")}
+                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+                      sourceType === "text"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50"
+                    }`}
+                    disabled={loading}
+                  >
+                    <Type className="h-4 w-4" />
+                    Texto
                   </button>
                 </div>
                 {sourceType === "document" && (
                   <p className="text-xs text-muted-foreground">
                     For archived interviews where only a transcript PDF exists.
                     Audio features will not be available.
+                  </p>
+                )}
+                {sourceType === "text" && (
+                  <p className="text-xs text-muted-foreground">
+                    Paste a transcript or upload a .txt file. Minimum 100 characters.
                   </p>
                 )}
               </div>
@@ -551,6 +662,62 @@ export default function UploadInterviewPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Text input zone */}
+              {sourceType === "text" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Interview Text *</Label>
+                    <Textarea
+                      placeholder="Paste transcript here…"
+                      value={textContent}
+                      onChange={(e) => setTextContent(e.target.value)}
+                      rows={10}
+                      disabled={loading}
+                      className="font-mono text-xs"
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{textContent.length.toLocaleString()} characters</span>
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground"
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".txt,text/plain";
+                          input.onchange = (e) => {
+                            const f = (e.target as HTMLInputElement).files?.[0];
+                            if (f) handleTxtFileLoad(f);
+                          };
+                          input.click();
+                        }}
+                        disabled={loading}
+                      >
+                        Load from .txt file
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Text structure</Label>
+                    <Select
+                      value={structureHint}
+                      onValueChange={setStructureHint}
+                      disabled={loading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto-detect</SelectItem>
+                        <SelectItem value="qa_structured">Q&amp;A (Q: / A: labels)</SelectItem>
+                        <SelectItem value="speaker_transcript">Speaker Transcript (Name: labels)</SelectItem>
+                        <SelectItem value="article_style">Article / Essay</SelectItem>
+                        <SelectItem value="freeform">Freeform</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
 
@@ -724,10 +891,15 @@ export default function UploadInterviewPage() {
                       <Upload className="mr-2 h-4 w-4" />
                       Upload & Process
                     </>
-                  ) : (
+                  ) : sourceType === "document" ? (
                     <>
                       <FileText className="mr-2 h-4 w-4" />
                       Process PDF
+                    </>
+                  ) : (
+                    <>
+                      <Type className="mr-2 h-4 w-4" />
+                      Process Text
                     </>
                   )}
                 </Button>
