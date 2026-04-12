@@ -193,9 +193,11 @@ function parseReviewedUtterancesJson(
 
 /**
  * Shared path: extraction → chunk → embed → persist chunks → resolve → ground → relationships → snippets.
+ * Handles audio (chunkUtterances present), PDF/text (chunkUtterances empty → chunkPlainText), and
+ * reviewed reprocess (clearDerivedBeforeInsert: true).
  * @param clearDerivedBeforeInsert — when true, RPC-wipes chunks/mentions/relationships/snippets after embeddings are computed and before chunk insert (reviewed reprocess).
  */
-async function runIntelPipelineFromTranscriptInput(params: {
+export async function runIntelPipelineFromCanonicalSource(params: {
   supabase: SupabaseClient<Database>;
   interviewId: string;
   interview: {
@@ -218,7 +220,7 @@ async function runIntelPipelineFromTranscriptInput(params: {
     entity_id: string | null;
   }>;
   clearDerivedBeforeInsert: boolean;
-  lastIntelSource: "assemblyai_auto" | "human_review";
+  lastIntelSource: "assemblyai_auto" | "human_review" | "direct_ingest";
   /** Merged into the final COMPLETED row update (e.g. transcript_review_status for human review). */
   completedInterviewExtra?: Record<string, unknown>;
 }): Promise<void> {
@@ -618,7 +620,7 @@ export async function processTranscription(
         }))
       : [];
 
-    await runIntelPipelineFromTranscriptInput({
+    await runIntelPipelineFromCanonicalSource({
       supabase,
       interviewId,
       interview: {
@@ -720,7 +722,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
 
-    await runIntelPipelineFromTranscriptInput({
+    await runIntelPipelineFromCanonicalSource({
       supabase,
       interviewId,
       interview: {

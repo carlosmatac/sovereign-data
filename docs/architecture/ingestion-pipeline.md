@@ -2,7 +2,9 @@
 
 > Audio Upload → Transcription → AI Extraction → Chunking → Anchor Normalization → Embedding → Knowledge Graph
 
-This document details Sovereign's ingestion pipeline that transforms raw audio interviews into searchable, structured business intelligence.
+This document details Sovereign's ingestion pipeline that transforms raw audio interviews, PDF documents, and text sources into searchable, structured business intelligence.
+
+> **PR1 (April 2026):** `processDocument` and `processTranscription` now both delegate to a single shared runner (`runIntelPipelineFromCanonicalSource` in `src/lib/ai/pipeline.ts`). The old `runIntelPipelineFromTranscriptInput` name has been retired — all references have been updated. `document-pipeline.ts` is now a thin wrapper (~80 lines) that handles PDF-specific setup before calling the shared runner.
 
 ---
 
@@ -120,7 +122,13 @@ Since AssemblyAI webhooks cannot reach `localhost`, a polling fallback exists:
 
 **File**: `src/lib/ai/pipeline.ts`
 
-The `processTranscription(interviewId, assemblyaiTranscriptId)` function orchestrates the remaining steps. It updates the interview status at each stage for real-time UI feedback via Supabase Realtime.
+`processTranscription(interviewId, assemblyaiTranscriptId)` orchestrates the remaining steps for the audio path. Both audio and document sources converge into the shared `runIntelPipelineFromCanonicalSource` function, which handles all extraction, chunking, embedding, and persistence. It updates the interview status at each stage for real-time UI feedback via Supabase Realtime.
+
+| Entry point | Caller | `lastIntelSource` |
+|-------------|--------|-------------------|
+| `processTranscription` | Webhook / poll | `assemblyai_auto` |
+| `processDocument` | `POST /api/interviews/from-pdf` | `direct_ingest` |
+| `reprocessInterviewFromReview` | `POST /api/interviews/[id]/reprocess-review` | `human_review` |
 
 ```mermaid
 stateDiagram-v2
@@ -346,11 +354,13 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Responsibility | File Path |
 |----------------|-----------|
 | Upload UI | `src/app/(dashboard)/interviews/upload/page.tsx` |
-| Create interview API | `src/app/api/interviews/route.ts` |
+| Create interview API (audio) | `src/app/api/interviews/route.ts` |
+| Create interview API (PDF) | `src/app/api/interviews/from-pdf/route.ts` |
 | AssemblyAI client | `src/lib/ai/assemblyai.ts` |
 | Transcription webhook | `src/app/api/webhooks/transcription/route.ts` |
 | Poll fallback | `src/app/api/interviews/[id]/poll/route.ts` |
-| ETL pipeline | `src/lib/ai/pipeline.ts` |
+| **Shared ETL runner** | `src/lib/ai/pipeline.ts` → `runIntelPipelineFromCanonicalSource` |
+| PDF pipeline (thin wrapper) | `src/lib/ai/document-pipeline.ts` → `processDocument` |
 | Intelligence extraction | `src/lib/ai/extraction.ts` |
 | Speaker-aware chunking | `src/lib/ai/chunking.ts` |
 | Embedding generation | `src/lib/ai/embeddings.ts` |
