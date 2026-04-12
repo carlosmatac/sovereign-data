@@ -5,6 +5,7 @@
 This document details Sovereign's ingestion pipeline that transforms raw audio interviews, PDF documents, and text sources into searchable, structured business intelligence.
 
 > **PR1 (April 2026):** `processDocument` and `processTranscription` now both delegate to a single shared runner (`runIntelPipelineFromCanonicalSource` in `src/lib/ai/pipeline.ts`). The old `runIntelPipelineFromTranscriptInput` name has been retired — all references have been updated. `document-pipeline.ts` is now a thin wrapper (~80 lines) that handles PDF-specific setup before calling the shared runner.
+> **PR4 (April 2026):** `extractIntelligence` now accepts `semanticSourceType` and `candidateEntities`. Source-type prompt overlays are applied based on the `source_type + semantic_source_type` combination (e.g., `document+report` gets a different extraction prompt than `audio+interview`). `fetchCandidateEntities` builds a shortlist of up to 30 known project entities (anchors first, then most-mentioned, then global fallback for new projects) and passes them to the extractor as a PROJECT ENTITIES context block. Prompt base for `audio+interview` is unchanged.
 
 ---
 

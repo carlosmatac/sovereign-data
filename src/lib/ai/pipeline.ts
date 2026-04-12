@@ -192,6 +192,140 @@ function parseReviewedUtterancesJson(
   }));
 }
 
+// ── fetchCandidateEntities ─────────────────────────────────────────────────
+
+/**
+ * Build a shortlist of known project entities to pass to extractIntelligence
+ * as reference context, improving entity matching and reducing duplicates.
+ *
+ * Priority:
+ * 1. Explicit anchor entities (interviewee + org, by entity_id if available)
+ * 2. Most-mentioned project entities (by entity_mention count)
+ * 3. Global fallback when project has <5 own entities
+ */
+async function fetchCandidateEntities(
+  supabase: SupabaseClient<Database>,
+  params: {
+    projectId: string;
+    anchors: {
+      intervieweeName: string | null;
+      intervieweeOrg: string | null;
+      intervieweeEntityId?: string | null;
+      intervieweeOrgEntityId?: string | null;
+    };
+    limit?: number;
+    maxAliasesPerEntity?: number;
+  }
+): Promise<Array<{ name: string; type: EntityType; aliases: string[] }>> {
+  const { projectId, anchors, limit = 28, maxAliasesPerEntity = 2 } = params;
+  const hardMax = Math.min(limit, 30);
+
+  const result: Array<{ id: string; name: string; type: EntityType }> = [];
+  const addedIds = new Set<string>();
+
+  // Step 1: anchor entities by ID (always first)
+  const anchorIds = [
+    anchors.intervieweeEntityId,
+    anchors.intervieweeOrgEntityId,
+  ].filter(Boolean) as string[];
+
+  if (anchorIds.length > 0) {
+    const { data: anchorEntities } = await supabase
+      .from("entities")
+      .select("id, name, type")
+      .in("id", anchorIds);
+
+    for (const e of anchorEntities ?? []) {
+      if (!addedIds.has(e.id)) {
+        result.push({ id: e.id, name: e.name, type: e.type as EntityType });
+        addedIds.add(e.id);
+      }
+    }
+  }
+
+  // Step 2: most-mentioned project entities
+  const remaining = hardMax - result.length;
+  if (remaining > 0) {
+    const { data: mentionData } = await supabase
+      .from("entity_mentions")
+      .select("entity_id, entities!inner(id, name, type, project_id)")
+      .in(
+        "interview_id",
+        (
+          await supabase
+            .from("interviews")
+            .select("id")
+            .eq("project_id", projectId)
+        ).data?.map((i) => i.id) ?? []
+      )
+      .limit(500);
+
+    // Aggregate by entity_id
+    const countMap = new Map<string, { name: string; type: string; projectId: string | null; count: number }>();
+    for (const row of mentionData ?? []) {
+      const ent = row.entities as unknown as { id: string; name: string; type: string; project_id: string | null };
+      if (!ent) continue;
+      const existing = countMap.get(ent.id);
+      if (existing) {
+        existing.count++;
+      } else {
+        countMap.set(ent.id, { name: ent.name, type: ent.type, projectId: ent.project_id, count: 1 });
+      }
+    }
+
+    const sorted = [...countMap.entries()]
+      .filter(([id]) => !addedIds.has(id))
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, remaining);
+
+    for (const [id, { name, type }] of sorted) {
+      result.push({ id, name, type: type as EntityType });
+      addedIds.add(id);
+    }
+
+    // Step 3: global fallback when project has <5 own entities
+    const ownEntitiesCount = [...countMap.values()].filter(
+      (e) => e.projectId === projectId
+    ).length;
+    if (ownEntitiesCount < 5) {
+      const globalRemaining = hardMax - result.length;
+      if (globalRemaining > 0) {
+        const { data: globalEntities } = await supabase
+          .from("entities")
+          .select("id, name, type")
+          .is("project_id", null)
+          .limit(globalRemaining + addedIds.size);
+
+        for (const e of globalEntities ?? []) {
+          if (!addedIds.has(e.id) && result.length < hardMax) {
+            result.push({ id: e.id, name: e.name, type: e.type as EntityType });
+            addedIds.add(e.id);
+          }
+        }
+      }
+    }
+  }
+
+  // Step 4: fetch aliases for each entity
+  const withAliases: Array<{ name: string; type: EntityType; aliases: string[] }> = [];
+  for (const entity of result) {
+    const { data: aliasRows } = await supabase
+      .from("entity_aliases")
+      .select("alias_normalized")
+      .eq("entity_id", entity.id)
+      .order("created_at", { ascending: false })
+      .limit(maxAliasesPerEntity);
+
+    withAliases.push({
+      name: entity.name,
+      type: entity.type,
+      aliases: (aliasRows ?? []).map((a) => a.alias_normalized).filter(Boolean),
+    });
+  }
+
+  return withAliases;
+}
+
 /**
  * Shared path: extraction → chunk → embed → persist chunks → resolve → ground → relationships → snippets.
  * Handles audio (chunkUtterances present), PDF/text (chunkUtterances empty → chunkPlainText), and
@@ -216,6 +350,8 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   chunkUtterances: TranscriptUtterance[];
   /** Source type from DB — controls which chunking strategy is used. Defaults to 'audio'. */
   sourceType?: "audio" | "document" | "text";
+  /** Semantic category used for prompt overlay in extraction. */
+  semanticSourceType?: string;
   /** Optional structure hint for text sources (auto-detected when absent). */
   sourceMetadata?: Record<string, unknown>;
   reviewerSeedsForExtraction?: Array<{ displayName: string; type: EntityType }>;
@@ -238,6 +374,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     extractionTranscript,
     chunkUtterances,
     sourceType = "audio",
+    semanticSourceType = "interview",
     sourceMetadata,
     reviewerSeedsForExtraction,
     reviewerSeedsForMerge,
@@ -245,6 +382,17 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     lastIntelSource,
     completedInterviewExtra,
   } = params;
+
+  // Fetch candidate entities from the project to improve extraction matching
+  const candidateEntities = await fetchCandidateEntities(supabase, {
+    projectId: interview.project_id,
+    anchors: {
+      intervieweeName: interview.interviewee_name ?? null,
+      intervieweeOrg: interview.interviewee_org ?? null,
+      intervieweeEntityId: interview.interviewee_entity_id,
+      intervieweeOrgEntityId: interview.interviewee_org_entity_id,
+    },
+  });
 
   const extraction = await extractIntelligence({
     transcript: extractionTranscript,
@@ -254,6 +402,9 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     primaryPerson: interview.interviewee_name ?? null,
     primaryOrg: interview.interviewee_org ?? null,
     reviewerSeedEntities: reviewerSeedsForExtraction,
+    sourceType,
+    semanticSourceType,
+    candidateEntities: candidateEntities.length > 0 ? candidateEntities : undefined,
   });
 
   await updateInterviewStatus(interviewId, "EMBEDDING", {
