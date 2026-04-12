@@ -82,6 +82,7 @@ export default function UploadInterviewPage() {
   // PDF-specific state
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfDragActive, setPdfDragActive] = useState(false);
+  const [pdfSemanticType, setPdfSemanticType] = useState("interview");
 
   // Text-specific state
   const [textContent, setTextContent] = useState("");
@@ -120,6 +121,7 @@ export default function UploadInterviewPage() {
     setSourceType(type);
     setAudioFile(null);
     setPdfFile(null);
+    setPdfSemanticType("interview");
     setTextContent("");
     setStructureHint("auto");
   };
@@ -311,6 +313,7 @@ export default function UploadInterviewPage() {
       formData.append("title", title.trim());
       formData.append("project_id", projectId);
       formData.append("language", language);
+      formData.append("semantic_source_type", pdfSemanticType);
       if (intervieweeName.trim())
         formData.append("interviewee_name", intervieweeName.trim());
       if (intervieweeOrg.trim())
@@ -662,6 +665,28 @@ export default function UploadInterviewPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* PDF document type selector */}
+              {sourceType === "document" && (
+                <div className="space-y-2">
+                  <Label>Document type</Label>
+                  <Select
+                    value={pdfSemanticType}
+                    onValueChange={setPdfSemanticType}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="interview">Interview Transcript</SelectItem>
+                      <SelectItem value="report">Report / Analysis</SelectItem>
+                      <SelectItem value="published_article">Published Article</SelectItem>
+                      <SelectItem value="other">Other Document</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

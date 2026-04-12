@@ -220,6 +220,20 @@ describe("pipeline smoke tests", () => {
     expect(completedCall?.patch.last_intel_source).toBe("direct_ingest");
   });
 
+  it("text_interview path: processTextInterview reaches COMPLETED with direct_ingest", async () => {
+    const { processTextInterview } = await import("@/lib/ai/document-pipeline");
+    const longText =
+      "Q: What is your role?\nA: I am the minister responsible for energy policy in this region.\n\n"
+        .repeat(20);
+    await processTextInterview("interview-text-1", longText, "qa_structured");
+
+    const completedCall = mockSupabase._updateCalls.find(
+      (c) => c.patch.status === "COMPLETED"
+    );
+    expect(completedCall).toBeDefined();
+    expect(completedCall?.patch.last_intel_source).toBe("direct_ingest");
+  });
+
   it("reprocess: clears derived data and uses human_review lastIntelSource", async () => {
     const { reprocessInterviewFromReview } = await import("@/lib/ai/pipeline");
 
