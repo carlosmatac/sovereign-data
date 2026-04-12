@@ -13,4 +13,6 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [platform-user-roles-authorization.md](./platform-user-roles-authorization.md) | Global roles (`member` / `platform_admin` / `superuser`), Platform Administration routing |
 | [platform-user-role-management.md](./platform-user-role-management.md) | `/admin/users` — superuser grants `platform_admin` / `superuser` |
 
+| [edit-interview-title.md](./edit-interview-title.md) | Inline rename of interview title from detail page |
+
 New completed features: add a row here when you move a spec into this folder.

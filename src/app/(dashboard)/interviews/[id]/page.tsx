@@ -37,6 +37,7 @@ import { AudioPlayer } from "@/components/interviews/audio-player";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
 import { EditableSpeakersCard } from "@/components/interviews/editable-speakers-card";
+import { EditableInterviewTitle } from "@/components/interviews/editable-interview-title";
 import type { SpeakerMap } from "@/types/database";
 
 export default async function InterviewDetailPage({
@@ -183,9 +184,11 @@ export default async function InterviewDetailPage({
       <div className="mb-8">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {interview.title}
-            </h1>
+            <EditableInterviewTitle
+              interviewId={interview.id}
+              initialTitle={interview.title}
+              canEdit={canEdit}
+            />
             <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
               {project && <span>{project.name}</span>}
               {project?.country && (
