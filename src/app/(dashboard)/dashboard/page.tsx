@@ -350,8 +350,7 @@ export default async function DashboardPage() {
               <Link
                 key={href}
                 href={href}
-                className="flex items-center gap-2 rounded-[5px] border px-2.5 py-2.5 text-[11.5px] font-medium text-white/80 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.03] hover:text-white"
-                style={{ borderColor: "rgba(147,147,147,0.15)" }}
+                className="sv-hover-card flex items-center gap-2 rounded-[5px] border border-[rgba(147,147,147,0.15)] px-2.5 py-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
               >
                 <Icon
                   className="h-[14px] w-[14px] shrink-0 text-white/55"
@@ -424,10 +423,7 @@ function StatLink({
   accent: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="block transition-transform duration-150 hover:-translate-y-[1px]"
-    >
+    <Link href={href} className="block">
       <MetricCard
         label={label}
         value={value.toLocaleString()}

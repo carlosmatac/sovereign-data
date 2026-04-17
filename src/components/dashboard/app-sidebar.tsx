@@ -125,16 +125,9 @@ export function AppSidebar({
     : user.email?.slice(0, 2).toUpperCase() ?? "SD";
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="border-r-0"
-      style={{ borderRight: "1px solid rgba(147,147,147,0.10)" }}
-    >
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarRail />
-      <SidebarHeader
-        className="px-3 pt-4 pb-3"
-        style={{ borderBottom: "1px solid rgba(147,147,147,0.10)" }}
-      >
+      <SidebarHeader className="px-3 pt-4 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
             {state === "expanded" || isMobile ? (
@@ -263,10 +256,7 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter
-        className="px-2 pb-3"
-        style={{ borderTop: "1px solid rgba(147,147,147,0.09)" }}
-      >
+      <SidebarFooter className="px-2 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

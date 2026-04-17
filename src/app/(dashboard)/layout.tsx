@@ -38,6 +38,39 @@ export default async function DashboardLayout({
   const sidebarCookie = cookieStore.get("sidebar_state")?.value;
   const sidebarDefaultOpen = sidebarCookie !== "false";
 
+  /**
+   * Shared app shell — "one outer frame with an integrated sidebar and a central
+   * working surface", mirroring the landing's `AppSurface` composition:
+   *
+   *   ┌────────────────────────────────────────────────────────────────────┐
+   *   │ Outer shell: #070E1F (--sidebar / --background, shared by both)    │
+   *   │  ┌────────┐   ┌──────────────────────────────────────────────────┐ │
+   *   │  │        │   │  Central working panel (SidebarInset)            │ │
+   *   │  │ Sidebar│   │  bg #080F1E · 6px radius · soft border           │ │
+   *   │  │        │   │  ┌── top bar ──┐                                 │ │
+   *   │  │        │   │  │             │                                 │ │
+   *   │  │        │   │  │  page       │                                 │ │
+   *   │  │        │   │  │  content    │                                 │ │
+   *   │  │        │   │  └─────────────┘                                 │ │
+   *   │  └────────┘   └──────────────────────────────────────────────────┘ │
+   *   └────────────────────────────────────────────────────────────────────┘
+   *
+   * How this is assembled:
+   *   - `variant="inset"` on `<Sidebar>` (see `AppSidebar`) makes the shadcn
+   *     sidebar-wrapper the outer shell and floats the sidebar column inside it
+   *     with an 8px gutter, so the sidebar stops reading as a detached card.
+   *   - `SidebarInset` is restyled below so the central panel matches the
+   *     landing `AppSurface` central rectangle (6px radius, `#080F1E` surface,
+   *     `rgba(147,147,147,0.16)` hairline border) instead of shadcn's default
+   *     `rounded-xl` + `shadow-sm` card. Both the sidebar column and the central
+   *     panel now sit on the *same* `#070E1F` outer shell, which is what gives
+   *     the shared-frame feel — no hard vertical rule between sidebar and
+   *     content, no divider boxes inside the sidebar, no edge-to-edge header
+   *     line across the content.
+   *
+   * Functionality preserved: `SidebarProvider` collapsible="icon", mobile Sheet
+   * behaviour, rail toggle, routing, active states — all unchanged.
+   */
   return (
     <SidebarProvider
       defaultOpen={sidebarDefaultOpen}
@@ -54,7 +87,9 @@ export default async function DashboardLayout({
         }}
         showPlatformAdministration={showPlatformAdministration}
       />
-      <SidebarInset className="flex min-h-svh min-w-0 flex-col">
+      <SidebarInset
+        className="flex min-w-0 flex-col overflow-hidden bg-[#080F1E] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.16)] md:shadow-none"
+      >
         <DashboardInsetHeader />
         <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto">
           {children}

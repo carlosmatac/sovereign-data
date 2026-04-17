@@ -165,3 +165,30 @@
     font-feature-settings: "tnum" 1;
   }
 }
+
+/*
+ * Shared hover affordance for card-like surfaces.
+ *
+ * Subtle, premium, restrained — matches docs/ui-panel-system.md §11
+ * (Interaction Rules). No scale, no translate, no glow.
+ *
+ * Applied by opting in with `className="sv-hover-card"`. The utility
+ * only handles the *transition* + *hover* rules; it deliberately does
+ * not force a base background, so cards that already paint themselves
+ * (shadcn `<Card>` via `bg-card`, or plain divs via `bg-[#080F1E]`)
+ * can opt in without disrupting their resting look.
+ *
+ * Placed in `@layer utilities` so `.sv-hover-card:hover` (0,2,0) wins
+ * over bare background/border utilities (0,1,0) on hover.
+ */
+@layer utilities {
+  .sv-hover-card {
+    transition-property: background-color, border-color;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+  .sv-hover-card:hover {
+    background-color: #0A1223;
+    border-color: rgba(147, 147, 147, 0.30);
+  }
+}

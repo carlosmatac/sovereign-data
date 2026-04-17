@@ -85,11 +85,7 @@ export default async function ProjectsPage() {
             <Link
               key={project.id}
               href={`/projects/${project.id}`}
-              className="group block rounded-[6px] border px-4 py-4 transition-colors duration-200 ease-out hover:border-[rgba(147,147,147,0.24)] hover:bg-[#0A1223]"
-              style={{
-                background: "#080F1E",
-                borderColor: "rgba(147,147,147,0.14)",
-              }}
+              className="sv-hover-card group block rounded-[6px] border border-[rgba(147,147,147,0.14)] bg-[#080F1E] px-4 py-4"
             >
               <div className="mb-2.5 flex items-start justify-between gap-2">
                 <p className="truncate text-[14px] font-semibold leading-snug text-white/92">

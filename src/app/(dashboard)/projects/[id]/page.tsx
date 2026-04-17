@@ -169,7 +169,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           <div className="space-y-4">
             {/* Stats Cards */}
             <Link href={`/interviews?project=${projectId}`}>
-              <Card className="transition-colors hover:border-primary/50">
+              <Card className="sv-hover-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
                     Interviews
@@ -187,7 +187,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
             {role === "owner" ? (
               <Link href={`/projects/${projectId}/members`}>
-                <Card className="transition-colors hover:border-primary/50">
+                <Card className="sv-hover-card">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
                       Team Members
@@ -203,7 +203,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 </Card>
               </Link>
             ) : (
-              <Card>
+              <Card className="sv-hover-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
                     Team Members
@@ -219,7 +219,7 @@ export default async function ProjectDetailPage({ params }: Props) {
               </Card>
             )}
 
-            <Card>
+            <Card className="sv-hover-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
                   Your Role
@@ -239,7 +239,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             </Card>
 
             {/* Quick Actions */}
-            <Card>
+            <Card className="sv-hover-card">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   Quick Actions

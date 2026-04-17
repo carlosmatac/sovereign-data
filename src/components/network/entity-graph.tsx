@@ -65,11 +65,18 @@ function resolveId(x: unknown): string {
 // ── Node sizing helper ─────────────────────────────────────────
 //
 // Nodes are intentionally small to match the landing's "precision
-// graph" look. Min 10 / max 22px diameter, scaled by the square
+// graph" look. Min 8 / max 18px diameter, scaled by the square
 // root of mention count so outliers do not dominate.
+//
+// This is a second tightening pass on top of the initial 10–22 range:
+// on dense projects the 22px outliers still read as heavy "balls" on
+// a graph with 60+ nodes, while the landing reference graph keeps every
+// node in a single-digit / low-teens diameter. 8–18 preserves the same
+// visual hierarchy between "mentioned once" and "mentioned many times"
+// without letting any node dominate the canvas.
 function nodeSize(mentionCount: number | null | undefined): number {
   const m = Math.max(0, mentionCount ?? 0)
-  return Math.max(10, Math.min(10 + Math.sqrt(m + 1) * 2.6, 22))
+  return Math.max(8, Math.min(8 + Math.sqrt(m + 1) * 2.0, 18))
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,22 +95,25 @@ const STYLESHEET: any[] = [
       "transition-duration": 180,
     },
   },
-  // Permanent label for top-N prominent nodes
+  // Permanent label for top-N prominent nodes.
+  //
+  // Label sizing is deliberately *smaller* than the surrounding node so
+  // the node stays the dominant visual element. The landing reference
+  // graph uses ~7.5–9px node labels at arbitrarily small scales; we
+  // stay in that range and keep the label pill tight (1px padding, no
+  // background fill) so labels never visually swallow the node.
   {
     selector: "node.show-label",
     style: {
       label: "data(displayName)",
-      "font-size": 10,
+      "font-size": 7.5,
       "font-family": "Inter, system-ui, sans-serif",
       "font-weight": 500,
       "text-valign": "bottom",
       "text-halign": "center",
-      "text-margin-y": 5,
-      color: "#64748b",
-      "text-background-color": "#0b0e17",
-      "text-background-opacity": 1,
-      "text-background-padding": "3px",
-      "text-background-shape": "roundrectangle",
+      "text-margin-y": 4,
+      color: "rgba(255,255,255,0.52)",
+      "text-background-opacity": 0,
       "text-max-width": "120px",
       "text-wrap": "ellipsis",
     },
@@ -116,14 +126,11 @@ const STYLESHEET: any[] = [
     selector: "node.focused",
     style: {
       label: "data(displayName)",
-      "font-size": 12,
+      "font-size": 9.5,
       "font-weight": 600,
-      color: "#f8fafc",
-      "text-background-color": "#1e293b",
-      "text-background-opacity": 1,
-      "text-background-padding": "4px",
-      "text-background-shape": "roundrectangle",
-      "text-margin-y": 7,
+      color: "rgba(255,255,255,0.92)",
+      "text-background-opacity": 0,
+      "text-margin-y": 6,
       "border-width": 1,
       "border-color": "#ffffff",
       "border-opacity": 0.75,
@@ -135,13 +142,10 @@ const STYLESHEET: any[] = [
     selector: "node.neighbor",
     style: {
       label: "data(displayName)",
-      "font-size": 10.5,
+      "font-size": 8.5,
       "font-weight": 500,
-      color: "#cbd5e1",
-      "text-background-color": "#0b0e17",
-      "text-background-opacity": 0.9,
-      "text-background-padding": "3px",
-      "text-background-shape": "roundrectangle",
+      color: "rgba(255,255,255,0.72)",
+      "text-background-opacity": 0,
       "text-margin-y": 5,
       "border-width": 1,
       "border-color": "data(color)",
@@ -154,32 +158,43 @@ const STYLESHEET: any[] = [
     selector: "node.dimmed",
     style: { opacity: 0.09 },
   },
-  // Base edge
+  // ── Edges ──────────────────────────────────────────────────────
+  //
+  // Design rule: edge *width stays constant* across all states. The
+  // only thing that changes on highlight is the **brightness** — the
+  // line brightens when it's part of a selected connection, and fades
+  // when it's unrelated. Thickening on highlight reads as noisy and
+  // gamey; a pure brightness change reads as analytical, which matches
+  // the landing reference graph.
   {
     selector: "edge",
     style: {
       width: 0.8,
       "line-color": "#94a3b8",
-      opacity: 0.16,
+      opacity: 0.18,
       "curve-style": "straight",
       "overlay-opacity": 0,
-      "transition-property": "opacity, line-color, width",
+      "transition-property": "opacity, line-color",
       "transition-duration": 180,
     },
   },
-  // Highlighted edge (connects focused → neighbor)
+  // Highlighted edge (connects focused → neighbor) — same width,
+  // brighter neutral white instead of a thicker indigo line.
   {
     selector: "edge.neighbor",
     style: {
-      width: 1.4,
-      "line-color": "#818cf8",
-      opacity: 0.82,
+      width: 0.8,
+      "line-color": "rgba(255,255,255,0.85)",
+      opacity: 0.85,
     },
   },
-  // Unrelated edge fades out
+  // Unrelated edge fades out — again, only opacity changes.
   {
     selector: "edge.dimmed",
-    style: { opacity: 0.03 },
+    style: {
+      width: 0.8,
+      opacity: 0.03,
+    },
   },
 ]
 
@@ -205,28 +220,37 @@ function applyHighlight(cy: any, nodeId: string | null) {
 }
 
 // ── Layout options ───────────────────────────────────────────────
-
+//
+// Tuned for the landing's "spread, composed, breathable" graph feel:
+//   - nodeRepulsion pushes much harder so nodes don't clump.
+//   - idealEdgeLength gives edges room so labels don't overlap.
+//   - gravity is lowered so disconnected components don't pile into
+//     the centre; combined with a large componentSpacing they spread
+//     across the canvas.
+//   - padding is intentionally large; combined with the post-layout
+//     fit-and-back-off below, the graph reads as *less zoomed-in* by
+//     default, giving the user an overview rather than a close-up.
 const LAYOUT_OPTIONS = {
   name: "cose",
   animate: true,
   animationEasing: "ease-out" as const,
-  animationDuration: 750,
+  animationDuration: 850,
   fit: true,
-  padding: 70,
+  padding: 160,
   randomize: true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nodeRepulsion: (_node: any) => 10500,
+  nodeRepulsion: (_node: any) => 60000,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  idealEdgeLength: (_edge: any) => 145,
+  idealEdgeLength: (_edge: any) => 320,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  edgeElasticity: (_edge: any) => 90,
+  edgeElasticity: (_edge: any) => 55,
   nestingFactor: 1.5,
-  gravity: 0.25,
-  numIter: 1500,
-  initialTemp: 250,
+  gravity: 0.08,
+  numIter: 2200,
+  initialTemp: 320,
   coolingFactor: 0.95,
   minTemp: 1.0,
-  componentSpacing: 130,
+  componentSpacing: 360,
 };
 
 // ── Main component ───────────────────────────────────────────────
@@ -465,10 +489,16 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
       ]);
     });
 
-    // Run force layout; fit viewport when animation finishes
+    // Run force layout; when animation finishes, fit and then pull the
+    // zoom back significantly so the user opens on an *overview*, not a
+    // close-up. 0.52× is roughly two full "zoom out" button clicks
+    // (each click is zoom × 0.72, so 0.72² ≈ 0.52) on top of an already
+    // padded fit — matching the landing graph's scale.
     const layout = cy.layout(LAYOUT_OPTIONS);
     layout.on("layoutstop", () => {
-      cy.fit(undefined, 60);
+      cy.fit(undefined, 180);
+      const center = { x: cy.width() / 2, y: cy.height() / 2 };
+      cy.zoom({ level: cy.zoom() * 0.52, renderedPosition: center });
     });
     layout.run();
 
@@ -512,7 +542,11 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
   }, []);
 
   const zoomFit = useCallback(() => {
-    cyRef.current?.fit(undefined, 60);
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.fit(undefined, 180);
+    const center = { x: cy.width() / 2, y: cy.height() / 2 };
+    cy.zoom({ level: cy.zoom() * 0.52, renderedPosition: center });
   }, []);
 
   // ── Filter toggles ─────────────────────────────────────────
@@ -652,10 +686,32 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
         which would break an inner div using absolute inset-0 (collapses to 0px).
         Using the outer div directly avoids that — it already has position:relative
         and an explicit height, so Cytoscape's override is a safe no-op.
+
+        Surface treatment:
+          - `#040A18` is *deeper* than the documented `--sv-canvas-bg`
+            (#050C1A) — we want "almost black" for the data canvas so
+            node colors and edges pop with high contrast, per the user's
+            brief. It stays navy-biased (not pure #000) to match the
+            panel system's tonal discipline.
+          - The `backgroundImage` radial-gradient paints a subtle 20px
+            dot-field at ~0.06 opacity, matching `docs/ui-panel-system.md`
+            §10.3 (0.055–0.075). It's a fixed atmospheric texture — it
+            does NOT move with zoom/pan, which is the desired "editor
+            canvas" feel. Cytoscape's own canvas paints on top with a
+            transparent background, so the dots remain visible beneath
+            nodes and edges without being obscured.
       */}
       <div
         ref={containerRef}
-        className="relative h-[640px] overflow-hidden rounded-xl border border-border bg-background"
+        className="relative h-[640px] overflow-hidden rounded-[6px] border"
+        style={{
+          borderColor: "rgba(147,147,147,0.16)",
+          backgroundColor: "#040A18",
+          backgroundImage:
+            "radial-gradient(circle, rgba(255,255,255,0.06) 0.9px, transparent 1.1px)",
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0",
+        }}
       >
         {/* ── Concentric fading rings for selected node ─────── */}
         {/*
@@ -694,7 +750,10 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
 
         {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
+          <div
+            className="absolute inset-0 z-20 flex items-center justify-center"
+            style={{ background: "rgba(4,10,24,0.85)" }}
+          >
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}

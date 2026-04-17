@@ -50,19 +50,8 @@ export function MetricCard({
     <div
       className={
         isLarge
-          ? "flex flex-col gap-1.5 rounded-[6px] p-4"
-          : "rounded-[6px] border px-4 py-3.5 transition-all duration-150 hover:border-[rgba(147,147,147,0.28)] hover:bg-white/[0.02]"
-      }
-      style={
-        isLarge
-          ? {
-              background: "#080F1E",
-              border: "1px solid rgba(147,147,147,0.13)",
-            }
-          : {
-              background: "#080F1E",
-              borderColor: "rgba(147,147,147,0.15)",
-            }
+          ? "sv-hover-card flex flex-col gap-1.5 rounded-[6px] border border-[rgba(147,147,147,0.13)] bg-[#080F1E] p-4"
+          : "sv-hover-card rounded-[6px] border border-[rgba(147,147,147,0.15)] bg-[#080F1E] px-4 py-3.5"
       }
     >
       {isLarge ? (
