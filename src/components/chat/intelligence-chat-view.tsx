@@ -59,7 +59,14 @@ function getMessageText(
 const UserBubble = memo(function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-md rounded-3xl border border-border/80 bg-primary px-5 py-4 text-[14px] leading-relaxed text-primary-foreground shadow-md md:px-6 md:py-[1.125rem]">
+      <div
+        className="max-w-md rounded-[10px] px-4 py-3 text-[12.5px] font-medium leading-[1.55] text-white/88"
+        style={{
+          background: "rgba(91,156,246,0.09)",
+          border: "1px solid rgba(91,156,246,0.22)",
+          letterSpacing: "-0.011em",
+        }}
+      >
         {text}
       </div>
     </div>

@@ -22,28 +22,38 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-md border border-white/10 bg-[oklch(0.18_0.03_264)] px-3 py-2 shadow-xl">
-      <p className="max-w-[180px] truncate text-xs font-semibold text-white/90">
+    <div
+      className="rounded-[5px] px-2.5 py-2"
+      style={{
+        background: "#080F1E",
+        border: "1px solid rgba(147,147,147,0.18)",
+        boxShadow:
+          "0 0 0 1px rgba(255,255,255,0.025), 0 8px 24px -6px rgba(0,0,0,0.55)",
+      }}
+    >
+      <p className="max-w-[220px] truncate text-[12px] font-semibold text-white/95">
         {d.topic}
       </p>
-      <p className="mt-0.5 text-xs text-white/60">
-        <span className="font-medium text-white/90">{d.count}</span>{" "}
+      <p className="mt-0.5 text-[11.5px] text-white/65">
+        <span className="font-semibold tabular-nums text-white/95">
+          {d.count}
+        </span>{" "}
         mention{d.count !== 1 ? "s" : ""}
       </p>
     </div>
   );
 }
 
-// Donut colour palette — slate/blue family matching brand
+// Donut colour palette — Sovereign fixed accent family.
 const PALETTE = [
-  "oklch(0.70 0.16 264)",
-  "oklch(0.75 0.14 200)",
-  "oklch(0.68 0.12 230)",
-  "oklch(0.62 0.18 270)",
-  "oklch(0.78 0.13 220)",
-  "oklch(0.55 0.15 250)",
-  "oklch(0.72 0.10 195)",
-  "oklch(0.65 0.14 280)",
+  "#5B9CF6",
+  "#34D399",
+  "#A78BFA",
+  "#7DD3FC",
+  "#FBBF24",
+  "#F472B6",
+  "#818CF8",
+  "#94A3B8",
 ];
 
 interface Props {
@@ -56,9 +66,9 @@ export function TopicDistributionChart({ data }: Props) {
   const displayData = data.slice(0, 8);
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
       {/* Donut */}
-      <div className="h-[180px] w-full max-w-[180px] shrink-0 mx-auto sm:mx-0">
+      <div className="mx-auto h-[200px] w-full max-w-[200px] shrink-0 sm:mx-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -85,17 +95,17 @@ export function TopicDistributionChart({ data }: Props) {
       </div>
 
       {/* Legend */}
-      <ul className="flex flex-1 flex-col gap-1.5 min-w-0">
+      <ul className="flex min-w-0 flex-1 flex-col gap-2">
         {displayData.map((entry, index) => (
-          <li key={entry.topic} className="flex items-center gap-2 min-w-0">
+          <li key={entry.topic} className="flex min-w-0 items-center gap-2.5">
             <span
-              className="inline-block h-2 w-2 shrink-0 rounded-sm"
+              className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
               style={{ background: PALETTE[index % PALETTE.length] }}
             />
-            <span className="flex-1 truncate text-xs text-white/70">
+            <span className="flex-1 truncate text-[12px] text-white/78">
               {entry.topic}
             </span>
-            <span className="shrink-0 text-xs tabular-nums text-white/40">
+            <span className="shrink-0 text-[11.5px] font-medium tabular-nums text-white/50">
               {entry.count}
             </span>
           </li>

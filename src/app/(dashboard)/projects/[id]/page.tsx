@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   MapPin,
@@ -23,6 +22,7 @@ import { notFound } from "next/navigation";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 import { ProjectInterviewsSection } from "@/components/projects/project-interviews-section";
 import { SalesWarRoom } from "./war-room";
+import { SectionChip } from "@/components/panels";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -66,42 +66,54 @@ export default async function ProjectDetailPage({ params }: Props) {
   const canEdit = role === "owner" || role === "editor";
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="px-5 py-6 lg:px-8 lg:py-7">
+      <div className="mb-5">
         <Link
           href="/projects"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-white/55 transition-colors duration-150 hover:text-white/92"
         >
-          <ArrowLeft className="mr-1 h-4 w-4" />
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
           Back to Projects
         </Link>
       </div>
 
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-7 flex items-start justify-between gap-4">
         <div>
+          <p
+            className="mb-1.5 text-[11px] font-semibold uppercase"
+            style={{
+              letterSpacing: "0.14em",
+              color: "rgba(255,255,255,0.42)",
+            }}
+          >
+            Project
+          </p>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1
+              className="text-[28px] font-semibold text-white"
+              style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
+            >
               {project.name}
             </h1>
             {project.region && (
-              <Badge variant="secondary">{project.region}</Badge>
+              <SectionChip tone="neutral">{project.region}</SectionChip>
             )}
           </div>
           {project.description && (
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-[13px] leading-[1.6] text-white/62">
               {project.description}
             </p>
           )}
-          <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="mt-3 flex items-center gap-3 text-[12px] text-white/50">
             {project.country && (
               <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" />
+                <MapPin className="h-[12px] w-[12px]" strokeWidth={1.5} />
                 {project.country}
               </span>
             )}
             <span className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-[12px] w-[12px]" strokeWidth={1.5} />
               Created {new Date(project.created_at).toLocaleDateString()}
             </span>
           </div>
@@ -131,8 +143,11 @@ export default async function ProjectDetailPage({ params }: Props) {
       {/* Two-column layout: War Room (left) + Project Ops (right) */}
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* ── Sales War Room ─────────────────────────────────────── */}
-        <section className="space-y-6">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">
+        <section className="space-y-5">
+          <h2
+            className="text-[12px] font-semibold uppercase text-white/82"
+            style={{ letterSpacing: "0.1em" }}
+          >
             Sales War Room
           </h2>
           <SalesWarRoom projectId={projectId} />
@@ -145,7 +160,10 @@ export default async function ProjectDetailPage({ params }: Props) {
 
         {/* ── Project Ops (sidebar) ──────────────────────────────── */}
         <section>
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">
+          <h2
+            className="mb-4 text-[12px] font-semibold uppercase text-white/82"
+            style={{ letterSpacing: "0.1em" }}
+          >
             Project Ops
           </h2>
           <div className="space-y-4">

@@ -62,6 +62,16 @@ function resolveId(x: unknown): string {
 
 // ── Cytoscape stylesheet ─────────────────────────────────────────
 
+// ── Node sizing helper ─────────────────────────────────────────
+//
+// Nodes are intentionally small to match the landing's "precision
+// graph" look. Min 10 / max 22px diameter, scaled by the square
+// root of mention count so outliers do not dominate.
+function nodeSize(mentionCount: number | null | undefined): number {
+  const m = Math.max(0, mentionCount ?? 0)
+  return Math.max(10, Math.min(10 + Math.sqrt(m + 1) * 2.6, 22))
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: any[] = [
   {
@@ -74,8 +84,8 @@ const STYLESHEET: any[] = [
       label: "",
       "overlay-opacity": 0,
       "z-index": 10,
-      "transition-property": "opacity",
-      "transition-duration": 150,
+      "transition-property": "opacity, border-width, border-opacity",
+      "transition-duration": 180,
     },
   },
   // Permanent label for top-N prominent nodes
@@ -98,22 +108,25 @@ const STYLESHEET: any[] = [
       "text-wrap": "ellipsis",
     },
   },
-  // Focused (selected) node
+  // Focused (selected) node — thin 1px white hairline ring on the node
+  // itself; the soft concentric rings are painted as a separate SVG
+  // overlay (see applyConcentricRings / <ConcentricRings />). Keeping
+  // the node itself tight avoids the "big ball" look.
   {
     selector: "node.focused",
     style: {
       label: "data(displayName)",
-      "font-size": 13,
-      "font-weight": 700,
+      "font-size": 12,
+      "font-weight": 600,
       color: "#f8fafc",
       "text-background-color": "#1e293b",
       "text-background-opacity": 1,
       "text-background-padding": "4px",
       "text-background-shape": "roundrectangle",
       "text-margin-y": 7,
-      "border-width": 2.5,
+      "border-width": 1,
       "border-color": "#ffffff",
-      "border-opacity": 1,
+      "border-opacity": 0.75,
       "z-index": 9999,
     },
   },
@@ -122,7 +135,7 @@ const STYLESHEET: any[] = [
     selector: "node.neighbor",
     style: {
       label: "data(displayName)",
-      "font-size": 11,
+      "font-size": 10.5,
       "font-weight": 500,
       color: "#cbd5e1",
       "text-background-color": "#0b0e17",
@@ -130,37 +143,37 @@ const STYLESHEET: any[] = [
       "text-background-padding": "3px",
       "text-background-shape": "roundrectangle",
       "text-margin-y": 5,
-      "border-width": 1.5,
+      "border-width": 1,
       "border-color": "data(color)",
-      "border-opacity": 0.8,
+      "border-opacity": 0.7,
       "z-index": 500,
     },
   },
   // Unrelated nodes fade out
   {
     selector: "node.dimmed",
-    style: { opacity: 0.07 },
+    style: { opacity: 0.09 },
   },
   // Base edge
   {
     selector: "edge",
     style: {
-      width: 1,
+      width: 0.8,
       "line-color": "#94a3b8",
-      opacity: 0.18,
+      opacity: 0.16,
       "curve-style": "straight",
       "overlay-opacity": 0,
       "transition-property": "opacity, line-color, width",
-      "transition-duration": 150,
+      "transition-duration": 180,
     },
   },
   // Highlighted edge (connects focused → neighbor)
   {
     selector: "edge.neighbor",
     style: {
-      width: 2,
+      width: 1.4,
       "line-color": "#818cf8",
-      opacity: 0.85,
+      opacity: 0.82,
     },
   },
   // Unrelated edge fades out
@@ -168,7 +181,7 @@ const STYLESHEET: any[] = [
     selector: "edge.dimmed",
     style: { opacity: 0.03 },
   },
-];
+]
 
 // ── Highlight helper (called imperatively against the cy instance) ──
 
@@ -239,6 +252,16 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cyReady, setCyReady] = useState(false);
 
+  // Concentric-ring overlay (tracks focused node through zoom / pan). We
+  // render pure SVG in a layer above the Cytoscape canvas, pulling the
+  // rendered position + zoom of the focused node on every `render` tick.
+  const [ringState, setRingState] = useState<{
+    x: number;
+    y: number;
+    radius: number;
+    color: string;
+  } | null>(null);
+
   // ── Init Cytoscape (once) ──────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return;
@@ -291,6 +314,42 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
   useEffect(() => {
     if (!cyRef.current || !cyReady) return;
     applyHighlight(cyRef.current, focusedNodeId);
+  }, [focusedNodeId, cyReady]);
+
+  // ── Keep concentric-rings overlay glued to the focused node ─
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !cyReady) return;
+
+    if (!focusedNodeId) {
+      setRingState(null);
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const update = () => {
+      const node = cy.getElementById(focusedNodeId);
+      if (!node.length) {
+        setRingState(null);
+        return;
+      }
+      const pos = node.renderedPosition() as { x: number; y: number };
+      const zoom = cy.zoom() as number;
+      const rawSize = (node.data("size") as number) ?? nodeSize(0);
+      // renderedSize = modelSize * zoom; we want a radius for the rings.
+      const radius = (rawSize * zoom) / 2;
+      const color = (node.data("color") as string) ?? "#94a3b8";
+      setRingState({ x: pos.x, y: pos.y, radius, color });
+    };
+
+    update();
+    cy.on("render", update);
+    cy.on("pan zoom position", update);
+
+    return () => {
+      cy.off("render", update);
+      cy.off("pan zoom position", update);
+    };
   }, [focusedNodeId, cyReady]);
 
   // ── Fetch graph data ───────────────────────────────────────
@@ -384,11 +443,10 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
               n.name.length > 22 ? `${n.name.slice(0, 20)}…` : n.name,
             type: n.type,
             color: nodeColor(n.type),
-            // Size proportional to mention count; clamped for visual balance
-            size: Math.max(
-              20,
-              Math.min(20 + Math.sqrt((n.mentionCount ?? 0) + 1) * 5, 46)
-            ),
+            // Intentionally small (10–22px). The earlier 20–46 range made
+            // nodes read as heavy "balls" on anything above medium-density
+            // projects. See nodeSize() for the scaling rationale.
+            size: nodeSize(n.mentionCount),
             mentionCount: n.mentionCount,
             description: n.description,
           },
@@ -599,6 +657,40 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
         ref={containerRef}
         className="relative h-[640px] overflow-hidden rounded-xl border border-border bg-background"
       >
+        {/* ── Concentric fading rings for selected node ─────── */}
+        {/*
+          Cytoscape itself can only paint ONE halo per node. To get the
+          landing's refined "two concentric rings fading outward" feel we
+          paint a dedicated SVG overlay on top of the Cytoscape canvas
+          and sync its position to the focused node via cy 'render'
+          events (see effect above). `pointer-events: none` so clicks
+          still reach the graph underneath.
+        */}
+        {ringState && (
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+          >
+            <circle
+              cx={ringState.x}
+              cy={ringState.y}
+              r={ringState.radius + 5}
+              fill="none"
+              stroke={ringState.color}
+              strokeWidth={1}
+              strokeOpacity={0.45}
+            />
+            <circle
+              cx={ringState.x}
+              cy={ringState.y}
+              r={ringState.radius + 11}
+              fill="none"
+              stroke={ringState.color}
+              strokeWidth={1}
+              strokeOpacity={0.18}
+            />
+          </svg>
+        )}
 
         {/* Loading overlay */}
         {loading && (

@@ -26,18 +26,38 @@ export default async function NetworkPage() {
     .filter((p): p is { id: string; name: string } => p !== null);
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Network Explorer</h1>
-        <p className="mt-1 text-muted-foreground">
-          Visualise entity relationships extracted from your interviews. Click a
-          node to explore its connections.
+    <div className="px-5 py-6 lg:px-8 lg:py-7">
+      <div className="mb-6">
+        <p
+          className="mb-1.5 text-[11px] font-semibold uppercase"
+          style={{
+            letterSpacing: "0.14em",
+            color: "rgba(255,255,255,0.42)",
+          }}
+        >
+          Intelligence Platform
+        </p>
+        <h1
+          className="text-[28px] font-semibold text-white"
+          style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
+        >
+          Network Explorer
+        </h1>
+        <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-white/62">
+          Visualise entity relationships extracted from your interviews. Click
+          a node to explore its connections.
         </p>
       </div>
 
       {projects.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-16 text-center">
-          <p className="text-sm text-muted-foreground">
+        <div
+          className="rounded-[6px] border border-dashed py-14 text-center"
+          style={{
+            borderColor: "rgba(147,147,147,0.22)",
+            background: "#080F1E",
+          }}
+        >
+          <p className="text-[13px] text-white/60">
             You are not a member of any projects yet.
           </p>
         </div>

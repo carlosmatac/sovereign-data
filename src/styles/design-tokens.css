@@ -1,0 +1,279 @@
+/* ============================================================================
+ * Sovereign Panel System — Design Tokens (CSS)
+ *
+ * Copy this file into your target app (e.g. `src/styles/design-tokens.css`)
+ * and import it ONCE at the root of the app (layout / _app.tsx / main.css).
+ *
+ * Every token here is 1:1 with `src/lib/design-tokens.ts`. Use whichever side
+ * is more ergonomic for each part of the codebase:
+ *
+ *   - Tailwind arbitrary classes  → `var(--sv-panel-bg)` or the JS tokens
+ *   - Raw CSS / styled components → the CSS variables below
+ *   - Inline React styles         → import from design-tokens.ts
+ *
+ * The panel system assumes a dark background. The variables below assume a
+ * `dark` / default scope; there is no light variant — the panel system is
+ * dark-only by design.
+ * ========================================================================== */
+
+:root {
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --sv-panel-bg:          #070E1F;      /* outer panel shell */
+  --sv-surface-bg:        #080F1E;      /* nested cards, detail wells */
+  --sv-canvas-bg:         #050C1A;      /* SVG data canvases */
+  --sv-chrome-top:        #0D1B32;
+  --sv-chrome-bottom:     #0B1729;
+  --sv-chrome-gradient:   linear-gradient(to bottom, #0D1B32, #0B1729);
+
+  /* Diagonal sheen used on the central panel inside AppSurface layouts. */
+  --sv-panel-sheen:       linear-gradient(
+                            135deg,
+                            rgba(255,255,255,0.012) 0%,
+                            #070E1F 28%
+                          );
+
+  /* ── Borders & dividers (single hue, multiple alphas) ──────────────────── */
+  --sv-border-divider:         rgba(147,147,147,0.09);
+  --sv-border-divider-muted:   rgba(147,147,147,0.10);
+  --sv-border-divider-soft:    rgba(147,147,147,0.13);
+  --sv-border-divider-strong:  rgba(147,147,147,0.14);
+  --sv-border-card:            rgba(147,147,147,0.15);
+  --sv-border-panel:           rgba(147,147,147,0.16);
+  --sv-border-surface-strong:  rgba(147,147,147,0.18);
+  --sv-border-control:         rgba(147,147,147,0.22);
+  --sv-border-card-hover:      rgba(147,147,147,0.30);
+  --sv-border-control-hover:   rgba(147,147,147,0.32);
+  --sv-border-control-hover-strong: rgba(147,147,147,0.38);
+
+  /* Inner highlight edge on panels (adds the "1px top lift"). */
+  --sv-highlight:         rgba(255,255,255,0.025);
+  --sv-highlight-strong:  rgba(255,255,255,0.05);
+
+  /* ── Text — white / alpha scale ────────────────────────────────────────── */
+  --sv-text-white:        #FFFFFF;
+  --sv-text-primary:      rgba(255,255,255,0.88);
+  --sv-text-primary-alt:  rgba(255,255,255,0.85);
+  --sv-text-strong:       rgba(255,255,255,0.75);
+  --sv-text-body:         rgba(255,255,255,0.72);
+  --sv-text-medium:       rgba(255,255,255,0.70);
+  --sv-text-secondary:    rgba(255,255,255,0.65);
+  --sv-text-paragraph:    rgba(255,255,255,0.62);
+  --sv-text-soft:         rgba(255,255,255,0.58);
+  --sv-text-subtle:       rgba(255,255,255,0.55);
+  --sv-text-muted:        rgba(255,255,255,0.52);
+  --sv-text-dim:          rgba(255,255,255,0.45);
+  --sv-text-placeholder:  rgba(255,255,255,0.42);
+  --sv-text-meta:         rgba(255,255,255,0.32);
+  --sv-text-eyebrow:      rgba(255,255,255,0.28);
+  --sv-text-ghost:        rgba(255,255,255,0.22);
+  --sv-text-faint:        rgba(255,255,255,0.18);
+  --sv-text-ghost-faint:  rgba(255,255,255,0.17);
+  --sv-text-trace:        rgba(255,255,255,0.10);
+
+  /* ── Text — gray scale (captions & tertiary data) ──────────────────────── */
+  --sv-gray-caption:      #777;
+  --sv-gray-caption-soft: #5e6878;
+  --sv-gray-caption-weak: #4a5060;
+  --sv-gray-chart-eyebrow:#555;
+  --sv-gray-mono:         #666;
+  --sv-gray-mono-dim:     #5a5a5a;
+  --sv-gray-axis:         #444;
+  --sv-gray-trailing:     #4a4a4a;
+  --sv-gray-divider:      #505a66;
+
+  /* ── Accents — fixed palette ──────────────────────────────────────────── */
+  --sv-accent-blue:         #5B9CF6;   /* Person / primary */
+  --sv-accent-green:        #34D399;   /* Company */
+  --sv-accent-green-bright: #4ADE80;   /* Live / Ready status */
+  --sv-accent-violet:       #A78BFA;   /* Government */
+  --sv-accent-amber:        #FBBF24;   /* Event / pending */
+  --sv-accent-red:          #F87171;
+  --sv-accent-red-bright:   #FB7185;
+  --sv-accent-orange:       #FB923C;
+  --sv-accent-cyan:         #7DD3FC;   /* Organization / Document */
+  --sv-accent-cyan-bright:  #38BDF8;
+  --sv-accent-indigo:       #818CF8;
+  --sv-accent-blue-soft:    #60A5FA;
+  --sv-accent-pink:         #F472B6;   /* Initiative */
+  --sv-accent-slate:        #94A3B8;
+
+  /* Tonal (background / border) pairs for accent pills & wells */
+  --sv-accent-green-bright-bg:     rgba(74,222,128,0.07);
+  --sv-accent-green-bright-border: rgba(74,222,128,0.17);
+  --sv-accent-blue-bg:             rgba(91,156,246,0.05);
+  --sv-accent-blue-bg-tag:         rgba(91,156,246,0.09);
+  --sv-accent-blue-border:         rgba(91,156,246,0.12);
+  --sv-accent-amber-bg:            rgba(251,191,36,0.07);
+  --sv-accent-amber-border:        rgba(251,191,36,0.18);
+  --sv-accent-red-bg:              rgba(239,68,68,0.10);
+  --sv-accent-red-border:          rgba(239,68,68,0.22);
+  --sv-accent-indigo-well-bg:      rgba(78,92,210,0.13);
+  --sv-accent-indigo-well-border:  rgba(78,92,210,0.28);
+  --sv-accent-indigo-well-fg:      #7c8fd4;
+
+  /* Bar-chart gradient. */
+  --sv-gradient-bar: linear-gradient(90deg, #3A5BA0 0%, #4E78CF 100%);
+
+  /* ── Radius scale (non-Tailwind values — intentional) ──────────────────── */
+  --sv-radius-xs:    3px;
+  --sv-radius-sm:    4px;
+  --sv-radius-md:    5px;    /* default card */
+  --sv-radius-lg:    6px;    /* central panel inside AppSurface */
+  --sv-radius-xl:    7px;
+  --sv-radius-2xl:   8px;    /* insight cards */
+  --sv-radius-3xl:   9px;
+  --sv-radius-4xl:   10px;
+  --sv-radius-5xl:   14px;   /* mobile panel shells */
+  --sv-radius-panel: 17px;   /* signature outer panel radius */
+
+  /* ── Shadows (3-layer compositions) ────────────────────────────────────── */
+  --sv-shadow-hero:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 32px 80px -12px rgba(0,0,0,0.85),
+    0 8px 32px -4px rgba(0,0,0,0.55);
+
+  --sv-shadow-copilot:
+    0 0 0 1px rgba(255,255,255,0.025),
+    0 36px 80px -16px rgba(0,0,0,0.75),
+    0 8px 24px -6px rgba(0,0,0,0.55);
+
+  --sv-shadow-report:
+    0 0 0 1px rgba(255,255,255,0.025),
+    0 48px 120px -24px rgba(0,0,0,0.85),
+    0 8px 24px -6px rgba(0,0,0,0.55);
+
+  --sv-shadow-compact:
+    0 0 0 1px rgba(255,255,255,0.025),
+    0 24px 60px -12px rgba(0,0,0,0.75),
+    0 6px 20px -4px rgba(0,0,0,0.5);
+
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  --sv-font-sans:  'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --sv-font-serif: 'Playfair Display', 'Playfair Display Fallback', Georgia, serif;
+  --sv-font-mono:  'Geist Mono', 'Geist Mono Fallback', monospace;
+
+  /* Font-size scale — keep px precision, do not round. */
+  --sv-text-2xs:   6.5px;
+  --sv-text-xs:    7px;
+  --sv-text-sm:    7.5px;
+  --sv-text-base:  8px;
+  --sv-text-md:    8.5px;
+  --sv-text-lg:    9px;
+  --sv-text-xl:    9.5px;
+  --sv-text-2xl:   10px;
+  --sv-text-3xl:   10.5px;
+  --sv-text-4xl:   11px;
+  --sv-text-5xl:   11.5px;
+  --sv-text-6xl:   12px;
+  --sv-text-7xl:   12.5px;
+  --sv-text-8xl:   13px;
+  --sv-text-9xl:   15px;
+  --sv-text-10xl:  16px;
+  --sv-text-11xl:  18px;
+  --sv-text-12xl:  22px;
+  --sv-text-13xl:  2.4rem;
+
+  --sv-weight-normal:   400;
+  --sv-weight-medium:   500;
+  --sv-weight-semibold: 600;
+  --sv-weight-bold:     700;
+
+  --sv-tracking-body-tight:        -0.005em;
+  --sv-tracking-body:              -0.010em;
+  --sv-tracking-body-firm:         -0.011em;
+  --sv-tracking-headline-xs:       -0.012em;
+  --sv-tracking-headline:          -0.014em;
+  --sv-tracking-headline-sm:       -0.015em;
+  --sv-tracking-headline-lg:       -0.020em;
+  --sv-tracking-headline-xl:       -0.028em;
+  --sv-tracking-uppercase-tight:    0.04em;
+  --sv-tracking-uppercase-chrome:   0.07em;
+  --sv-tracking-uppercase-eyebrow:  0.08em;
+  --sv-tracking-uppercase-status:   0.09em;
+  --sv-tracking-uppercase-vol:      0.10em;
+  --sv-tracking-uppercase-report:   0.12em;
+  --sv-tracking-uppercase-hero:     0.14em;
+
+  --sv-lh-none:     1;
+  --sv-lh-tight:    1.08;
+  --sv-lh-snug:     1.15;
+  --sv-lh-card:     1.5;
+  --sv-lh-prose:    1.65;
+  --sv-lh-longform: 1.72;
+  --sv-lh-report:   1.82;
+
+  /* ── Opacity scale ─────────────────────────────────────────────────────── */
+  --sv-op-hiddenish: 0.05;
+  --sv-op-watermark: 0.11;
+  --sv-op-passive:   0.18;
+  --sv-op-dim:       0.28;
+  --sv-op-active:    0.45;
+  --sv-op-default:   0.72;
+  --sv-op-focused:   0.85;
+
+  /* ── Motion ────────────────────────────────────────────────────────────── */
+  --sv-duration-instant: 150ms;
+  --sv-duration-quick:   180ms;
+  --sv-duration-short:   200ms;
+  --sv-duration-medium:  250ms;
+  --sv-duration-page:    320ms;
+  --sv-duration-reveal:  420ms;
+
+  --sv-ease-premium:     cubic-bezier(0.22, 0.8, 0.36, 1);
+  --sv-ease-reveal:      cubic-bezier(0.25, 0.10, 0.25, 1);
+
+  /* ── Z-index ──────────────────────────────────────────────────────────── */
+  --sv-z-background: 0;
+  --sv-z-content:    10;
+  --sv-z-foreground: 20;
+  --sv-z-overlay:    30;
+  --sv-z-nav:        40;
+  --sv-z-modal:      50;
+}
+
+/* ============================================================================
+ * Convenience utility classes (optional, pure CSS fallback for non-Tailwind
+ * projects). If you already use Tailwind v4, you can ignore this block and
+ * reach for the variables directly via `bg-[var(--sv-panel-bg)]`.
+ * ========================================================================== */
+
+.sv-panel {
+  background: var(--sv-panel-bg);
+  border: 1px solid var(--sv-border-panel);
+  border-radius: var(--sv-radius-panel);
+  box-shadow: var(--sv-shadow-hero);
+  overflow: hidden;
+}
+
+.sv-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sv-chrome-y, 9px) 16px;
+  background: var(--sv-chrome-gradient);
+  border-bottom: 1px solid var(--sv-border-divider-muted);
+}
+
+.sv-card {
+  background: transparent;
+  border: 1px solid var(--sv-border-card);
+  border-radius: var(--sv-radius-md);
+  transition: border-color var(--sv-duration-instant) ease,
+              background-color var(--sv-duration-instant) ease;
+}
+.sv-card:hover {
+  border-color: var(--sv-border-card-hover);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: var(--sv-text-md);
+  font-weight: var(--sv-weight-semibold);
+  letter-spacing: var(--sv-tracking-uppercase-status);
+  text-transform: uppercase;
+}

@@ -2,16 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/project-role";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Plus, Mic, Clock, FolderKanban, FileText } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
-import { IconWrapper } from "@/components/ui/icon-wrapper";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
+import {
+  SectionSurface,
+  IconWell,
+  SectionChip,
+  StatusPill,
+} from "@/components/panels";
+import type { InterviewStatus } from "@/types/database";
 
 export default async function InterviewsPage({
   searchParams,
@@ -59,15 +60,42 @@ export default async function InterviewsPage({
     return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
+  const statusPillTone = (
+    status: InterviewStatus
+  ): React.ComponentProps<typeof StatusPill>["tone"] => {
+    switch (status) {
+      case "COMPLETED":
+        return "live";
+      case "FAILED":
+        return "confidential";
+      default:
+        return "draft";
+    }
+  };
+
   return (
-    <div className="p-6">
+    <div className="px-5 py-6 lg:px-8 lg:py-7">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">All Interviews</h1>
-          <p className="mt-1 text-muted-foreground">
-            Cross-project interview index. For day-to-day workflow, start in Projects
-            and manage interviews in project context.
+          <p
+            className="mb-1.5 text-[11px] font-semibold uppercase"
+            style={{
+              letterSpacing: "0.14em",
+              color: "rgba(255,255,255,0.42)",
+            }}
+          >
+            Intelligence Platform
+          </p>
+          <h1
+            className="text-[28px] font-semibold text-white"
+            style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
+          >
+            All Interviews
+          </h1>
+          <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-white/62">
+            Cross-project interview index. For day-to-day workflow, start in
+            Projects and manage interviews in project context.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -90,81 +118,105 @@ export default async function InterviewsPage({
 
       {/* Interview List */}
       {error ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
+        <SectionSurface>
+          <p className="py-10 text-center text-[13px] text-white/60">
             Failed to load interviews. Please try again.
-          </CardContent>
-        </Card>
+          </p>
+        </SectionSurface>
       ) : !interviews || interviews.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center py-16">
-            <IconWrapper color="indigo" size="lg" className="mb-4">
-              <Mic className="h-7 w-7" />
-            </IconWrapper>
-            <h3 className="font-semibold">No interviews yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload your first audio interview to start extracting intelligence.
-            </p>
-            {canUpload && (
-              <Button className="mt-4" asChild>
-                <Link href="/interviews/upload">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Upload Interview
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <SectionSurface bodyClassName="flex flex-col items-center py-16 text-center">
+          <IconWell accent="#818CF8" size={44}>
+            <Mic
+              className="h-[18px] w-[18px]"
+              style={{ color: "#818CF8" }}
+              strokeWidth={1.5}
+            />
+          </IconWell>
+          <h3 className="mt-3 text-[14px] font-semibold text-white/92">
+            No interviews yet
+          </h3>
+          <p className="mt-1.5 text-[12.5px] text-white/60">
+            Upload your first audio interview to start extracting intelligence.
+          </p>
+          {canUpload && (
+            <Button className="mt-4" asChild>
+              <Link href="/interviews/upload">
+                <Plus className="mr-2 h-4 w-4" />
+                Upload Interview
+              </Link>
+            </Button>
+          )}
+        </SectionSurface>
       ) : (
-        <div className="space-y-3">
-          {interviews.map((interview) => {
-            const statusInfo = STATUS_LABELS[interview.status] ?? {
-              label: interview.status,
-              variant: "secondary" as const,
-            };
+        <SectionSurface
+          header={{
+            title: "Interviews",
+            subtitle: `${interviews.length} recording${interviews.length === 1 ? "" : "s"}`,
+          }}
+          bodyClassName="p-2"
+        >
+          <div className="flex flex-col">
+            {interviews.map((interview) => {
+              const statusInfo = STATUS_LABELS[interview.status] ?? {
+                label: interview.status,
+                variant: "secondary" as const,
+              };
+              const project = (
+                interview as Record<string, unknown>
+              ).projects as { name?: string } | null;
 
-            return (
-              <Card key={interview.id} className="transition-colors hover:border-primary/50 hover:shadow-sm">
-                <CardContent className="flex items-center gap-4 py-4">
+              return (
+                <div
+                  key={interview.id}
+                  className="group flex items-center gap-3 rounded-[5px] px-2.5 py-2.5 transition-colors duration-150 hover:bg-white/[0.025]"
+                >
                   <Link
                     href={`/interviews/${interview.id}`}
-                    className="flex min-w-0 flex-1 items-center gap-4"
+                    className="flex min-w-0 flex-1 items-center gap-3"
                   >
-                    <IconWrapper color="indigo" size="md">
+                    <IconWell accent="#818CF8" size={32}>
                       {interview.source_type === "document" ? (
-                        <FileText className="h-5 w-5" />
+                        <FileText
+                          className="h-[14px] w-[14px]"
+                          style={{ color: "#818CF8" }}
+                          strokeWidth={1.8}
+                        />
                       ) : (
-                        <Mic className="h-5 w-5" />
+                        <Mic
+                          className="h-[14px] w-[14px]"
+                          style={{ color: "#818CF8" }}
+                          strokeWidth={1.8}
+                        />
                       )}
-                    </IconWrapper>
+                    </IconWell>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
+                      <p className="truncate text-[13px] font-semibold leading-tight text-white/92">
                         {interview.title}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {(interview as Record<string, unknown>).projects
-                          ? String(
-                              ((interview as Record<string, unknown>).projects as Record<string, unknown>)?.name ?? ""
-                            )
-                          : "Unknown project"}
+                      <p className="mt-[4px] truncate text-[11.5px] text-white/50">
+                        {project?.name ?? "Unknown project"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-2.5">
                       {interview.source_type === "document" ? (
-                        <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                          PDF
-                        </span>
+                        <SectionChip tone="neutral">PDF</SectionChip>
                       ) : (
                         interview.audio_duration && (
-                          <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
+                          <span className="flex items-center gap-1 text-[11.5px] tabular-nums text-white/55">
+                            <Clock
+                              className="h-[11px] w-[11px]"
+                              strokeWidth={1.5}
+                            />
                             {formatDuration(interview.audio_duration)}
                           </span>
                         )
                       )}
-                      <Badge variant={statusInfo.variant}>
-                        {statusInfo.label}
-                      </Badge>
+                      <StatusPill
+                        tone={statusPillTone(
+                          interview.status as InterviewStatus
+                        )}
+                        text={statusInfo.label}
+                      />
                     </div>
                   </Link>
                   {editableProjectIds.has(interview.project_id) && (
@@ -174,11 +226,11 @@ export default async function InterviewsPage({
                       variant="icon"
                     />
                   )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionSurface>
       )}
     </div>
   );
