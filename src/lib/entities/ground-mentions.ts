@@ -18,6 +18,36 @@ import { normalizeEntityName } from "./normalize";
 export type MatchMethod = "exact" | "alias" | "anchor_context" | "fuzzy";
 export type MatchConfidence = "high" | "medium" | "low";
 
+// ── Persistence policy ──────────────────────────────────────────────
+//
+// Which grounding methods are considered **explicit textual evidence**
+// sufficient to persist an `entity_mention` and, by extension, any
+// relationship that depends on that entity.
+//
+// Product intent (precision > recall in this phase):
+//   - `exact`          → canonical entity name is literally in the chunk.   PERSIST
+//   - `alias`          → a known alias from `entity_aliases` is literally
+//                        in the chunk.                                      PERSIST
+//   - `anchor_context` → upload anchor inferred from honorific / surname /
+//                        org-token overlap. Useful for *internal* chunk
+//                        resolution, but not a guarantee that the entity
+//                        is explicitly mentioned.                           DO NOT PERSIST
+//   - `fuzzy`          → capitalized-name trigram similarity. Too noisy
+//                        to act as ground truth for persistence.            DO NOT PERSIST
+//
+// `anchor_context` and `fuzzy` are still computed and returned by the
+// grounding pass because they improve downstream resolution and chunk
+// coverage, but the persistence gate in `src/lib/ai/persistence-gate.ts`
+// must filter them out before writing to `entity_mentions`.
+export const PERSISTABLE_MATCH_METHODS: ReadonlySet<MatchMethod> = new Set<MatchMethod>([
+  "exact",
+  "alias",
+]);
+
+export function isPersistableMatchMethod(method: MatchMethod): boolean {
+  return PERSISTABLE_MATCH_METHODS.has(method);
+}
+
 export interface GroundedMention {
   entityId: string;
   chunkId: string;

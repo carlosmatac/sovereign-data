@@ -20,6 +20,7 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 ## Right now
 
 - **In progress:** [`admin-entity-governance-dashboard.md`](../features/on-going/admin-entity-governance-dashboard.md) — entity governance UI at `/admin/entities`.
+- **In progress:** [`fix-context-entity-ingestion.md`](../features/on-going/fix-context-entity-ingestion.md) — strict source-grounded entity persistence (drop ungrounded mentions + contaminated relationships) across audio, document/PDF, and reviewed-text reprocess.
 
 ---
 
