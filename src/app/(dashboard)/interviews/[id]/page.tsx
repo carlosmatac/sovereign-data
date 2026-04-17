@@ -225,7 +225,7 @@ export default async function InterviewDetailPage({
             {interview.last_intel_source === "human_review" && (
               <Badge
                 variant="outline"
-                className="gap-1 border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+                className="gap-1 border-[rgba(74,222,128,0.28)] bg-[rgba(74,222,128,0.06)] text-[rgba(167,243,208,0.92)]"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 Human-reviewed intel
@@ -464,7 +464,7 @@ export default async function InterviewDetailPage({
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
-                    <Link2 className="h-4 w-4 text-primary" />
+                    <Link2 className="h-4 w-4 text-[#8EB6F3]" />
                     <CardTitle className="text-base">
                       Relationships
                     </CardTitle>
@@ -474,7 +474,7 @@ export default async function InterviewDetailPage({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <ul className="space-y-2">
                     {relationships.map((rel) => {
                       const source =
                         entityNameMap[rel.source_entity_id];
@@ -483,35 +483,37 @@ export default async function InterviewDetailPage({
                       if (!source || !target) return null;
 
                       return (
-                        <div
+                        <li
                           key={rel.id}
-                          className="rounded-md border p-2.5"
+                          className="rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-white/[0.022] px-3.5 py-3"
                         >
-                          <div className="flex items-center gap-1.5 text-sm font-medium">
-                            <span>{source.name}</span>
-                            <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                            <span>{target.name}</span>
+                          <div className="flex items-center gap-2 text-[13px] tracking-[-0.005em] text-white/88">
+                            <span className="truncate font-medium">
+                              {source.name}
+                            </span>
+                            <ArrowRight className="h-3 w-3 shrink-0 text-white/30" />
+                            <span className="truncate font-medium">
+                              {target.name}
+                            </span>
                           </div>
-                          <div className="mt-1 flex items-center gap-2">
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px]"
-                            >
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#8EB6F3]/85">
+                              <span className="h-1 w-1 rounded-full bg-[#8EB6F3]/70" />
                               {rel.relation_type.replace(/_/g, " ")}
-                            </Badge>
-                            <span className="text-[10px] text-muted-foreground">
-                              {Math.round(rel.confidence * 100)}%
+                            </span>
+                            <span className="text-[10.5px] tabular-nums text-white/35">
+                              {Math.round(rel.confidence * 100)}% confidence
                             </span>
                           </div>
                           {rel.evidence_text && (
-                            <p className="mt-1.5 text-xs italic text-muted-foreground">
+                            <p className="mt-2 border-l border-white/10 pl-3 text-[12px] leading-[1.55] italic text-white/50">
                               &ldquo;{rel.evidence_text}&rdquo;
                             </p>
                           )}
-                        </div>
+                        </li>
                       );
                     })}
-                  </div>
+                  </ul>
                 </CardContent>
               </Card>
             )}

@@ -195,4 +195,4 @@ Do **not** add `dark:` variants unless implementing a genuine dual-mode feature.
 | Donut chart | `src/components/dashboard/topic-distribution-chart.tsx` |
 | Logo (horizontal) | `public/sovereign_log_apaisado.svg` |
 | Logo (icon) | `public/sovereign_logo.svg` |
-| Logo (favicon bg) | `public/sovereign_log_fondo.svg` |
+| Logo (favicon bg) | `public/sovereign_negro.svg` |
