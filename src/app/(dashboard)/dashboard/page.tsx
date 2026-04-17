@@ -6,7 +6,7 @@ import {
   FolderKanban,
   Users,
   CheckCircle2,
-  Loader2,
+  CircleDot,
   XCircle,
   Upload,
   ArrowUpRight,
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       .from("interviews")
       .select("id, title, status, created_at, projects(name, country)")
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(12),
     admin
       .from("entity_relationships")
       .select("id", { count: "exact", head: true }),
@@ -187,6 +187,7 @@ export default async function DashboardPage() {
         {/* Recent Interviews — spans 8 cols on wide */}
         <div className="lg:col-span-8">
           <SectionSurface
+            className="flex h-full flex-col"
             header={{
               title: "Recent Interviews",
               subtitle: "Latest uploaded recordings",
@@ -200,10 +201,10 @@ export default async function DashboardPage() {
                 </Link>
               ),
             }}
-            bodyClassName="px-2 py-1.5"
+            bodyClassName="flex min-h-0 flex-1 flex-col px-2 py-1.5"
           >
             {recentInterviews.length === 0 ? (
-              <div className="flex flex-col items-center py-12 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
                 <Mic
                   className="mb-3 h-8 w-8 text-white/22"
                   strokeWidth={1.5}
@@ -219,7 +220,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col">
+              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -293,8 +294,8 @@ export default async function DashboardPage() {
                 count={processingCount}
                 accent="#5B9CF6"
                 icon={
-                  <Loader2
-                    className="h-[12px] w-[12px] animate-spin"
+                  <CircleDot
+                    className="h-[12px] w-[12px]"
                     strokeWidth={1.8}
                   />
                 }
@@ -330,32 +331,52 @@ export default async function DashboardPage() {
                 href: "/interviews/upload",
                 icon: Upload,
                 label: "Upload Interview",
+                accent: "#5FA6A8", // dusty teal
               },
               {
                 href: "/chat",
                 icon: MessageSquare,
                 label: "Copilot",
+                accent: "#A78BFA", // soft violet
               },
               {
                 href: "/network",
                 icon: Network,
                 label: "Network Explorer",
+                accent: "#818CF8", // faded indigo
               },
               {
                 href: "/projects/new",
                 icon: FolderKanban,
                 label: "New Project",
+                accent: "#D4B77C", // restrained amber / sand
               },
-            ].map(({ href, icon: Icon, label }) => (
+            ].map(({ href, icon: Icon, label, accent }) => (
               <Link
                 key={href}
                 href={href}
-                className="sv-hover-card flex items-center gap-2 rounded-[5px] border border-[rgba(147,147,147,0.15)] px-2.5 py-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
+                className="sv-hover-card group relative flex items-center gap-2.5 overflow-hidden rounded-[5px] border border-[rgba(147,147,147,0.15)] py-2.5 pl-[13px] pr-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${accent} 3%, transparent)`,
+                }}
               >
-                <Icon
-                  className="h-[14px] w-[14px] shrink-0 text-white/55"
-                  strokeWidth={1.6}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+                  style={{ backgroundColor: accent }}
                 />
+                <span
+                  className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px]"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${accent} 11%, transparent)`,
+                  }}
+                >
+                  <Icon
+                    className="h-[13px] w-[13px]"
+                    strokeWidth={1.7}
+                    style={{ color: accent }}
+                  />
+                </span>
                 <span className="truncate">{label}</span>
               </Link>
             ))}
@@ -490,10 +511,7 @@ function StatusWell({ status }: { status: InterviewStatus }) {
         return {
           color: "#FBBF24",
           icon: (
-            <Loader2
-              className="h-[13px] w-[13px] animate-spin"
-              strokeWidth={1.8}
-            />
+            <CircleDot className="h-[13px] w-[13px]" strokeWidth={1.8} />
           ),
         };
     }

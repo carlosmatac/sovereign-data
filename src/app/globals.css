@@ -191,4 +191,35 @@
     background-color: #0A1223;
     border-color: rgba(147, 147, 147, 0.30);
   }
+
+  /*
+   * Thin, restrained scrollbar for in-panel scroll regions
+   * (e.g. dashboard Recent Interviews, chat history). Stays out of
+   * the way until the user is actively scrolling near the edge.
+   */
+  .sv-scroll-soft {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.10) transparent;
+  }
+  .sv-scroll-soft::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .sv-scroll-soft::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sv-scroll-soft::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  .sv-scroll-soft:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    background-clip: padding-box;
+  }
+  .sv-scroll-soft::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+    background-clip: padding-box;
+  }
 }

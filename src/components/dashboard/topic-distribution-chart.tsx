@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   PieChart,
   Pie,
@@ -61,14 +62,28 @@ interface Props {
 }
 
 export function TopicDistributionChart({ data }: Props) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   if (!data.length) return null;
 
   const displayData = data.slice(0, 8);
 
+  // Opacity rule: when nothing is hovered, everything at full brightness.
+  // When one slice/legend row is hovered, that one stays at 1 and the rest
+  // fade to 0.22 — a calm dim/highlight treatment matching the landing.
+  const opacityFor = (index: number) =>
+    hoveredIndex === null ? 1 : hoveredIndex === index ? 1 : 0.22;
+
+  const handleEnter = (index: number) => () => setHoveredIndex(index);
+  const handleLeave = () => setHoveredIndex(null);
+
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
       {/* Donut */}
-      <div className="mx-auto h-[200px] w-full max-w-[200px] shrink-0 sm:mx-0">
+      <div
+        className="mx-auto h-[200px] w-full max-w-[200px] shrink-0 sm:mx-0"
+        onMouseLeave={handleLeave}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -81,35 +96,88 @@ export function TopicDistributionChart({ data }: Props) {
               outerRadius="82%"
               paddingAngle={2}
               strokeWidth={0}
+              isAnimationActive={false}
+              onMouseEnter={(_, index) => setHoveredIndex(index)}
+              onMouseLeave={handleLeave}
             >
               {displayData.map((entry, index) => (
                 <Cell
                   key={entry.topic}
                   fill={PALETTE[index % PALETTE.length]}
+                  fillOpacity={opacityFor(index)}
+                  style={{
+                    transition:
+                      "fill-opacity 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
                 />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={false}
+              isAnimationActive={false}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
       {/* Legend */}
-      <ul className="flex min-w-0 flex-1 flex-col gap-2">
-        {displayData.map((entry, index) => (
-          <li key={entry.topic} className="flex min-w-0 items-center gap-2.5">
-            <span
-              className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
-              style={{ background: PALETTE[index % PALETTE.length] }}
-            />
-            <span className="flex-1 truncate text-[12px] text-white/78">
-              {entry.topic}
-            </span>
-            <span className="shrink-0 text-[11.5px] font-medium tabular-nums text-white/50">
-              {entry.count}
-            </span>
-          </li>
-        ))}
+      <ul
+        className="flex min-w-0 flex-1 flex-col gap-0.5"
+        onMouseLeave={handleLeave}
+      >
+        {displayData.map((entry, index) => {
+          const isActive = hoveredIndex === index;
+          const isDimmed = hoveredIndex !== null && !isActive;
+          return (
+            <li
+              key={entry.topic}
+              onMouseEnter={handleEnter(index)}
+              className="flex min-w-0 cursor-default items-center gap-2.5 rounded-[4px] px-1.5 py-1.5"
+              style={{
+                transition:
+                  "opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), background-color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                opacity: isDimmed ? 0.38 : 1,
+                backgroundColor: isActive
+                  ? "rgba(255,255,255,0.035)"
+                  : "transparent",
+              }}
+            >
+              <span
+                className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
+                style={{
+                  background: PALETTE[index % PALETTE.length],
+                  transition: "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  transform: isActive ? "scale(1.3)" : "scale(1)",
+                }}
+              />
+              <span
+                className="flex-1 truncate text-[12px]"
+                style={{
+                  color: isActive
+                    ? "rgba(255,255,255,0.95)"
+                    : "rgba(255,255,255,0.78)",
+                  transition: "color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {entry.topic}
+              </span>
+              <span
+                className="shrink-0 text-[11.5px] font-medium tabular-nums"
+                style={{
+                  color: isActive
+                    ? "rgba(255,255,255,0.92)"
+                    : "rgba(255,255,255,0.50)",
+                  transition: "color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {entry.count}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
