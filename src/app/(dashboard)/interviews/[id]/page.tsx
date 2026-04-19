@@ -38,6 +38,7 @@ import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
 import { EditableSpeakersCard } from "@/components/interviews/editable-speakers-card";
 import { EditableInterviewTitle } from "@/components/interviews/editable-interview-title";
+import { IconWell } from "@/components/panels";
 import type { SpeakerMap } from "@/types/database";
 
 export default async function InterviewDetailPage({
@@ -275,12 +276,21 @@ export default async function InterviewDetailPage({
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column: Transcript + Summary */}
           <div className="space-y-6 lg:col-span-2">
-            {/* Executive Summary */}
+            {/*
+             * Executive Summary — the most prominent content block on the
+             * page. It carries a subtle Sovereign-blue accent (border tint
+             * + faint background tint + leading IconWell) so it reads as
+             * the page's primary takeaway without becoming a colourful
+             * tile. All other intelligence cards stay neutral on purpose
+             * so this one keeps its visual weight.
+             */}
             {interview.summary && (
-              <Card>
+              <Card className="border-[rgba(91,156,246,0.20)] bg-[rgba(91,156,246,0.03)]">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
+                  <div className="flex items-center gap-2.5">
+                    <IconWell accent="#5B9CF6" size={26}>
+                      <FileText className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    </IconWell>
                     <CardTitle className="text-base">
                       Executive Summary
                     </CardTitle>

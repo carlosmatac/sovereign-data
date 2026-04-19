@@ -756,7 +756,7 @@ export function TranscriptReviewEditor({
   const emptyState = utterances.length === 0;
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-8 px-6 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 px-6 py-8 lg:px-8">
       {chunkAudioEnabled && audioUrl ? (
         <audio
           ref={sharedAudioRef}

@@ -2,8 +2,24 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+
+/**
+ * Top-of-page audio player for the interview detail view.
+ *
+ * Visual language:
+ *   - Sovereign panel surface (#080F1E + tonal hairline border, 6px radius).
+ *   - Amber `#FBBF24` accent on the play button + progress fill + thumb.
+ *     This mirrors the per-utterance audio scrubbing in the transcript
+ *     review editor, so "audio playback" reads as the same thing across
+ *     the product. The amber is restrained — single-channel, never on
+ *     more than one element at a time inside this card.
+ *   - Mute button stays neutral so the amber stays meaningful (volume
+ *     control is not the same semantic as scrubbing).
+ *
+ * Behaviour is unchanged: same play/pause, seek, mute, loading, error.
+ */
+
+const ACCENT = "#FBBF24"; // amber — audio playback semantic
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || isNaN(seconds)) return "0:00";
@@ -100,47 +116,72 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="px-4 py-3 text-sm text-muted-foreground">
-          Audio file unavailable.
-        </CardContent>
-      </Card>
+      <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#080F1E] px-4 py-3 text-[12.5px] text-white/55">
+        Audio file unavailable.
+      </div>
     );
   }
 
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
-    <Card>
-      <CardContent className="px-4 py-3">
-        {/* Hidden native audio element */}
-        <audio ref={audioRef} src={src} preload="metadata" />
+    <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#080F1E] px-4 py-3">
+      {/* Hidden native audio element */}
+      <audio ref={audioRef} src={src} preload="metadata" />
 
-        <div className="flex items-center gap-3">
-          {/* Play / Pause */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 rounded-full"
-            onClick={togglePlay}
-            disabled={loading}
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-          </Button>
+      <div className="flex items-center gap-3">
+        {/*
+         * Play / Pause — bespoke 32px circular button using the amber
+         * accent so the playback affordance reads instantly, in the
+         * same visual family as the per-utterance play buttons in the
+         * transcript review editor.
+         */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          disabled={loading}
+          aria-label={playing ? "Pause" : "Play"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: "rgba(251,191,36,0.10)",
+            borderColor: "rgba(251,191,36,0.32)",
+            color: ACCENT,
+          }}
+        >
+          {playing ? (
+            <Pause className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
+          ) : (
+            <Play
+              className="h-3.5 w-3.5 translate-x-[0.5px]"
+              fill="currentColor"
+              strokeWidth={0}
+            />
+          )}
+        </button>
 
-          {/* Current time */}
-          <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-            {formatTime(currentTime)}
-          </span>
+        {/* Current time */}
+        <span className="w-10 shrink-0 text-right text-[11.5px] tabular-nums text-white/55">
+          {formatTime(currentTime)}
+        </span>
 
-          {/* Progress bar — input taller than track so thumb centers on track (WebKit/Firefox) */}
-          <div className="relative flex h-8 flex-1 items-center">
-            {loading ? (
-              <div className="h-0.5 w-full animate-pulse rounded-full bg-muted" />
-            ) : (
+        {/*
+         * Progress bar — three-layer treatment:
+         *   1. base track 3px (white @ 8%)
+         *   2. amber fill 3px sized to progress
+         *   3. transparent native <input type="range"> on top so the
+         *      thumb + keyboard a11y come for free.
+         * Mirrors the per-segment scrubbing in transcript-review-editor.
+         */}
+        <div className="relative flex h-8 flex-1 items-center">
+          {loading ? (
+            <div className="h-[3px] w-full animate-pulse rounded-full bg-white/8" />
+          ) : (
+            <>
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
+              <div
+                className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full"
+                style={{ width: `${progressPct}%`, background: ACCENT }}
+              />
               <input
                 type="range"
                 min={0}
@@ -149,54 +190,52 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
                 value={currentTime}
                 onChange={handleSeek}
                 aria-label="Seek"
+                aria-valuemin={0}
+                aria-valuemax={duration || 1}
+                aria-valuenow={currentTime}
                 className="
-                  h-8 w-full cursor-pointer appearance-none rounded-full bg-transparent
-                  accent-foreground outline-none
-                  focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
-                  [&::-webkit-slider-runnable-track]:h-0.5 [&::-webkit-slider-runnable-track]:rounded-full
+                  relative z-[1] h-8 w-full cursor-pointer appearance-none bg-transparent outline-none
+                  focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080F1E]
+                  [&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full
                   [&::-webkit-slider-runnable-track]:bg-transparent
-                  [&::-webkit-slider-thumb]:mt-[calc((0.125rem-0.75rem)/2)]
-                  [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3
+                  [&::-webkit-slider-thumb]:mt-[calc((3px-10px)/2)]
+                  [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:w-[10px]
                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-foreground
-                  [&::-webkit-slider-thumb]:shadow-sm
-                  [&::-moz-range-track]:h-0.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent
-                  [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3
-                  [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0
-                  [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:shadow-sm
+                  [&::-webkit-slider-thumb]:border-[2px] [&::-webkit-slider-thumb]:border-[#080F1E]
+                  [&::-webkit-slider-thumb]:bg-[#FBBF24]
+                  [&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent
+                  [&::-moz-range-thumb]:h-[10px] [&::-moz-range-thumb]:w-[10px]
+                  [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[2px]
+                  [&::-moz-range-thumb]:border-[#080F1E] [&::-moz-range-thumb]:bg-[#FBBF24]
                 "
-                style={{
-                  /* Gradient on the full input h-8 looked like a fat pill; paint only a 2px strip (matches track). */
-                  background:
-                    duration > 0
-                      ? `linear-gradient(to right, var(--foreground) ${(currentTime / duration) * 100}%, var(--border) ${(currentTime / duration) * 100}%) center / 100% 2px no-repeat`
-                      : `linear-gradient(var(--border), var(--border)) center / 100% 2px no-repeat`,
-                }}
               />
-            )}
-          </div>
-
-          {/* Duration */}
-          <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
-            {duration > 0 ? formatTime(duration) : "—"}
-          </span>
-
-          {/* Mute */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 rounded-full"
-            onClick={toggleMute}
-            aria-label={muted ? "Unmute" : "Mute"}
-          >
-            {muted ? (
-              <VolumeX className="h-4 w-4" />
-            ) : (
-              <Volume2 className="h-4 w-4" />
-            )}
-          </Button>
+            </>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Duration */}
+        <span className="w-10 shrink-0 text-[11.5px] tabular-nums text-white/55">
+          {duration > 0 ? formatTime(duration) : "—"}
+        </span>
+
+        {/*
+         * Mute — kept neutral on purpose. The amber is reserved for the
+         * playback semantic (play state + scrub progress); the mute
+         * toggle is a different concept and shouldn't compete.
+         */}
+        <button
+          type="button"
+          onClick={toggleMute}
+          aria-label={muted ? "Unmute" : "Mute"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(147,147,147,0.18)] bg-white/[0.03] text-white/55 transition-colors duration-150 hover:border-[rgba(147,147,147,0.30)] hover:bg-white/[0.06] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(147,147,147,0.40)]"
+        >
+          {muted ? (
+            <VolumeX className="h-3.5 w-3.5" strokeWidth={1.6} />
+          ) : (
+            <Volume2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+          )}
+        </button>
+      </div>
+    </div>
   );
 }
