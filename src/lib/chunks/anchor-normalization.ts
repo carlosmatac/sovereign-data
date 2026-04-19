@@ -22,10 +22,17 @@
 //     (e.g. "Buddha" is never forcibly rewritten to "Boudab")
 //   - Chunks become retrievable for anchor-related queries via context,
 //     not via risky text rewriting
+//
+// REGRESSION GUARD (do not re-introduce): bare-surname / honorific-stripped
+// variants. From a person anchor like "Mrs. Brown" we used to derive
+// "Brown" as a replaceable variant, which then rewrote unrelated mentions
+// (e.g. "Mr. Brown") into "Mr. Mrs. Brown" inside chunk text. The variant
+// builder below intentionally only emits the full anchor and its
+// punctuation/spacing-tidy form. Anchor *enrichment* (appended context for
+// the embedding) is what gives us retrieval coverage of partial mentions —
+// not destructive sub-token substitution.
 
 import type { ChunkMetadata } from "@/types/database";
-
-const HONORIFIC_PREFIX_RE = /^\s*(mr|mrs|ms|dr|prof)\.?\s+/i;
 
 export interface ChunkAnchors {
   intervieweeName: string | null;
@@ -216,10 +223,6 @@ function normalizeSpaces(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function stripLeadingHonorific(value: string): string {
-  return value.replace(HONORIFIC_PREFIX_RE, "").trim();
-}
-
 function stripPunctuation(value: string): string {
   return value.replace(/[.,/#!$%^&*;:{}=_`~()\-+[\]\\'"?<>]/g, " ").trim();
 }
@@ -228,13 +231,23 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Safe anchor variants for chunk normalization.
+ *
+ * Only deterministic forms of the *full* anchor string are produced:
+ *   - the normalized anchor itself (whitespace collapsed)
+ *   - a punctuation/spacing-tidy form (e.g. "Dr Mohamed" → "Dr. Mohamed")
+ *
+ * Honorific-stripped sub-tokens (e.g. "Brown" from "Mrs. Brown") are
+ * deliberately NOT generated here — see the regression note at the
+ * top of this file.
+ */
 function buildAnchorVariants(anchor: string): string[] {
   const variants = new Set<string>();
   const normalized = normalizeSpaces(anchor);
   if (!normalized) return [];
 
   variants.add(normalized);
-  variants.add(stripLeadingHonorific(normalized));
   variants.add(normalizeSpaces(stripPunctuation(normalized)));
 
   return [...variants].filter(Boolean).sort((a, b) => b.length - a.length);

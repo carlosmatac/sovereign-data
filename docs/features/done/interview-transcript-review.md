@@ -3,7 +3,7 @@ title: Interview Transcript Review & Reviewed Reprocessing
 status: done
 owner: team
 priority: high
-last_updated: 2026-03-21
+last_updated: 2026-04-19
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_infrastructure:
@@ -127,3 +127,53 @@ Reprocess flow is unchanged: editing produces `reviewed_utterances` with these s
 **UX note:** Unsaved transcript edits are kept in the browser when you add/remove seed entities (we do not reset local utterance state on every server refresh). A full page reload or navigating away and back loads the last **saved** draft from the database.
 
 **Completion UX:** The final `COMPLETED` database update for a human-review run includes `transcript_review_status: draft` in the **same** write as `last_intel_source: human_review`, so Realtime / polling never leave the UI stuck on “reprocessing”. The transcript review page’s status tracker then redirects to the interview detail route when the pipeline hits `COMPLETED`. The interview header shows a **Human-reviewed intel** badge when `last_intel_source === human_review`.
+
+---
+
+## Display and chunk normalization fidelity guarantees
+
+The reviewed reprocess flow flows through two normalization layers between
+`reviewed_utterances` and what the user sees / what we embed:
+
+1. `normalizeTranscriptDisplay()` — `src/lib/transcript/normalizeDisplay.ts`
+   - Builds `transcript_display` for the reviewed run from
+     `reviewed_utterances.map(u => u.text).join("\n")`.
+2. `normalizeChunkWithAnchors()` — `src/lib/chunks/anchor-normalization.ts`
+   - Builds the per-chunk `metadata.normalized_content` and
+     `metadata.content_for_embedding`.
+
+Both layers are **conservative-only**. They MUST NOT semantically rewrite
+the human-reviewed text. Concretely:
+
+- **No honorific-stripped / bare-surname variants.** A person anchor
+  like `"Mrs. Brown"` does **not** generate `"Brown"` as a replaceable
+  variant. (Earlier behavior produced `"Mr. Brown"` → `"Mr. Mrs. Brown"`
+  whenever another person shared the surname.)
+- **No proximity-based variant discovery in display normalization.** The
+  display layer no longer scans an 80-char window around an anchor for
+  acronyms, role-prefixed names, or org markers. (Earlier behavior
+  caused `NNPC` to be rewritten to the interviewee org globally after
+  it was spotted near the anchor a single time.)
+- **Only safe, deterministic variants of the *full* canonical anchor
+  are applied** — currently the punctuation/spacing-tidy form
+  (e.g. `"Mrs Brown"` → `"Mrs. Brown"`, `"Dr Mohamed"` → `"Dr. Mohamed"`).
+- **Anchor enrichment carries retrieval coverage**, not destructive
+  substitution. `content_for_embedding` still appends
+  `Primary interviewee: …` / `Primary institution: …` so partial
+  mentions inside a chunk remain retrievable without rewriting the body.
+- `reviewed_utterances` itself is never modified by these layers.
+
+Tests (regression coverage):
+- `src/__tests__/normalize-display.test.ts`
+- `src/__tests__/anchor-normalization.test.ts`
+
+**Known phase-2 limitations** (deliberately not in scope of this fix):
+- The display layer still does no honorific-aware lookbehind; it relies
+  entirely on *not generating* dangerous variants in the first place.
+  If future variants are added, they must be evaluated for the same
+  `Mr.` / `Mrs.` collision risk.
+- The chunk layer still gates the surfaced `normalizedContent` on
+  `confidence === "high"`, so a single-anchor interview falls back to
+  raw chunk text in `normalizedContent` even when a safe variant
+  matched. `contentForEmbedding` always benefits from the anchor
+  enrichment lines.
