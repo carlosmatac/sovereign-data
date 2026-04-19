@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { Plus, FolderKanban, MapPin } from "lucide-react";
 import Link from "next/link";
-import { SectionSurface, SectionChip } from "@/components/panels";
+import {
+  SectionSurface,
+  SectionChip,
+  TonalActionButton,
+} from "@/components/panels";
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
@@ -17,15 +20,6 @@ export default async function ProjectsPage() {
       {/* Header */}
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p
-            className="mb-1.5 text-[11px] font-semibold uppercase"
-            style={{
-              letterSpacing: "0.14em",
-              color: "rgba(255,255,255,0.42)",
-            }}
-          >
-            Intelligence Platform
-          </p>
           <h1
             className="text-[28px] font-semibold text-white"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
@@ -36,12 +30,12 @@ export default async function ProjectsPage() {
             Manage your market intelligence projects by country or region.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/projects/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Link>
-        </Button>
+        <TonalActionButton
+          href="/projects/new"
+          icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+        >
+          New Project
+        </TonalActionButton>
       </div>
 
       {/* Project Grid */}
@@ -72,12 +66,14 @@ export default async function ProjectsPage() {
           <p className="mt-1.5 text-[12.5px] text-white/58">
             Create your first project to start ingesting interviews.
           </p>
-          <Button className="mt-5" asChild>
-            <Link href="/projects/new">
-              <Plus className="mr-2 h-4 w-4" />
+          <div className="mt-5">
+            <TonalActionButton
+              href="/projects/new"
+              icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+            >
               Create Project
-            </Link>
-          </Button>
+            </TonalActionButton>
+          </div>
         </SectionSurface>
       ) : (
         <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">

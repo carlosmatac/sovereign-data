@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Button } from "@/components/ui/button";
 import {
   Mic,
   FolderKanban,
@@ -25,6 +24,7 @@ import {
   SectionSurface,
   IconWell,
   StatusPill,
+  TonalActionButton,
 } from "@/components/panels";
 
 export default async function DashboardPage() {
@@ -83,7 +83,6 @@ export default async function DashboardPage() {
     (statusCounts["EMBEDDING"] ?? 0);
   const failedCount = statusCounts["FAILED"] ?? 0;
 
-  // Interviews by project
   const projectsData = projectsResult.data ?? [];
   const projectInterviewCounts: Record<
     string,
@@ -108,7 +107,6 @@ export default async function DashboardPage() {
     .filter((p) => p.total > 0)
     .sort((a, b) => b.total - a.total);
 
-  // Topic distribution
   const topicCounts: Record<string, number> = {};
   completedInterviews.forEach((i) => {
     const topics = i.topics as string[] | null;
@@ -123,36 +121,52 @@ export default async function DashboardPage() {
 
   const hasCharts = projectBreakdown.length > 0 || topTopics.length > 0;
 
+  // Snapshot line — derived, not invented data. Reads as an operational
+  // ticker rather than a marketing tagline. Server-rendered → consistent
+  // value across the whole HTTP response.
+  const snapshotDate = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const snapshotScope = `${projectCount.toLocaleString()} ${
+    projectCount === 1 ? "project" : "projects"
+  } · ${interviewCount.toLocaleString()} ${
+    interviewCount === 1 ? "interview" : "interviews"
+  }`;
+
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-7">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="mb-5 flex items-end justify-between gap-4">
-        <div>
-          <p
-            className="mb-1.5 text-[11px] font-semibold uppercase"
-            style={{
-              letterSpacing: "0.14em",
-              color: "rgba(255,255,255,0.42)",
-            }}
-          >
-            Intelligence Platform
-          </p>
+        <div className="min-w-0">
           <h1
             className="text-[28px] font-semibold text-white"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
             Dashboard
           </h1>
+          <p
+            className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-white/45"
+            style={{ letterSpacing: "-0.005em" }}
+          >
+            <span>Snapshot · {snapshotDate}</span>
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+            <span className="tabular-nums">{snapshotScope}</span>
+          </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link href="/interviews/upload">
-            <Upload className="h-4 w-4" />
-            Upload Interview
-          </Link>
-        </Button>
+
+        <TonalActionButton
+          href="/interviews/upload"
+          icon={<Upload className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+        >
+          Upload Interview
+        </TonalActionButton>
       </div>
 
-      {/* ── KPI Row — 3 metrics ────────────────────────────────── */}
+      {/* ── KPI Row — lifted tone ─────────────────────────────── */}
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <StatLink
           href="/projects"
@@ -187,6 +201,7 @@ export default async function DashboardPage() {
         {/* Recent Interviews — spans 8 cols on wide */}
         <div className="lg:col-span-8">
           <SectionSurface
+            tone="lifted"
             className="flex h-full flex-col"
             header={{
               title: "Recent Interviews",
@@ -201,7 +216,7 @@ export default async function DashboardPage() {
                 </Link>
               ),
             }}
-            bodyClassName="flex min-h-0 flex-1 flex-col px-2 py-1.5"
+            bodyClassName="flex min-h-0 flex-1 flex-col p-2"
           >
             {recentInterviews.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
@@ -220,7 +235,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -232,39 +247,16 @@ export default async function DashboardPage() {
                   };
 
                   return (
-                    <Link
+                    <InterviewListRow
                       key={interview.id}
-                      href={`/interviews/${interview.id}`}
-                      className="group flex items-center gap-3 rounded-[5px] px-2.5 py-2.5 transition-colors duration-150 hover:bg-white/[0.025]"
-                    >
-                      <StatusWell
-                        status={interview.status as InterviewStatus}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium leading-tight text-white/92">
-                          {interview.title}
-                        </p>
-                        <p className="mt-[4px] truncate text-[11px] text-white/50">
-                          {project?.name}
-                          {project?.country ? ` · ${project.country}` : ""}
-                          <span className="text-white/32">
-                            {"  ·  "}
-                            {new Date(interview.created_at).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )}
-                          </span>
-                        </p>
-                      </div>
-                      <InterviewStatusPill
-                        label={statusInfo.label}
-                        status={interview.status as InterviewStatus}
-                      />
-                    </Link>
+                      id={interview.id}
+                      title={interview.title}
+                      project={project?.name ?? null}
+                      country={project?.country ?? null}
+                      createdAt={interview.created_at}
+                      status={interview.status as InterviewStatus}
+                      statusLabel={statusInfo.label}
+                    />
                   );
                 })}
               </div>
@@ -276,6 +268,7 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-4 lg:col-span-4">
           {/* Pipeline Status (top of rail — most informational) */}
           <SectionSurface
+            tone="lifted"
             header={{
               title: "Pipeline Status",
               subtitle: "Interview processing",
@@ -323,6 +316,7 @@ export default async function DashboardPage() {
 
           {/* Quick Actions */}
           <SectionSurface
+            tone="lifted"
             header={{ title: "Quick Actions" }}
             bodyClassName="grid grid-cols-2 gap-2 p-3"
           >
@@ -357,7 +351,7 @@ export default async function DashboardPage() {
                 href={href}
                 className="sv-hover-card group relative flex items-center gap-2.5 overflow-hidden rounded-[5px] border border-[rgba(147,147,147,0.15)] py-2.5 pl-[13px] pr-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
                 style={{
-                  backgroundColor: `color-mix(in srgb, ${accent} 3%, transparent)`,
+                  backgroundColor: `color-mix(in srgb, ${accent} 4%, transparent)`,
                 }}
               >
                 <span
@@ -389,6 +383,7 @@ export default async function DashboardPage() {
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {projectBreakdown.length > 0 && (
             <SectionSurface
+              tone="lifted"
               header={{
                 title: "Interviews by Project",
                 subtitle: "Completed interviews per project",
@@ -399,13 +394,23 @@ export default async function DashboardPage() {
                   />
                 ),
               }}
+              bodyClassName="p-3"
             >
-              <InterviewsByProjectChart data={projectBreakdown} />
+              <div
+                className="rounded-[4px] p-2"
+                style={{
+                  background: "#070D1A",
+                  border: "1px solid rgba(147,147,147,0.10)",
+                }}
+              >
+                <InterviewsByProjectChart data={projectBreakdown} />
+              </div>
             </SectionSurface>
           )}
 
           {topTopics.length > 0 && (
             <SectionSurface
+              tone="lifted"
               header={{
                 title: "Topic Distribution",
                 subtitle: `Top ${topTopics.length} themes across all interviews`,
@@ -416,8 +421,17 @@ export default async function DashboardPage() {
                   />
                 ),
               }}
+              bodyClassName="p-3"
             >
-              <TopicDistributionChart data={topTopics} />
+              <div
+                className="rounded-[4px] p-2"
+                style={{
+                  background: "#070D1A",
+                  border: "1px solid rgba(147,147,147,0.10)",
+                }}
+              >
+                <TopicDistributionChart data={topTopics} />
+              </div>
             </SectionSurface>
           )}
         </div>
@@ -446,6 +460,7 @@ function StatLink({
   return (
     <Link href={href} className="block">
       <MetricCard
+        tone="lifted"
         label={label}
         value={value.toLocaleString()}
         sub={sub}
@@ -491,6 +506,81 @@ function StatusRow({
         {count}
       </span>
     </div>
+  );
+}
+
+/**
+ * Recent Interviews row — composed in the spirit of the panel-system
+ * `ListRow` primitive (leading IconWell, primary title, tiered metadata,
+ * trailing status pill) but rendered inline so the row can be a Next.js
+ * `<Link>` (the primitive's `onClick` doesn't do client-side navigation).
+ *
+ * Visual contract mirrors `src/components/panels/ListRow.tsx`:
+ *   - 52px min height, `px-3` padding, 6px radius.
+ *   - 1px hairline border at `rgba(147,147,147,0.10)` so consecutive rows
+ *     read as a structured list, not a stack of free-floating items.
+ *   - Hover lights border to 0.26 + lifts background to white/[0.025],
+ *     same recipe as `ListRow`.
+ *   - Title 12.5px / 600 / white-92, caption 10.5px / white-50 with a
+ *     subdued separator dot at white/22, status pill on the right.
+ */
+function InterviewListRow({
+  id,
+  title,
+  project,
+  country,
+  createdAt,
+  status,
+  statusLabel,
+}: {
+  id: string;
+  title: string;
+  project: string | null;
+  country: string | null;
+  createdAt: string;
+  status: InterviewStatus;
+  statusLabel: string;
+}) {
+  const formattedDate = new Date(createdAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <Link
+      href={`/interviews/${id}`}
+      className="group flex items-center gap-3 rounded-[6px] border px-3 py-2.5 transition-colors duration-150 hover:border-[rgba(147,147,147,0.26)] hover:bg-white/[0.025]"
+      style={{
+        minHeight: 52,
+        borderColor: "rgba(147,147,147,0.10)",
+      }}
+    >
+      <StatusWell status={status} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12.5px] font-semibold leading-tight text-white/92">
+          {title}
+        </p>
+        <p className="mt-[4px] flex flex-wrap items-center gap-x-1.5 truncate text-[10.5px] leading-snug text-white/50">
+          {project && <span className="truncate">{project}</span>}
+          {project && country && (
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+          )}
+          {country && <span className="truncate">{country}</span>}
+          {(project || country) && (
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+          )}
+          <span className="tabular-nums text-white/38">{formattedDate}</span>
+        </p>
+      </div>
+      <div className="shrink-0">
+        <InterviewStatusPill label={statusLabel} status={status} />
+      </div>
+    </Link>
   );
 }
 

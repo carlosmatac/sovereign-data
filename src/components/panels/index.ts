@@ -32,3 +32,7 @@ export { WindowPanel, type WindowPanelProps } from "./WindowPanel"
 export { ListRow, IconWell, type ListRowProps } from "./ListRow"
 export { InsightCard, type InsightCardProps } from "./InsightCard"
 export { SectionSurface, type SectionSurfaceProps } from "./SectionSurface"
+export {
+  TonalActionButton,
+  type TonalActionButtonProps,
+} from "./TonalActionButton"

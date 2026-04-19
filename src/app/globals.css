@@ -200,6 +200,23 @@
   }
 
   /*
+   * Variant for cards painted on the *lifted* tone (`#0B1325`, used by
+   * dashboard KPI cards and right-rail panels sitting on the workspace
+   * canvas). Hover lifts one more tonal step toward the same border alpha
+   * range as `sv-hover-card`, so the depth chain stays consistent rather
+   * than collapsing back toward the workspace surface.
+   */
+  .sv-hover-card-lifted {
+    transition-property: background-color, border-color;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+  .sv-hover-card-lifted:hover {
+    background-color: #0E1830;
+    border-color: rgba(147, 147, 147, 0.30);
+  }
+
+  /*
    * Thin, restrained scrollbar for in-panel scroll regions
    * (e.g. dashboard Recent Interviews, chat history). Stays out of
    * the way until the user is actively scrolling near the edge.

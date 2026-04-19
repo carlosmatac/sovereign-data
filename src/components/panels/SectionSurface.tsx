@@ -21,12 +21,46 @@ import { PanelHeader, type PanelHeaderProps } from "./PanelHeader";
  *     {children}
  *   </SectionSurface>
  */
+/**
+ * Tone controls the surface elevation in the 3-level hierarchy:
+ *
+ *   • `default` — `#080F1E` / border 0.13. Use when the surface sits directly
+ *     on the outer shell (`#070A14`), i.e. on most route pages.
+ *   • `lifted`  — `#0B1325` / border 0.16. Use when the surface sits on the
+ *     workspace canvas (`#080F1E`) and needs to read as one tonal step above
+ *     it. The dashboard uses this so the chain reads as
+ *     sidebar (deepest) → workspace → card → inner well (back to workspace).
+ *   • `well`    — `#070D1A` / border 0.10. Use for *recessed* inner regions
+ *     (chart container, status interior) inside a `lifted` card.
+ */
+export type SectionSurfaceTone = "default" | "lifted" | "well";
+
+const TONE_STYLES: Record<
+  SectionSurfaceTone,
+  { background: string; borderColor: string }
+> = {
+  default: {
+    background: "#080F1E",
+    borderColor: "rgba(147,147,147,0.13)",
+  },
+  lifted: {
+    background: "#0B1325",
+    borderColor: "rgba(147,147,147,0.16)",
+  },
+  well: {
+    background: "#070D1A",
+    borderColor: "rgba(147,147,147,0.10)",
+  },
+};
+
 export interface SectionSurfaceProps {
   header?: PanelHeaderProps;
   /** Padding applied to the body (between the header and the bottom edge). */
   bodyClassName?: string;
   /** Additional class names on the outer surface. */
   className?: string;
+  /** Surface elevation tone. Defaults to `default`. */
+  tone?: SectionSurfaceTone;
   children: React.ReactNode;
 }
 
@@ -34,14 +68,16 @@ export function SectionSurface({
   header,
   bodyClassName = "p-4",
   className = "",
+  tone = "default",
   children,
 }: SectionSurfaceProps) {
+  const t = TONE_STYLES[tone];
   return (
     <div
       className={`overflow-hidden rounded-[6px] ${className}`}
       style={{
-        background: "#080F1E",
-        border: "1px solid rgba(147,147,147,0.13)",
+        background: t.background,
+        border: `1px solid ${t.borderColor}`,
       }}
     >
       {header && <PanelHeader {...header} />}

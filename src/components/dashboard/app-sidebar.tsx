@@ -256,40 +256,58 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="px-2 pb-3">
+      {/*
+        Account block — lives below a hairline divider so it reads as a
+        separate "system identity" zone, not a floating nav item. Padding
+        and inner gap follow the panel-system tonal hierarchy:
+          - hairline border at sidebar-foreground/0.06 → soft separation
+          - account row uses 28px avatar + tight 2-line stack
+          - whole row stays on the sidebar surface (no extra fill at rest)
+            so the slightly darker sidebar tone keeps reading as "deeper"
+        Behavior: the dropdown trigger / Settings / Sign out paths are
+        unchanged.
+      */}
+      <SidebarFooter
+        className="px-2 pb-3 pt-2.5 group-data-[collapsible=icon]:px-1.5"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="rounded-[6px] px-2.5 py-2 transition-colors duration-150 hover:bg-white/[0.05]"
+                  className="h-auto items-center gap-2.5 rounded-[6px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.05] data-[state=open]:bg-white/[0.06] group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!w-9 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                   title={
                     state === "collapsed" && !isMobile
                       ? (user.name ?? user.email ?? "Account menu")
                       : undefined
                   }
                 >
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="size-7 shrink-0 group-data-[collapsible=icon]:size-7">
                     <AvatarFallback
-                      className="text-[11px] font-semibold"
+                      className="text-[10.5px] font-semibold"
                       style={{
-                        background: "rgba(91,156,246,0.10)",
-                        color: "#5B9CF6",
+                        background: "rgba(91,156,246,0.12)",
+                        color: "#9CC2F8",
+                        letterSpacing: "0.02em",
                       }}
                     >
                       {initials}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col gap-[3px] leading-none">
-                    <span className="text-[12.5px] font-medium text-white/92">
+                  <div className="flex min-w-0 flex-1 flex-col leading-none">
+                    <span className="truncate text-[12px] font-semibold text-white/92">
                       {user.name ?? "User"}
                     </span>
-                    <span className="text-[10.5px] text-white/50">
+                    <span
+                      className="mt-[3px] truncate text-[10.5px] text-white/45"
+                      style={{ letterSpacing: "-0.005em" }}
+                    >
                       {user.email}
                     </span>
                   </div>
-                  <ChevronUp className="ml-auto size-4 text-white/50" />
+                  <ChevronUp className="ml-auto size-3.5 shrink-0 text-white/35 transition-colors duration-150 group-hover/menu-item:text-white/60" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

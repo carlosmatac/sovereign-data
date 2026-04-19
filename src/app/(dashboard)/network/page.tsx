@@ -28,15 +28,6 @@ export default async function NetworkPage() {
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-7">
       <div className="mb-6">
-        <p
-          className="mb-1.5 text-[11px] font-semibold uppercase"
-          style={{
-            letterSpacing: "0.14em",
-            color: "rgba(255,255,255,0.42)",
-          }}
-        >
-          Intelligence Platform
-        </p>
         <h1
           className="text-[28px] font-semibold text-white"
           style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}

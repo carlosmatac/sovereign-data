@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Loader2, MessageSquare, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { SectionSurface, IconWell } from "@/components/panels";
+import {
+  SectionSurface,
+  IconWell,
+  TonalActionButton,
+} from "@/components/panels";
 
 type ConversationRow = {
   id: string;
@@ -43,15 +46,6 @@ export function ChatInboxLanding() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p
-              className="mb-1.5 text-[11px] font-semibold uppercase"
-              style={{
-                letterSpacing: "0.14em",
-                color: "rgba(255,255,255,0.42)",
-              }}
-            >
-              Sovereign · Copilot
-            </p>
             <h1
               className="text-[28px] font-semibold text-white"
               style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
@@ -62,12 +56,12 @@ export function ChatInboxLanding() {
               Open a recent conversation or start a new one.
             </p>
           </div>
-          <Button asChild className="shrink-0 gap-2">
-            <Link href="/chat/new">
-              <Plus className="size-4" />
-              New chat
-            </Link>
-          </Button>
+          <TonalActionButton
+            href="/chat/new"
+            icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+          >
+            New chat
+          </TonalActionButton>
         </header>
 
         {loading ? (
@@ -86,12 +80,14 @@ export function ChatInboxLanding() {
             <p className="mt-1.5 text-[12.5px] text-white/60">
               Start your first chat to explore your interview intelligence.
             </p>
-            <Button asChild className="mt-6 gap-2">
-              <Link href="/chat/new">
-                <Plus className="size-4" />
+            <div className="mt-6">
+              <TonalActionButton
+                href="/chat/new"
+                icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+              >
                 New chat
-              </Link>
-            </Button>
+              </TonalActionButton>
+            </div>
           </SectionSurface>
         ) : (
           <SectionSurface

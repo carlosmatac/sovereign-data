@@ -24,7 +24,7 @@ This document captures work delivered on branch `feature/ventura-ux-and-ingestio
 
 - Desktop: **`collapsible="icon"`** on the shadcn `Sidebar` — narrow rail with icon navigation; main content (`SidebarInset`) grows when collapsed.
 - **Expanded**: full horizontal logo `public/apaisado_con_logo.svg` (link to `/projects`).
-- **Collapsed**: compact mark `public/SD.svg` (not the wide logo).
+- **Collapsed**: compact mark `public/sovereign_logo.svg` (not the wide logo).
 - **Toggle**: `SidebarTrigger` in `DashboardInsetHeader` + `SidebarRail` + keyboard **⌘B / Ctrl+B** (existing `sidebar.tsx` shortcut).
 - **Persistence**: cookie `sidebar_state` (written by `SidebarProvider` on toggle) + **`defaultOpen`** read in the dashboard layout via `cookies()` so SSR matches the user preference.
 

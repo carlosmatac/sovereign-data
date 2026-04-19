@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/project-role";
-import { Button } from "@/components/ui/button";
 import { Plus, Mic, Clock, FolderKanban, FileText } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
@@ -11,6 +10,7 @@ import {
   IconWell,
   SectionChip,
   StatusPill,
+  TonalActionButton,
 } from "@/components/panels";
 import type { InterviewStatus } from "@/types/database";
 
@@ -78,15 +78,6 @@ export default async function InterviewsPage({
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p
-            className="mb-1.5 text-[11px] font-semibold uppercase"
-            style={{
-              letterSpacing: "0.14em",
-              color: "rgba(255,255,255,0.42)",
-            }}
-          >
-            Intelligence Platform
-          </p>
           <h1
             className="text-[28px] font-semibold text-white"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
@@ -99,19 +90,24 @@ export default async function InterviewsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/projects">
-              <FolderKanban className="mr-2 h-4 w-4" />
-              View Projects
-            </Link>
-          </Button>
+          <TonalActionButton
+            href="/projects"
+            icon={
+              <FolderKanban
+                className="h-[12px] w-[12px]"
+                strokeWidth={1.8}
+              />
+            }
+          >
+            View Projects
+          </TonalActionButton>
           {canUpload && (
-            <Button asChild>
-              <Link href="/interviews/upload">
-                <Plus className="mr-2 h-4 w-4" />
-                Upload Interview
-              </Link>
-            </Button>
+            <TonalActionButton
+              href="/interviews/upload"
+              icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+            >
+              Upload Interview
+            </TonalActionButton>
           )}
         </div>
       </div>
@@ -139,12 +135,14 @@ export default async function InterviewsPage({
             Upload your first audio interview to start extracting intelligence.
           </p>
           {canUpload && (
-            <Button className="mt-4" asChild>
-              <Link href="/interviews/upload">
-                <Plus className="mr-2 h-4 w-4" />
+            <div className="mt-4">
+              <TonalActionButton
+                href="/interviews/upload"
+                icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
+              >
                 Upload Interview
-              </Link>
-            </Button>
+              </TonalActionButton>
+            </div>
           )}
         </SectionSurface>
       ) : (

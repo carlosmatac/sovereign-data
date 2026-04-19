@@ -14,6 +14,27 @@
 
 import * as React from "react"
 
+/**
+ * Tone controls KPI surface elevation. See `SectionSurface` for the hierarchy
+ * rationale. Default keeps existing visual contract; `lifted` is opt-in for
+ * surfaces (dashboard KPI row) sitting on the lifted workspace canvas.
+ *
+ * IMPORTANT (specificity gotcha — see Card hover-state restoration log
+ * 2026-04-17 in `docs/features/on-going/ui-panel-system-transfer.md`):
+ *   The resting `background-color` and `border-color` MUST be applied as
+ *   Tailwind/CSS classes, not as inline `style={{}}` objects, otherwise the
+ *   `:hover` rules from `.sv-hover-card[-lifted]` cannot win the cascade
+ *   (inline styles have specificity 1,0,0,0 — they beat any class-based
+ *   `:hover`). The first version of `tone="lifted"` regressed this and
+ *   killed the hover on the dashboard KPI cards.
+ */
+export type MetricCardTone = "default" | "lifted"
+
+const METRIC_TONE_CLASS: Record<MetricCardTone, string> = {
+  default: "bg-[#080F1E] border-[rgba(147,147,147,0.15)]",
+  lifted: "bg-[#0B1325] border-[rgba(147,147,147,0.18)]",
+}
+
 export interface MetricCardProps {
   label: string
   value: string | number
@@ -32,6 +53,8 @@ export interface MetricCardProps {
   size?: "compact" | "large"
   /** Color the value with the accent (used for positive/negative numbers). */
   tintValue?: boolean
+  /** Surface elevation tone. Defaults to `default`. */
+  tone?: MetricCardTone
 }
 
 export function MetricCard({
@@ -42,16 +65,20 @@ export function MetricCard({
   accent,
   size = "compact",
   tintValue = false,
+  tone = "default",
 }: MetricCardProps) {
   const isLarge = size === "large"
   const valueColor = tintValue && accent ? accent : "#fff"
+  const toneClass = METRIC_TONE_CLASS[tone]
+  const hoverClass =
+    tone === "lifted" ? "sv-hover-card-lifted" : "sv-hover-card"
 
   return (
     <div
       className={
         isLarge
-          ? "sv-hover-card flex flex-col gap-1.5 rounded-[6px] border border-[rgba(147,147,147,0.13)] bg-[#080F1E] p-4"
-          : "sv-hover-card rounded-[6px] border border-[rgba(147,147,147,0.15)] bg-[#080F1E] px-4 py-3.5"
+          ? `${hoverClass} ${toneClass} flex flex-col gap-1.5 rounded-[6px] border p-4`
+          : `${hoverClass} ${toneClass} rounded-[6px] border px-4 py-3.5`
       }
     >
       {isLarge ? (

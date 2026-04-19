@@ -631,33 +631,72 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
       </div>
 
       {/* ── Filter row ────────────────────────────────────────── */}
+      {/*
+        Pills follow the panel-system tonal accent recipe (see
+        `docs/ui-panel-system.md` §6 and the `TonalActionButton` primitive):
+
+          active  →  bg @ ~0.13 of accent / border @ ~0.32 of accent
+                     / text & dot @ accent (full)
+          inactive → soft hairline border, transparent fill, dim text
+
+        Previously the active state painted the *full* saturated accent as
+        the background, which read as opaque/blocky next to the rest of the
+        Sovereign UI. The tonal version preserves the semantic colour
+        mapping (PERSON → blue, COMPANY → green, …) while dropping the
+        fill weight so the chips feel refined and consistent with the
+        accent ramp used elsewhere (Quick Actions, IconWell, StatusPill).
+
+        `color-mix(in srgb, <hex> X%, transparent)` is the same CSS we
+        already use on the dashboard Quick Actions surface and works in
+        every browser the app supports.
+      */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-0.5 text-xs text-muted-foreground">Show:</span>
+        <span className="mr-0.5 text-[11px] uppercase tracking-[0.08em] text-white/40">
+          Show
+        </span>
         {ENTITY_TYPES.map((type) => {
           const active = !hiddenTypes.has(type);
+          const accent = nodeColor(type);
           return (
             <button
               key={type}
               onClick={() => toggleType(type)}
               className={`
                 inline-flex cursor-pointer select-none items-center gap-1.5
-                rounded-full border px-2.5 py-0.5 text-xs font-medium
-                transition-all
+                rounded-full border px-2.5 py-[3px] text-[11px] font-medium
+                transition-colors duration-150
                 ${
                   active
-                    ? "border-transparent text-white"
-                    : "border-border bg-transparent text-muted-foreground opacity-40 hover:opacity-70"
+                    ? ""
+                    : "border-[rgba(147,147,147,0.18)] bg-transparent text-white/35 hover:text-white/55 hover:border-[rgba(147,147,147,0.28)]"
                 }
               `}
-              style={active ? { background: nodeColor(type) } : undefined}
+              style={
+                active
+                  ? {
+                      background: `color-mix(in srgb, ${accent} 13%, transparent)`,
+                      borderColor: `color-mix(in srgb, ${accent} 32%, transparent)`,
+                      color: accent,
+                    }
+                  : undefined
+              }
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: active
+                    ? accent
+                    : "rgba(255,255,255,0.25)",
+                }}
+              />
               {type.charAt(0) + type.slice(1).toLowerCase()}
             </button>
           );
         })}
 
-        <span className="mx-1 select-none text-muted-foreground/25">|</span>
+        <span aria-hidden className="mx-1 select-none text-white/15">
+          |
+        </span>
 
         <button
           onClick={() => {
@@ -666,12 +705,12 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
           }}
           className={`
             inline-flex cursor-pointer select-none items-center gap-1.5
-            rounded-full border px-2.5 py-0.5 text-xs font-medium
-            transition-all
+            rounded-full border px-2.5 py-[3px] text-[11px] font-medium
+            transition-colors duration-150
             ${
               hideIsolated
-                ? "border-border bg-muted text-foreground"
-                : "border-border bg-transparent text-muted-foreground opacity-40 hover:opacity-70"
+                ? "border-[rgba(147,147,147,0.32)] bg-white/[0.045] text-white/85 hover:bg-white/[0.07]"
+                : "border-[rgba(147,147,147,0.18)] bg-transparent text-white/35 hover:text-white/55 hover:border-[rgba(147,147,147,0.28)]"
             }
           `}
         >
