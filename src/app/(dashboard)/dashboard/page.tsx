@@ -1,22 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import {
   Mic,
   FolderKanban,
   Users,
-  Clock,
   CheckCircle2,
-  Loader2,
+  CircleDot,
   XCircle,
   Upload,
   ArrowUpRight,
@@ -27,10 +16,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
-import { IconWrapper } from "@/components/ui/icon-wrapper";
 import type { InterviewStatus } from "@/types/database";
 import { InterviewsByProjectChart } from "@/components/dashboard/interviews-by-project-chart";
 import { TopicDistributionChart } from "@/components/dashboard/topic-distribution-chart";
+import {
+  MetricCard,
+  SectionSurface,
+  IconWell,
+  StatusPill,
+  TonalActionButton,
+} from "@/components/panels";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -57,7 +52,7 @@ export default async function DashboardPage() {
       .from("interviews")
       .select("id, title, status, created_at, projects(name, country)")
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(12),
     admin
       .from("entity_relationships")
       .select("id", { count: "exact", head: true }),
@@ -88,7 +83,6 @@ export default async function DashboardPage() {
     (statusCounts["EMBEDDING"] ?? 0);
   const failedCount = statusCounts["FAILED"] ?? 0;
 
-  // Interviews by project
   const projectsData = projectsResult.data ?? [];
   const projectInterviewCounts: Record<
     string,
@@ -113,7 +107,6 @@ export default async function DashboardPage() {
     .filter((p) => p.total > 0)
     .sort((a, b) => b.total - a.total);
 
-  // Topic distribution
   const topicCounts: Record<string, number> = {};
   completedInterviews.forEach((i) => {
     const topics = i.topics as string[] | null;
@@ -126,295 +119,320 @@ export default async function DashboardPage() {
     .slice(0, 8)
     .map(([topic, count]) => ({ topic, count }));
 
+  const hasCharts = projectBreakdown.length > 0 || topTopics.length > 0;
+
+  // Snapshot line — derived, not invented data. Reads as an operational
+  // ticker rather than a marketing tagline. Server-rendered → consistent
+  // value across the whole HTTP response.
+  const snapshotDate = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const snapshotScope = `${projectCount.toLocaleString()} ${
+    projectCount === 1 ? "project" : "projects"
+  } · ${interviewCount.toLocaleString()} ${
+    interviewCount === 1 ? "interview" : "interviews"
+  }`;
+
   return (
-    <div className="p-6 lg:p-8">
+    <div className="px-5 py-6 lg:px-8 lg:py-7">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-            Intelligence Platform
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1
+            className="text-[28px] font-semibold text-white"
+            style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
+          >
+            Dashboard
+          </h1>
+          <p
+            className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-white/45"
+            style={{ letterSpacing: "-0.005em" }}
+          >
+            <span>Snapshot · {snapshotDate}</span>
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+            <span className="tabular-nums">{snapshotScope}</span>
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         </div>
-        <Button size="sm" asChild className="gap-1.5">
-          <Link href="/interviews/upload">
-            <Upload className="h-3.5 w-3.5" />
-            Upload Interview
-          </Link>
-        </Button>
+
+        <TonalActionButton
+          href="/interviews/upload"
+          icon={<Upload className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+        >
+          Upload Interview
+        </TonalActionButton>
       </div>
 
-      {/* ── KPI Row — 3 metrics ────────────────────────────────── */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <StatsCard
-          title="Projects"
-          value={projectCount}
-          icon={FolderKanban}
-          iconColor="blue"
-          description="Active intelligence projects"
+      {/* ── KPI Row — lifted tone ─────────────────────────────── */}
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <StatLink
           href="/projects"
+          label="Projects"
+          value={projectCount}
+          sub="Active intelligence projects"
+          icon={
+            <FolderKanban className="h-[12px] w-[12px]" strokeWidth={1.6} />
+          }
+          accent="#5B9CF6"
         />
-        <StatsCard
-          title="Interviews"
-          value={interviewCount}
-          icon={Mic}
-          iconColor="indigo"
-          description={`${completedCount} completed · ${processingCount} processing`}
+        <StatLink
           href="/interviews"
+          label="Interviews"
+          value={interviewCount}
+          sub={`${completedCount} completed · ${processingCount} processing`}
+          icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.6} />}
+          accent="#818CF8"
         />
-        <StatsCard
-          title="Entities"
-          value={entityCount}
-          icon={Users}
-          iconColor="amber"
-          description={`${relationshipCount} relationships mapped`}
+        <StatLink
           href="/network"
+          label="Entities"
+          value={entityCount}
+          sub={`${relationshipCount} relationships mapped`}
+          icon={<Users className="h-[12px] w-[12px]" strokeWidth={1.6} />}
+          accent="#FBBF24"
         />
       </div>
 
-      {/* ── Middle row: Recent + Side panel ───────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Interviews */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
-              <div>
-                <CardTitle className="text-sm font-semibold tracking-tight">
-                  Recent Interviews
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Latest uploaded recordings
-                </CardDescription>
+      {/* ── Primary grid: Recent + side rail ─────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-12">
+        {/* Recent Interviews — spans 8 cols on wide */}
+        <div className="lg:col-span-8">
+          <SectionSurface
+            tone="lifted"
+            className="flex h-full flex-col"
+            header={{
+              title: "Recent Interviews",
+              subtitle: "Latest uploaded recordings",
+              right: (
+                <Link
+                  href="/interviews"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55 transition-colors duration-150 hover:text-white"
+                >
+                  View all
+                  <ArrowUpRight className="h-[11px] w-[11px]" />
+                </Link>
+              ),
+            }}
+            bodyClassName="flex min-h-0 flex-1 flex-col p-2"
+          >
+            {recentInterviews.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+                <Mic
+                  className="mb-3 h-8 w-8 text-white/22"
+                  strokeWidth={1.5}
+                />
+                <p className="text-[13px] text-white/55">
+                  No interviews yet.{" "}
+                  <Link
+                    href="/interviews/upload"
+                    className="text-white/85 underline decoration-white/30 underline-offset-2 transition-colors duration-150 hover:text-white"
+                  >
+                    Upload your first one.
+                  </Link>
+                </p>
               </div>
-              <Link
-                href="/interviews"
-                className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              >
-                View all
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {recentInterviews.length === 0 ? (
-                <div className="flex flex-col items-center py-10 text-center">
-                  <Mic className="mb-3 h-7 w-7 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">
-                    No interviews yet.{" "}
-                    <Link
-                      href="/interviews/upload"
-                      className="text-primary underline"
-                    >
-                      Upload your first one.
-                    </Link>
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {recentInterviews.map((interview) => {
-                    const project = interview.projects as unknown as {
-                      name: string;
-                      country: string | null;
-                    } | null;
-                    const statusInfo = STATUS_LABELS[interview.status] ?? {
-                      label: interview.status,
-                      variant: "secondary" as const,
-                    };
+            ) : (
+              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+                {recentInterviews.map((interview) => {
+                  const project = interview.projects as unknown as {
+                    name: string;
+                    country: string | null;
+                  } | null;
+                  const statusInfo = STATUS_LABELS[interview.status] ?? {
+                    label: interview.status,
+                    variant: "secondary" as const,
+                  };
 
-                    return (
-                      <Link
-                        key={interview.id}
-                        href={`/interviews/${interview.id}`}
-                        className="group flex items-center justify-between py-3 transition-colors hover:bg-muted/30 -mx-1 px-1 rounded"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <StatusIcon
-                            status={interview.status as InterviewStatus}
-                          />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium leading-snug">
-                              {interview.title}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {project?.name}
-                              {project?.country
-                                ? ` · ${project.country}`
-                                : ""}
-                              {"  "}
-                              <span className="opacity-50">
-                                {new Date(
-                                  interview.created_at
-                                ).toLocaleDateString("en-GB", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                        <Badge
-                          variant={statusInfo.variant}
-                          className="ml-3 shrink-0 text-[10px] font-medium tracking-wide"
-                        >
-                          {statusInfo.label}
-                        </Badge>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  return (
+                    <InterviewListRow
+                      key={interview.id}
+                      id={interview.id}
+                      title={interview.title}
+                      project={project?.name ?? null}
+                      country={project?.country ?? null}
+                      createdAt={interview.created_at}
+                      status={interview.status as InterviewStatus}
+                      statusLabel={statusInfo.label}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </SectionSurface>
         </div>
 
-        {/* Right column */}
-        <div className="flex flex-col gap-5">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold tracking-tight">
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2">
-              {[
-                {
-                  href: "/interviews/upload",
-                  icon: Upload,
-                  label: "Upload Interview",
-                },
-                {
-                  href: "/chat",
-                  icon: MessageSquare,
-                  label: "Copilot",
-                },
-                {
-                  href: "/network",
-                  icon: Network,
-                  label: "Network Explorer",
-                },
-                {
-                  href: "/projects/new",
-                  icon: FolderKanban,
-                  label: "New Project",
-                },
-              ].map(({ href, icon: Icon, label }) => (
-                <Button
-                  key={href}
-                  variant="outline"
-                  className="justify-start gap-2 text-sm font-medium h-9"
-                  asChild
-                >
-                  <Link href={href}>
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {label}
-                  </Link>
-                </Button>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Pipeline Status */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold tracking-tight">
-                Pipeline Status
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Interview processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+        {/* Right rail — spans 4 cols on wide */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          {/* Pipeline Status (top of rail — most informational) */}
+          <SectionSurface
+            tone="lifted"
+            header={{
+              title: "Pipeline Status",
+              subtitle: "Interview processing",
+            }}
+            bodyClassName="px-4 py-3.5"
+          >
+            <div className="flex flex-col gap-3">
+              <StatusRow
+                label="Completed"
+                count={completedCount}
+                accent="#4ADE80"
+                icon={<CheckCircle2 className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+              />
+              <StatusRow
+                label="Processing"
+                count={processingCount}
+                accent="#5B9CF6"
+                icon={
+                  <CircleDot
+                    className="h-[12px] w-[12px]"
+                    strokeWidth={1.8}
+                  />
+                }
+              />
+              <StatusRow
+                label="Failed"
+                count={failedCount}
+                accent="#F87171"
+                icon={<XCircle className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+              />
+              <div
+                className="mt-0.5 pt-3"
+                style={{ borderTop: "1px solid rgba(147,147,147,0.10)" }}
+              >
                 <StatusRow
-                  icon={
-                    <IconWrapper color="emerald" size="sm">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    </IconWrapper>
-                  }
-                  label="Completed"
-                  count={completedCount}
-                />
-                <StatusRow
-                  icon={
-                    <IconWrapper color="blue" size="sm">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    </IconWrapper>
-                  }
-                  label="Processing"
-                  count={processingCount}
-                />
-                <StatusRow
-                  icon={
-                    <IconWrapper color="rose" size="sm">
-                      <XCircle className="h-3.5 w-3.5" />
-                    </IconWrapper>
-                  }
-                  label="Failed"
-                  count={failedCount}
-                />
-                <Separator className="opacity-50" />
-                <StatusRow
-                  icon={
-                    <IconWrapper color="slate" size="sm">
-                      <Mic className="h-3.5 w-3.5" />
-                    </IconWrapper>
-                  }
                   label="Total"
                   count={interviewCount}
+                  accent="#94A3B8"
+                  icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.8} />}
                   bold
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </SectionSurface>
+
+          {/* Quick Actions */}
+          <SectionSurface
+            tone="lifted"
+            header={{ title: "Quick Actions" }}
+            bodyClassName="grid grid-cols-2 gap-2 p-3"
+          >
+            {[
+              {
+                href: "/interviews/upload",
+                icon: Upload,
+                label: "Upload Interview",
+                accent: "#5FA6A8", // dusty teal
+              },
+              {
+                href: "/chat",
+                icon: MessageSquare,
+                label: "Copilot",
+                accent: "#A78BFA", // soft violet
+              },
+              {
+                href: "/network",
+                icon: Network,
+                label: "Network Explorer",
+                accent: "#818CF8", // faded indigo
+              },
+              {
+                href: "/projects/new",
+                icon: FolderKanban,
+                label: "New Project",
+                accent: "#D4B77C", // restrained amber / sand
+              },
+            ].map(({ href, icon: Icon, label, accent }) => (
+              <Link
+                key={href}
+                href={href}
+                className="sv-hover-card group relative flex items-center gap-2.5 overflow-hidden rounded-[5px] border border-[rgba(147,147,147,0.15)] py-2.5 pl-[13px] pr-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${accent} 4%, transparent)`,
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+                  style={{ backgroundColor: accent }}
+                />
+                <span
+                  className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px]"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${accent} 11%, transparent)`,
+                  }}
+                >
+                  <Icon
+                    className="h-[13px] w-[13px]"
+                    strokeWidth={1.7}
+                    style={{ color: accent }}
+                  />
+                </span>
+                <span className="truncate">{label}</span>
+              </Link>
+            ))}
+          </SectionSurface>
         </div>
       </div>
 
       {/* ── Analytics Row — Charts ─────────────────────────────── */}
-      {(projectBreakdown.length > 0 || topTopics.length > 0) && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          {/* Interviews by Project — horizontal bar */}
+      {hasCharts && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {projectBreakdown.length > 0 && (
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-3.5 w-3.5 text-primary/70" />
-                      <CardTitle className="text-sm font-semibold tracking-tight">
-                        Interviews by Project
-                      </CardTitle>
-                    </div>
-                    <CardDescription className="mt-0.5 text-xs">
-                      Completed interviews per project
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pb-5">
+            <SectionSurface
+              tone="lifted"
+              header={{
+                title: "Interviews by Project",
+                subtitle: "Completed interviews per project",
+                right: (
+                  <TrendingUp
+                    className="h-[13px] w-[13px] text-white/45"
+                    strokeWidth={1.6}
+                  />
+                ),
+              }}
+              bodyClassName="p-3"
+            >
+              <div
+                className="rounded-[4px] p-2"
+                style={{
+                  background: "#070D1A",
+                  border: "1px solid rgba(147,147,147,0.10)",
+                }}
+              >
                 <InterviewsByProjectChart data={projectBreakdown} />
-              </CardContent>
-            </Card>
+              </div>
+            </SectionSurface>
           )}
 
-          {/* Topic Distribution — donut */}
           {topTopics.length > 0 && (
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-2">
-                  <Hash className="h-3.5 w-3.5 text-primary/70" />
-                  <CardTitle className="text-sm font-semibold tracking-tight">
-                    Topic Distribution
-                  </CardTitle>
-                </div>
-                <CardDescription className="text-xs">
-                  Top {topTopics.length} themes across all interviews
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pb-5">
+            <SectionSurface
+              tone="lifted"
+              header={{
+                title: "Topic Distribution",
+                subtitle: `Top ${topTopics.length} themes across all interviews`,
+                right: (
+                  <Hash
+                    className="h-[13px] w-[13px] text-white/45"
+                    strokeWidth={1.6}
+                  />
+                ),
+              }}
+              bodyClassName="p-3"
+            >
+              <div
+                className="rounded-[4px] p-2"
+                style={{
+                  background: "#070D1A",
+                  border: "1px solid rgba(147,147,147,0.10)",
+                }}
+              >
                 <TopicDistributionChart data={topTopics} />
-              </CardContent>
-            </Card>
+              </div>
+            </SectionSurface>
           )}
         </div>
       )}
@@ -424,83 +442,65 @@ export default async function DashboardPage() {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  iconColor = "primary",
-  description,
+function StatLink({
   href,
+  label,
+  value,
+  sub,
+  icon,
+  accent,
 }: {
-  title: string;
+  href: string;
+  label: string;
   value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor?:
-    | "blue"
-    | "indigo"
-    | "emerald"
-    | "amber"
-    | "rose"
-    | "purple"
-    | "slate"
-    | "primary";
-  description: string;
-  href?: string;
+  sub: string;
+  icon: React.ReactNode;
+  accent: string;
 }) {
-  const content = (
-    <Card
-      className={
-        href
-          ? "group transition-all duration-150 hover:border-primary/30 hover:bg-card/80"
-          : ""
-      }
-    >
-      <CardHeader className="flex flex-row items-start justify-between pb-2 pt-5">
-        <CardTitle className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
-          {title}
-        </CardTitle>
-        <IconWrapper color={iconColor} size="sm">
-          <Icon className="h-3.5 w-3.5" />
-        </IconWrapper>
-      </CardHeader>
-      <CardContent className="pb-5">
-        <div className="text-[28px] font-semibold tabular-nums leading-none tracking-tight">
-          {value.toLocaleString()}
-        </div>
-        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-          {description}
-        </p>
-      </CardContent>
-    </Card>
+  return (
+    <Link href={href} className="block">
+      <MetricCard
+        tone="lifted"
+        label={label}
+        value={value.toLocaleString()}
+        sub={sub}
+        icon={icon}
+        accent={accent}
+      />
+    </Link>
   );
-
-  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 function StatusRow({
-  icon,
   label,
   count,
+  icon,
+  accent,
   bold,
 }: {
-  icon: React.ReactNode;
   label: string;
   count: number;
+  icon: React.ReactNode;
+  accent: string;
   bold?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {icon}
+      <div className="flex items-center gap-2.5">
+        <IconWell accent={accent} size={22} shape="square">
+          <span style={{ color: accent }}>{icon}</span>
+        </IconWell>
         <span
-          className={`text-sm ${bold ? "font-semibold" : "text-muted-foreground"}`}
+          className={`text-[12.5px] ${
+            bold ? "font-semibold text-white" : "text-white/70"
+          }`}
         >
           {label}
         </span>
       </div>
       <span
-        className={`text-sm tabular-nums ${
-          bold ? "font-semibold" : "text-muted-foreground"
+        className={`text-[13px] tabular-nums ${
+          bold ? "font-semibold text-white" : "text-white/62"
         }`}
       >
         {count}
@@ -509,25 +509,127 @@ function StatusRow({
   );
 }
 
-function StatusIcon({ status }: { status: InterviewStatus }) {
-  switch (status) {
-    case "COMPLETED":
-      return (
-        <IconWrapper color="emerald" size="sm">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-        </IconWrapper>
-      );
-    case "FAILED":
-      return (
-        <IconWrapper color="rose" size="sm">
-          <XCircle className="h-3.5 w-3.5" />
-        </IconWrapper>
-      );
-    default:
-      return (
-        <IconWrapper color="amber" size="sm">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        </IconWrapper>
-      );
-  }
+/**
+ * Recent Interviews row — composed in the spirit of the panel-system
+ * `ListRow` primitive (leading IconWell, primary title, tiered metadata,
+ * trailing status pill) but rendered inline so the row can be a Next.js
+ * `<Link>` (the primitive's `onClick` doesn't do client-side navigation).
+ *
+ * Visual contract mirrors `src/components/panels/ListRow.tsx`:
+ *   - 52px min height, `px-3` padding, 6px radius.
+ *   - 1px hairline border at `rgba(147,147,147,0.10)` so consecutive rows
+ *     read as a structured list, not a stack of free-floating items.
+ *   - Hover lights border to 0.26 + lifts background to white/[0.025],
+ *     same recipe as `ListRow`.
+ *   - Title 12.5px / 600 / white-92, caption 10.5px / white-50 with a
+ *     subdued separator dot at white/22, status pill on the right.
+ */
+function InterviewListRow({
+  id,
+  title,
+  project,
+  country,
+  createdAt,
+  status,
+  statusLabel,
+}: {
+  id: string;
+  title: string;
+  project: string | null;
+  country: string | null;
+  createdAt: string;
+  status: InterviewStatus;
+  statusLabel: string;
+}) {
+  const formattedDate = new Date(createdAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <Link
+      href={`/interviews/${id}`}
+      className="group flex items-center gap-3 rounded-[6px] border px-3 py-2.5 transition-colors duration-150 hover:border-[rgba(147,147,147,0.26)] hover:bg-white/[0.025]"
+      style={{
+        minHeight: 52,
+        borderColor: "rgba(147,147,147,0.10)",
+      }}
+    >
+      <StatusWell status={status} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12.5px] font-semibold leading-tight text-white/92">
+          {title}
+        </p>
+        <p className="mt-[4px] flex flex-wrap items-center gap-x-1.5 truncate text-[10.5px] leading-snug text-white/50">
+          {project && <span className="truncate">{project}</span>}
+          {project && country && (
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+          )}
+          {country && <span className="truncate">{country}</span>}
+          {(project || country) && (
+            <span aria-hidden className="text-white/22">
+              ·
+            </span>
+          )}
+          <span className="tabular-nums text-white/38">{formattedDate}</span>
+        </p>
+      </div>
+      <div className="shrink-0">
+        <InterviewStatusPill label={statusLabel} status={status} />
+      </div>
+    </Link>
+  );
+}
+
+function StatusWell({ status }: { status: InterviewStatus }) {
+  const { color, icon } = (() => {
+    switch (status) {
+      case "COMPLETED":
+        return {
+          color: "#4ADE80",
+          icon: <CheckCircle2 className="h-[13px] w-[13px]" strokeWidth={1.8} />,
+        };
+      case "FAILED":
+        return {
+          color: "#F87171",
+          icon: <XCircle className="h-[13px] w-[13px]" strokeWidth={1.8} />,
+        };
+      default:
+        return {
+          color: "#FBBF24",
+          icon: (
+            <CircleDot className="h-[13px] w-[13px]" strokeWidth={1.8} />
+          ),
+        };
+    }
+  })();
+
+  return (
+    <IconWell accent={color} size={28}>
+      <span style={{ color }}>{icon}</span>
+    </IconWell>
+  );
+}
+
+function InterviewStatusPill({
+  label,
+  status,
+}: {
+  label: string;
+  status: InterviewStatus;
+}) {
+  const tone: React.ComponentProps<typeof StatusPill>["tone"] = (() => {
+    switch (status) {
+      case "COMPLETED":
+        return "live";
+      case "FAILED":
+        return "confidential";
+      default:
+        return "draft";
+    }
+  })();
+  return <StatusPill tone={tone} text={label} />;
 }

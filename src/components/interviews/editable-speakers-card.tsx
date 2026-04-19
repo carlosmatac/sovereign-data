@@ -79,60 +79,69 @@ export function EditableSpeakersCard({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Speakers</CardTitle>
-        {canEdit && (
-          <CardDescription>
-            Set display names for each detected speaker
-          </CardDescription>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          {codes.map((code) => (
-            <div
-              key={code}
-              className="grid gap-2 sm:grid-cols-[minmax(0,5rem)_1fr] sm:items-center sm:gap-3"
-            >
-              <div className="text-sm text-muted-foreground">
-                <span className="sr-only">Diarization track </span>
-                <span className="font-mono text-xs" title="Stable speaker id from diarization">
-                  {code}
-                </span>
-              </div>
-              {canEdit ? (
-                <SpeakerPersonNameInput
-                  projectId={projectId}
-                  id={`speaker-name-${code}`}
-                  value={map[code] ?? ""}
-                  onChange={(next) =>
-                    setMap((prev) => ({ ...prev, [code]: next }))
-                  }
-                  disabled={pending}
-                  placeholder={`Speaker ${code}`}
-                  aria-label={`Display name for speaker track ${code}`}
-                />
-              ) : (
-                <p className="text-sm font-medium">{map[code]}</p>
-              )}
-            </div>
-          ))}
-        </div>
-        {canEdit && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={onSave}
-            disabled={pending || !isDirty}
-            className="w-full sm:w-auto"
-          >
-            {pending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="text-base">Speakers</CardTitle>
+            {canEdit && (
+              <CardDescription>
+                Set display names for each detected speaker
+              </CardDescription>
             )}
-            Save speaker names
-          </Button>
-        )}
+          </div>
+          {canEdit && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onSave}
+              disabled={pending || !isDirty}
+              className="h-8 shrink-0 rounded-md px-3 text-xs font-medium"
+            >
+              {pending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Save
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2.5">
+          {codes.map((code) => (
+            <li
+              key={code}
+              className="flex items-center gap-3 rounded-[8px] border border-[rgba(147,147,147,0.10)] bg-white/[0.02] px-3 py-2"
+            >
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.04] font-mono text-[11px] font-semibold text-white/60"
+                title="Stable speaker id from diarization"
+              >
+                <span className="sr-only">Diarization track </span>
+                {code}
+              </span>
+              <div className="min-w-0 flex-1">
+                {canEdit ? (
+                  <SpeakerPersonNameInput
+                    projectId={projectId}
+                    id={`speaker-name-${code}`}
+                    value={map[code] ?? ""}
+                    onChange={(next) =>
+                      setMap((prev) => ({ ...prev, [code]: next }))
+                    }
+                    disabled={pending}
+                    placeholder={`Speaker ${code}`}
+                    aria-label={`Display name for speaker track ${code}`}
+                  />
+                ) : (
+                  <p className="truncate text-sm font-medium text-white/85">
+                    {map[code]}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );
