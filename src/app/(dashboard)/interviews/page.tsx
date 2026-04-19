@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/project-role";
-import { Plus, Mic, Clock, FolderKanban, FileText } from "lucide-react";
+import { Plus, Mic, Clock, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
@@ -13,6 +13,7 @@ import {
   TonalActionButton,
 } from "@/components/panels";
 import type { InterviewStatus } from "@/types/database";
+import { interviewSourceMeta } from "@/lib/interview-source";
 
 export default async function InterviewsPage({
   searchParams,
@@ -162,6 +163,22 @@ export default async function InterviewsPage({
               const project = (
                 interview as Record<string, unknown>
               ).projects as { name?: string } | null;
+              /*
+               * Source-type metadata drives BOTH the leading IconWell
+               * icon (Mic / FileText / Video) and the colour-coded source
+               * pill in the right metadata cluster. Showing the pill on
+               * every row — not only when audio_duration is missing —
+               * means users can identify the source kind at a glance even
+               * before they notice the duration column. The pill follows
+               * the standard SectionChip tonal recipe, matching every
+               * other accent pill in the system.
+               */
+              const source = interviewSourceMeta(interview.source_type);
+              const SourceIcon = source.Icon;
+              const hasDuration =
+                interview.source_type !== "document" &&
+                interview.audio_duration != null &&
+                interview.audio_duration > 0;
 
               return (
                 <div
@@ -172,20 +189,12 @@ export default async function InterviewsPage({
                     href={`/interviews/${interview.id}`}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
-                    <IconWell accent="#818CF8" size={32}>
-                      {interview.source_type === "document" ? (
-                        <FileText
-                          className="h-[14px] w-[14px]"
-                          style={{ color: "#818CF8" }}
-                          strokeWidth={1.8}
-                        />
-                      ) : (
-                        <Mic
-                          className="h-[14px] w-[14px]"
-                          style={{ color: "#818CF8" }}
-                          strokeWidth={1.8}
-                        />
-                      )}
+                    <IconWell accent={source.color} size={32}>
+                      <SourceIcon
+                        className="h-[14px] w-[14px]"
+                        style={{ color: source.color }}
+                        strokeWidth={1.8}
+                      />
                     </IconWell>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold leading-tight text-white/92">
@@ -196,18 +205,17 @@ export default async function InterviewsPage({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2.5">
-                      {interview.source_type === "document" ? (
-                        <SectionChip tone="neutral">PDF</SectionChip>
-                      ) : (
-                        interview.audio_duration && (
-                          <span className="flex items-center gap-1 text-[11.5px] tabular-nums text-white/55">
-                            <Clock
-                              className="h-[11px] w-[11px]"
-                              strokeWidth={1.5}
-                            />
-                            {formatDuration(interview.audio_duration)}
-                          </span>
-                        )
+                      <SectionChip tone="accent" color={source.color} dot>
+                        {source.label}
+                      </SectionChip>
+                      {hasDuration && (
+                        <span className="flex items-center gap-1 text-[11.5px] tabular-nums text-white/55">
+                          <Clock
+                            className="h-[11px] w-[11px]"
+                            strokeWidth={1.5}
+                          />
+                          {formatDuration(interview.audio_duration)}
+                        </span>
                       )}
                       <StatusPill
                         tone={statusPillTone(

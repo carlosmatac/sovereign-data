@@ -70,9 +70,36 @@ export default async function DashboardLayout({
    * Functionality preserved: `SidebarProvider` collapsible="icon", mobile Sheet
    * behaviour, rail toggle, routing, active states — all unchanged.
    */
+  /*
+   * Sticky-header behaviour.
+   *
+   * The dashboard top bar (`DashboardInsetHeader`) carries the only desktop
+   * sidebar trigger. When users scrolled long pages (transcript review,
+   * dense interview lists, war room, …) the trigger went off-screen and
+   * they had to scroll all the way back up just to collapse / expand the
+   * sidebar — annoying.
+   *
+   * Fix: constrain the entire shell to viewport height so the *inner*
+   * scroll container inside `SidebarInset` becomes the real scroll
+   * surface, instead of the document body. Once `SidebarInset` is height-
+   * locked, its `overflow-hidden` + the children div's `overflow-auto`
+   * combine into a working scroll region, and the header (which is
+   * `shrink-0` and lives outside that scroll region) stays naturally
+   * pinned at the top of the workspace panel — no `position: sticky`
+   * needed, no z-index war, no "floating navbar" feel.
+   *
+   * Implementation: extra utility classes on `SidebarProvider`:
+   *   - `h-svh max-h-svh` — lock the wrapper to one viewport tall.
+   *   - `overflow-hidden` — body never scrolls; everything happens inside.
+   * Shadcn's default `min-h-svh` survives via `cn()` merge but is now a
+   * no-op against the explicit `h-svh`. The inset's `md:m-2` desktop
+   * margins still apply, so the panel stays inside the rounded shell on
+   * `md+` breakpoints.
+   */
   return (
     <SidebarProvider
       defaultOpen={sidebarDefaultOpen}
+      className="h-svh max-h-svh overflow-hidden"
       style={
         {
           "--sidebar-width-icon": "3.5rem",

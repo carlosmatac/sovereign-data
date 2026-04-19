@@ -23,6 +23,7 @@ import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 import { ProjectInterviewsSection } from "@/components/projects/project-interviews-section";
 import { SalesWarRoom } from "./war-room";
 import { SectionChip } from "@/components/panels";
+import { regionColor } from "@/lib/region-colors";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -97,7 +98,13 @@ export default async function ProjectDetailPage({ params }: Props) {
               {project.name}
             </h1>
             {project.region && (
-              <SectionChip tone="neutral">{project.region}</SectionChip>
+              <SectionChip
+                tone="accent"
+                color={regionColor(project.region)}
+                dot
+              >
+                {project.region}
+              </SectionChip>
             )}
           </div>
           {project.description && (

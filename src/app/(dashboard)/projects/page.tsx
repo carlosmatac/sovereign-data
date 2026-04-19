@@ -6,6 +6,7 @@ import {
   SectionChip,
   TonalActionButton,
 } from "@/components/panels";
+import { regionColor } from "@/lib/region-colors";
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
@@ -88,7 +89,13 @@ export default async function ProjectsPage() {
                   {project.name}
                 </p>
                 {project.region && (
-                  <SectionChip tone="neutral">{project.region}</SectionChip>
+                  <SectionChip
+                    tone="accent"
+                    color={regionColor(project.region)}
+                    dot
+                  >
+                    {project.region}
+                  </SectionChip>
                 )}
               </div>
               <p className="mb-3.5 line-clamp-2 text-[12px] leading-[1.55] text-white/58">
