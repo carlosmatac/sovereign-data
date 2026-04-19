@@ -149,7 +149,7 @@ stateDiagram-v2
 
 1. Calls `getTranscription(assemblyaiId)` from AssemblyAI.
 2. Builds a `speakerMap` and `formattedTranscript` from utterances.
-3. Runs `normalizeTranscriptDisplay()` (`src/lib/transcript/normalizeDisplay.ts`) to create a cleaned display version — replaces speaker variants with canonical anchors using interviewee name/org.
+3. Runs `normalizeTranscriptDisplay()` (`src/lib/transcript/normalizeDisplay.ts`) to create a cleaned display version. Behaviour is **conservative-only**: it applies punctuation/spacing-tidy variants of the *full* canonical interviewee anchors (e.g. `Mrs Brown` → `Mrs. Brown`) and never strips honorifics or runs proximity-based variant discovery. See [Step 8b](#step-8b-anchor-aware-chunk-normalization) for the same rule applied at chunk level, and the [Transcript Review fidelity guarantees](../features/done/interview-transcript-review.md#display-and-chunk-normalization-fidelity-guarantees) for the regression that motivated this.
 4. Saves `transcript_full` (raw), `transcript_display` (cleaned), `speaker_map`, and `audio_duration` to the interview row.
 5. Updates status to `EXTRACTING`.
 
@@ -200,7 +200,7 @@ After extraction, the summary, sentiment, and topics are saved to the interview 
 
 After chunking, each chunk is run through anchor-aware normalization. Rather than aggressively rewriting ASR variants (which caused unsafe substitutions like "Buddha" → "Boudab"), the system now uses a two-layer approach:
 
-1. **Conservative text normalization** — only replaces deterministic derivatives of the canonical anchor name (e.g. stripping an honorific period: "Dr Mohamed" → "Dr. Mohamed"). Proximity-based variant detection has been removed from the replacement path entirely.
+1. **Conservative text normalization** — only replaces deterministic punctuation/spacing variants of the *full* canonical anchor (e.g. "Dr Mohamed" → "Dr. Mohamed"). Proximity-based variant detection is removed, and **honorific-stripped sub-tokens are no longer generated as variants** (see the [Transcript Review fidelity guarantees](../features/done/interview-transcript-review.md#display-and-chunk-normalization-fidelity-guarantees) — `"Brown"` is *not* derived from `"Mrs. Brown"`, otherwise an unrelated `"Mr. Brown"` would be rewritten to `"Mr. Mrs. Brown"`).
 
 2. **Anchor enrichment for embeddings** — builds `content_for_embedding` by appending structured anchor context to the chunk text:
    - `Primary interviewee: <name>`
