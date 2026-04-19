@@ -1,11 +1,12 @@
 /**
  * Interview source-type metadata.
  *
- * `source_type` (`audio` | `document` | `video`) governs both:
+ * `source_type` (`audio` | `document` | `text` | `video`) governs both:
  *   - which icon belongs in the leading IconWell on row UIs
  *   - which colour-coded source pill we render alongside duration/status,
  *     so users can tell *what kind of source* an interview comes from
- *     even when no duration is present (document uploads have no audio).
+ *     even when no duration is present (document/text uploads have no
+ *     audio — see `docs/features/done/interview-transcript-review.md`).
  *
  * Discipline:
  *   - One label, one icon, one accent per source type. Never per row.
@@ -44,6 +45,14 @@ const SOURCE_META: Record<SourceType, InterviewSourceMeta> = {
   document: {
     label: "Transcript",
     color: "#A78BFA", // violet — text / document family
+    Icon: FileText,
+  },
+  text: {
+    // `text` (pasted-in transcripts) shares the document/transcript family:
+    // no audio, transcript-only, same icon and accent. Kept as a separate
+    // entry rather than aliased so future divergence is trivial.
+    label: "Transcript",
+    color: "#A78BFA",
     Icon: FileText,
   },
   video: {

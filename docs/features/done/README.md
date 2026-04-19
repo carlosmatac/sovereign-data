@@ -15,4 +15,6 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 
 | [edit-interview-title.md](./edit-interview-title.md) | Inline rename of interview title from detail page |
 
+| [ingestion-refactor.md](./ingestion-refactor.md) | Unified ingestion pipeline, text source type, semantic classification, candidate entities |
+
 New completed features: add a row here when you move a spec into this folder.

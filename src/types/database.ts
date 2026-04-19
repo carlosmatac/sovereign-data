@@ -38,7 +38,7 @@ export type RelationType =
   | "supplier"
   | "acquirer";
 
-export type SourceType = "audio" | "document" | "video";
+export type SourceType = "audio" | "document" | "video" | "text";
 
 export type SnippetPlatform = "linkedin" | "twitter" | "newsletter" | "summary";
 export type SnippetTone = "professional" | "casual" | "provocative";
@@ -261,6 +261,8 @@ export interface Database {
           interviewee_entity_id: string | null;
           interviewee_org_entity_id: string | null;
           source_type: SourceType;
+          semantic_source_type: string | null;
+          source_metadata: Record<string, unknown> | null;
           expected_speakers: number | null;
           conducted_at: string | null;
           reviewed_utterances: ReviewedUtterance[] | null;
@@ -294,6 +296,8 @@ export interface Database {
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
           source_type?: SourceType;
+          semantic_source_type?: string | null;
+          source_metadata?: Record<string, unknown> | null;
           expected_speakers?: number | null;
           conducted_at?: string | null;
           reviewed_utterances?: ReviewedUtterance[] | null;
@@ -327,6 +331,8 @@ export interface Database {
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
           source_type?: SourceType;
+          semantic_source_type?: string | null;
+          source_metadata?: Record<string, unknown> | null;
           expected_speakers?: number | null;
           conducted_at?: string | null;
           reviewed_utterances?: ReviewedUtterance[] | null;

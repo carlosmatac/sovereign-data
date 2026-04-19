@@ -969,9 +969,11 @@ export function TranscriptReviewEditor({
                             >
                               {speakerLabel(u.speaker)}
                             </p>
-                            <span className="text-[11.5px] tabular-nums text-white/38">
-                              {formatTime(u.start)} – {formatTime(u.end)}
-                            </span>
+                            {chunkAudioEnabled ? (
+                              <span className="text-[11.5px] tabular-nums text-white/38">
+                                {formatTime(u.start)} – {formatTime(u.end)}
+                              </span>
+                            ) : null}
                           </div>
                           {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
                             <div className="mb-3 flex items-center gap-3">

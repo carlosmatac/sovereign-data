@@ -134,6 +134,21 @@ const ExtractionSchema = z.object({
 
 export type ExtractionResult = z.infer<typeof ExtractionSchema>;
 
+// ── Source-type prompt overlays ───────────────────────────────────────────
+
+const SOURCE_OVERLAYS: Record<string, string> = {
+  "text+interview":
+    "This is a written interview transcript. Speaker labels may appear as 'Q:'/'A:' or name prefixes.",
+  "document+interview":
+    "This is a PDF interview transcript. It may not have speaker labels; extract intelligence from the narrative.",
+  "document+report":
+    "This is a report or document source. It may not follow interview structure. Focus on extracting entities, relationships, and intelligence from the content.",
+  "document+published_article":
+    "This is a published article. Attribution of statements to sources is important; distinguish between the author's voice and quoted entities.",
+  "text+published_article":
+    "This is a published article. Attribution of statements to sources is important; distinguish between the author's voice and quoted entities.",
+};
+
 /**
  * Stage 1: Extract raw structured intelligence from a transcript.
  *
@@ -149,6 +164,9 @@ export async function extractIntelligence({
   primaryPerson,
   primaryOrg,
   reviewerSeedEntities,
+  sourceType,
+  semanticSourceType,
+  candidateEntities,
 }: {
   transcript: string;
   interviewTitle: string;
@@ -161,6 +179,16 @@ export async function extractIntelligence({
     displayName: string;
     type: EntityType;
   }>;
+  /** Technical source type ('audio' | 'document' | 'text'). Used for prompt overlay. */
+  sourceType?: string;
+  /** Semantic source type ('interview' | 'report' | etc.). Used for prompt overlay. */
+  semanticSourceType?: string;
+  /** Known project entities to help extraction match existing entities. */
+  candidateEntities?: Array<{
+    name: string;
+    type: EntityType;
+    aliases?: string[];
+  }>;
 }): Promise<ExtractionResult> {
   const speakerContext = speakerMap
     ? `\nSpeaker identification: ${JSON.stringify(speakerMap)}`
@@ -171,6 +199,29 @@ export async function extractIntelligence({
 - Primary PERSON: ${primaryPerson ?? "unknown"}
 - Primary ORG: ${primaryOrg ?? "unknown"}`
       : "";
+
+  // Candidate entities block (project context for better entity matching)
+  const candidateEntitiesContext =
+    candidateEntities && candidateEntities.length > 0
+      ? `\nPROJECT ENTITIES (reference for matching — you may still create new entities if none match):\n` +
+        candidateEntities
+          .map(
+            (e) =>
+              `- "${e.name}" (${e.type})${
+                e.aliases?.length
+                  ? ` [aka: ${e.aliases.join(", ")}]`
+                  : ""
+              }`
+          )
+          .join("\n")
+      : "";
+
+  // Source-type overlay (only for non-audio or non-interview sources)
+  const overlayKey = `${sourceType ?? "audio"}+${semanticSourceType ?? "interview"}`;
+  const sourceOverlay = SOURCE_OVERLAYS[overlayKey]
+    ? `\nSOURCE NOTE: ${SOURCE_OVERLAYS[overlayKey]}`
+    : "";
+
   const reviewerSeedsContext =
     reviewerSeedEntities && reviewerSeedEntities.length > 0
       ? `\nHUMAN-CONFIRMED ENTITIES (non-optional — you MUST treat these as real entities in this interview):
@@ -192,7 +243,7 @@ ${reviewerSeedEntities
 Analyze the following interview transcript and extract structured intelligence.
 
 Interview: "${interviewTitle}"
-${country ? `Country/Region: ${country}` : ""}${speakerContext}${primaryEntitiesContext}${reviewerSeedsContext}
+${country ? `Country/Region: ${country}` : ""}${speakerContext}${primaryEntitiesContext}${candidateEntitiesContext}${sourceOverlay}${reviewerSeedsContext}
 
 TRANSCRIPT:
 ${transcript}
@@ -204,6 +255,7 @@ INSTRUCTIONS:
   - raw_name: the name as it appears in the transcript (may contain ASR misspellings)
   - canonical_name: your best guess at the correct full name
 - If Primary Entities were provided above, use those exact spellings as canonical_name when you believe a transcript mention refers to them — even if the transcript spells the name differently.
+- If PROJECT ENTITIES were listed above, prefer matching those names as canonical_name when the transcript refers to the same entity. You may still create new entities if none of the listed entities match.
 - ALWAYS provide a factual description for each entity based on what the transcript reveals. Even a short role or affiliation is valuable.
 - Be precise with sentiment — distinguish between the interviewee's opinion and factual statements.
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
