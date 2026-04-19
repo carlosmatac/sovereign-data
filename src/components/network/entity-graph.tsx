@@ -221,37 +221,146 @@ function applyHighlight(cy: any, nodeId: string | null) {
 
 // ── Layout options ───────────────────────────────────────────────
 //
-// Tuned for the landing's "spread, composed, breathable" graph feel:
-//   - nodeRepulsion pushes much harder so nodes don't clump.
-//   - idealEdgeLength gives edges room so labels don't overlap.
-//   - gravity is lowered so disconnected components don't pile into
-//     the centre; combined with a large componentSpacing they spread
-//     across the canvas.
-//   - padding is intentionally large; combined with the post-layout
-//     fit-and-back-off below, the graph reads as *less zoomed-in* by
-//     default, giving the user an overview rather than a close-up.
+// Tuned for the landing's "spread, composed, breathable" graph feel.
+// Two problems the previous tuning created:
+//
+//   1. A post-fit `zoom * 0.52` multiplier was applied to make the
+//      graph "less zoomed-in by default". Combined with the strong
+//      repulsion below, that visually halved the gap between connected
+//      nodes and made the cluster feel cramped. Removed below — the
+//      view is now the natural `cy.fit()` with moderate padding, which
+//      gives connected nodes their full intended breathing room.
+//   2. `componentSpacing: 360` told cose to fling every disconnected
+//      component (every isolated node is its own component) far away
+//      from the rest. With Hide-Isolated OFF that meant the bounding
+//      box exploded and the useful cluster shrank to a corner.
+//
+// Today's tuning:
+//   - `nodeRepulsion: 60000` + `idealEdgeLength: 360` gives connected
+//     nodes ~10% more breathing room than before now that the *0.52
+//     post-fit shrink is gone.
+//   - `componentSpacing: 120` keeps multi-component layouts compact;
+//     for the dominant case (one connected cluster + N isolated nodes)
+//     we bypass cose for isolated nodes entirely (see runGraphLayout
+//     below) and lay them out in a controlled grid band, so this value
+//     only matters for genuinely separate connected sub-clusters.
+//   - `fit: false` because we run `cy.fit()` ourselves *after* the
+//     isolated grid is placed, so the fit considers the controlled
+//     bounding box and not random pre-layout positions of isolated
+//     nodes.
 const LAYOUT_OPTIONS = {
   name: "cose",
   animate: true,
   animationEasing: "ease-out" as const,
-  animationDuration: 850,
-  fit: true,
-  padding: 160,
+  animationDuration: 750,
+  fit: false,
+  padding: 60,
   randomize: true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   nodeRepulsion: (_node: any) => 60000,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  idealEdgeLength: (_edge: any) => 320,
+  idealEdgeLength: (_edge: any) => 360,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   edgeElasticity: (_edge: any) => 55,
   nestingFactor: 1.5,
-  gravity: 0.08,
-  numIter: 2200,
-  initialTemp: 320,
+  gravity: 0.10,
+  numIter: 2000,
+  initialTemp: 300,
   coolingFactor: 0.95,
   minTemp: 1.0,
-  componentSpacing: 360,
+  componentSpacing: 120,
 };
+
+// ── Isolated-node grid spacing ──────────────────────────────────
+//
+// When isolated nodes exist (Hide-Isolated OFF), we don't let cose
+// position them — cose treats each as a free-floating component and
+// pushes them away with `componentSpacing` forces, which blows up the
+// bounding box. Instead we place them ourselves in a tight grid below
+// the connected cluster. These two constants control that grid.
+const ISOLATED_GRID_SPACING = 50; // model units between isolated centres
+const ISOLATED_GRID_GAP = 90;     // model units between cluster bottom and grid top
+
+/**
+ * Run the cose force layout on the connected subgraph only, then place
+ * isolated nodes in a tidy grid band underneath the resulting cluster
+ * and finally fit the viewport.
+ *
+ * Why split the work this way:
+ *   - cose's `componentSpacing` was the lever that made isolated nodes
+ *     fly far away. Excluding them from cose entirely removes that
+ *     pressure — connected nodes settle at their natural cose distances
+ *     without isolated outliers stretching the bounding box.
+ *   - The grid keeps isolated nodes scannable and clearly distinct from
+ *     the connected cluster, but anchored close enough that `cy.fit()`
+ *     does not have to zoom out aggressively to encompass them.
+ *   - Isolated nodes are temporarily hidden (`opacity: 0`) during the
+ *     cose animation so the user does not see them at random pre-layout
+ *     positions; they fade in once placed.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function runGraphLayout(cy: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const connectedNodes = cy.nodes().filter((n: any) => n.degree(false) > 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isolatedNodes = cy.nodes().filter((n: any) => n.degree(false) === 0);
+
+  // Hide isolated during the cose animation so they don't flash at
+  // pre-layout positions while connected nodes settle.
+  if (isolatedNodes.length > 0) {
+    isolatedNodes.style({ opacity: 0 });
+  }
+
+  const placeIsolatedAndFit = () => {
+    if (isolatedNodes.length > 0) {
+      const bb =
+        connectedNodes.length > 0
+          ? connectedNodes.boundingBox({})
+          : { x1: 0, y1: 0, x2: 0, y2: 0, w: 0, h: 0 };
+
+      // Choose a column count that prefers a wider-than-tall band so the
+      // isolated row sits visually as a "tray" under the cluster instead
+      // of a tall sidebar that would shrink the cluster on `fit`.
+      const cols = Math.max(
+        6,
+        Math.ceil(Math.sqrt(isolatedNodes.length) * 1.5)
+      );
+      const totalGridWidth = (cols - 1) * ISOLATED_GRID_SPACING;
+      const startX = bb.x1 + (bb.w - totalGridWidth) / 2;
+      const startY = bb.y2 + ISOLATED_GRID_GAP;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      isolatedNodes.forEach((n: any, i: number) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        n.position({
+          x: startX + col * ISOLATED_GRID_SPACING,
+          y: startY + row * ISOLATED_GRID_SPACING,
+        });
+      });
+
+      isolatedNodes.removeStyle("opacity");
+    }
+
+    cy.fit(undefined, 60);
+  };
+
+  if (connectedNodes.length === 0) {
+    // Pure-isolated graph: skip cose entirely, just grid the isolated
+    // nodes at the origin and fit.
+    placeIsolatedAndFit();
+    return;
+  }
+
+  // Run cose on the connected subgraph only. eles.layout() is the
+  // standard Cytoscape way to scope a layout to a subset of elements.
+  const connectedSubgraph = connectedNodes.union(
+    connectedNodes.connectedEdges()
+  );
+  const layout = connectedSubgraph.layout(LAYOUT_OPTIONS);
+  layout.on("layoutstop", placeIsolatedAndFit);
+  layout.run();
+}
 
 // ── Main component ───────────────────────────────────────────────
 
@@ -489,18 +598,12 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
       ]);
     });
 
-    // Run force layout; when animation finishes, fit and then pull the
-    // zoom back significantly so the user opens on an *overview*, not a
-    // close-up. 0.52× is roughly two full "zoom out" button clicks
-    // (each click is zoom × 0.72, so 0.72² ≈ 0.52) on top of an already
-    // padded fit — matching the landing graph's scale.
-    const layout = cy.layout(LAYOUT_OPTIONS);
-    layout.on("layoutstop", () => {
-      cy.fit(undefined, 180);
-      const center = { x: cy.width() / 2, y: cy.height() / 2 };
-      cy.zoom({ level: cy.zoom() * 0.52, renderedPosition: center });
-    });
-    layout.run();
+    // Run the split layout: cose on the connected subgraph, controlled
+    // grid for isolated nodes, single fit at the end. See runGraphLayout
+    // for the rationale (boils down to: don't let isolated nodes blow
+    // up the bounding box, and don't post-shrink the connected cluster
+    // with an aggressive zoom multiplier).
+    runGraphLayout(cy);
 
     // Reset selection
     setFocusedNodeId(null);
@@ -544,9 +647,11 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
   const zoomFit = useCallback(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    cy.fit(undefined, 180);
-    const center = { x: cy.width() / 2, y: cy.height() / 2 };
-    cy.zoom({ level: cy.zoom() * 0.52, renderedPosition: center });
+    // Same fit padding as the post-layout fit so manual "Fit to view"
+    // matches the default framing exactly. No more zoom-back multiplier
+    // — the natural fit is already the desired composition since the
+    // bounding box is no longer dominated by far-flung isolated nodes.
+    cy.fit(undefined, 60);
   }, []);
 
   // ── Filter toggles ─────────────────────────────────────────
