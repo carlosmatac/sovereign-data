@@ -1,6 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Header } from "@/components/header"
+// NOTE: this file lives under `src-landing/` as a *visual reference* of the
+// landing-page panel system (see docs/ui-panel-system.md). It is not wired
+// into any Next.js route in this repo. The original landing project ships a
+// `<Header />` from `@/components/header`; that component does not exist
+// here, so the import (and its single usage below) is intentionally
+// removed to keep `tsc --noEmit` green. The page-level chrome is irrelevant
+// for the panel-design reference.
 import {
   Archive,
   ArrowRight,
@@ -382,7 +388,8 @@ function EntitiesPanel() {
 export default function CaptureOrganisePage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#060D1C" }}>
-      <Header />
+      {/* Header from the original landing app omitted on purpose — see the
+          import-block note at the top of this file. */}
 
       {/* Textures */}
       <div
