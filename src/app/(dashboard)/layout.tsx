@@ -43,11 +43,11 @@ export default async function DashboardLayout({
    * working surface", mirroring the landing's `AppSurface` composition:
    *
    *   ┌────────────────────────────────────────────────────────────────────┐
-   *   │ Outer shell: #070E1F (--sidebar / --background, shared by both)    │
+   *   │ Outer shell: #070A14 (--sidebar, deeper matte ink-navy)            │
    *   │  ┌────────┐   ┌──────────────────────────────────────────────────┐ │
    *   │  │        │   │  Central working panel (SidebarInset)            │ │
-   *   │  │ Sidebar│   │  bg #080F1E · 6px radius · soft border           │ │
-   *   │  │        │   │  ┌── top bar ──┐                                 │ │
+   *   │  │ Sidebar│   │  bg #080F1E · 6px radius · whisper border        │ │
+   *   │  │(deeper)│   │  ┌── top bar ──┐                                 │ │
    *   │  │        │   │  │             │                                 │ │
    *   │  │        │   │  │  page       │                                 │ │
    *   │  │        │   │  │  content    │                                 │ │
@@ -57,16 +57,15 @@ export default async function DashboardLayout({
    *
    * How this is assembled:
    *   - `variant="inset"` on `<Sidebar>` (see `AppSidebar`) makes the shadcn
-   *     sidebar-wrapper the outer shell and floats the sidebar column inside it
-   *     with an 8px gutter, so the sidebar stops reading as a detached card.
-   *   - `SidebarInset` is restyled below so the central panel matches the
-   *     landing `AppSurface` central rectangle (6px radius, `#080F1E` surface,
-   *     `rgba(147,147,147,0.16)` hairline border) instead of shadcn's default
-   *     `rounded-xl` + `shadow-sm` card. Both the sidebar column and the central
-   *     panel now sit on the *same* `#070E1F` outer shell, which is what gives
-   *     the shared-frame feel — no hard vertical rule between sidebar and
-   *     content, no divider boxes inside the sidebar, no edge-to-edge header
-   *     line across the content.
+   *     sidebar-wrapper the outer shell and floats the sidebar column inside
+   *     it with an 8px gutter, so the sidebar stops reading as a detached card.
+   *   - `SidebarInset` is restyled below as the *lifted* workspace surface:
+   *     `#080F1E` (~1 tonal step above the new darker shell), a 6px radius to
+   *     match the landing `AppSurface` rectangle, a hairline border dropped to
+   *     `rgba(147,147,147,0.08)` — the separation now comes from tone, not a
+   *     hard rule — and a very restrained ambient shadow (barely perceptible)
+   *     so the panel reads as slightly elevated above the recessed sidebar
+   *     layer without becoming a floating card.
    *
    * Functionality preserved: `SidebarProvider` collapsible="icon", mobile Sheet
    * behaviour, rail toggle, routing, active states — all unchanged.
@@ -88,7 +87,7 @@ export default async function DashboardLayout({
         showPlatformAdministration={showPlatformAdministration}
       />
       <SidebarInset
-        className="flex min-w-0 flex-col overflow-hidden bg-[#080F1E] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.16)] md:shadow-none"
+        className="flex min-w-0 flex-col overflow-hidden bg-[#080F1E] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.08)] md:shadow-[0_0_0_1px_rgba(255,255,255,0.012),0_24px_48px_-32px_rgba(0,0,0,0.75)]"
       >
         <DashboardInsetHeader />
         <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto">

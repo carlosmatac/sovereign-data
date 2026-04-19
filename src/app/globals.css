@@ -96,14 +96,21 @@
   --chart-4: #FBBF24;   /* amber */
   --chart-5: #7DD3FC;   /* cyan */
 
-  /* Sidebar = outer panel surface so it reads continuous with the shell. */
-  --sidebar: #070E1F;
+  /*
+   * Sidebar = deeper, matte, desaturated ink-navy so it reads as a recessed
+   * structural layer *behind* the lifted workspace panel (`--card` / `#080F1E`).
+   * Cool-toned but noticeably less saturated than the workspace surface:
+   *   workspace:  #080F1E  rgb(  8, 15, 30)
+   *   sidebar:    #070A14  rgb(  7, 10, 20)  ← ~33% less blue, darker overall
+   * Not pure black, not glossy, not a different theme — same family, recessed.
+   */
+  --sidebar: #070A14;
   --sidebar-foreground: rgba(255, 255, 255, 0.72);
   --sidebar-primary: rgba(255, 255, 255, 0.92);
-  --sidebar-primary-foreground: #070E1F;
-  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-primary-foreground: #070A14;
+  --sidebar-accent: rgba(255, 255, 255, 0.07);
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(147, 147, 147, 0.10);
+  --sidebar-border: rgba(147, 147, 147, 0.09);
   --sidebar-ring: rgba(91, 156, 246, 0.55);
 }
 
@@ -132,13 +139,13 @@
   --chart-3: #A78BFA;
   --chart-4: #FBBF24;
   --chart-5: #7DD3FC;
-  --sidebar: #070E1F;
+  --sidebar: #070A14;
   --sidebar-foreground: rgba(255, 255, 255, 0.72);
   --sidebar-primary: rgba(255, 255, 255, 0.92);
-  --sidebar-primary-foreground: #070E1F;
-  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-primary-foreground: #070A14;
+  --sidebar-accent: rgba(255, 255, 255, 0.07);
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(147, 147, 147, 0.10);
+  --sidebar-border: rgba(147, 147, 147, 0.09);
   --sidebar-ring: rgba(91, 156, 246, 0.55);
 }
 
