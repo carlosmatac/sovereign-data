@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="w-full max-w-md px-4">
         <div className="mb-8 text-center">
-          <Image src="/sovereign_log_fondo.svg" alt="Sovereign Data" width={56} height={56} className="mx-auto mb-4" />
+          <Image src="/sovereign_negro.svg" alt="Sovereign Data" width={56} height={56} className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold tracking-tight">Sovereign Data</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Frontier Markets Intelligence Platform

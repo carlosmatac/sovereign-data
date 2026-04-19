@@ -200,10 +200,10 @@ function HighlightedTranscriptTextarea({
   );
 
   return (
-    <div className="relative w-full min-w-0 rounded-md border border-input/80 bg-background shadow-xs">
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]">
+    <div className="relative w-full min-w-0">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <div
-          className="break-words px-3 py-2 text-base leading-relaxed whitespace-pre-wrap"
+          className="break-words px-0 py-0 text-[14px] leading-[1.65] whitespace-pre-wrap text-white/72"
           style={{ transform: `translateY(-${scrollTop}px)` }}
         >
           {segments.map((seg, idx) =>
@@ -212,14 +212,14 @@ function HighlightedTranscriptTextarea({
             ) : seg.kind === "dim" ? (
               <mark
                 key={idx}
-                className="rounded-[3px] bg-amber-500/16 px-px text-inherit dark:bg-amber-400/12"
+                className="rounded-[3px] bg-amber-400/15 px-px text-inherit"
               >
                 {seg.text}
               </mark>
             ) : (
               <mark
                 key={idx}
-                className="rounded-[3px] bg-amber-400/40 px-px font-medium text-inherit shadow-[inset_0_0_0_1px_rgba(217,119,6,0.35)] dark:bg-amber-500/35 dark:shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35)]"
+                className="rounded-[3px] bg-amber-400/35 px-px font-medium text-inherit"
               >
                 {seg.text}
               </mark>
@@ -235,8 +235,8 @@ function HighlightedTranscriptTextarea({
         rows={rows}
         spellCheck={false}
         className={cn(
-          "relative z-10 min-h-[5.5rem] w-full resize-y border-0 bg-transparent px-3 py-2 text-base leading-relaxed text-transparent caret-foreground shadow-none",
-          "selection:bg-primary/20",
+          "relative z-10 min-h-[5.5rem] w-full resize-y border-0 bg-transparent px-0 py-0 text-[14px] leading-[1.65] text-transparent caret-white/80 shadow-none",
+          "selection:bg-[rgba(91,156,246,0.22)]",
           "focus-visible:ring-0 focus-visible:outline-none",
           "disabled:cursor-not-allowed disabled:opacity-50"
         )}
@@ -756,7 +756,7 @@ export function TranscriptReviewEditor({
   const emptyState = utterances.length === 0;
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-8 px-6 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 px-6 py-8 lg:px-8">
       {chunkAudioEnabled && audioUrl ? (
         <audio
           ref={sharedAudioRef}
@@ -824,85 +824,83 @@ export function TranscriptReviewEditor({
             </p>
           ) : (
             <>
-              <div className="mb-4 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 backdrop-blur-[2px] dark:border-border/50 dark:bg-card/30">
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border/50 bg-input/25 px-2.5 py-1 dark:border-border/40 dark:bg-input/20">
-                      <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
-                      <Input
-                        id="tr-find"
-                        value={transcriptFind}
-                        onChange={(e) => setTranscriptFind(e.target.value)}
-                        placeholder="Find in transcript…"
-                        disabled={reprocessing}
-                        autoComplete="off"
-                        className="h-8 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 md:text-sm"
-                        aria-label="Find in reviewed transcript (case-insensitive)"
-                      />
-                    </div>
-                    {transcriptFind ? (
-                      flatMatches.length > 0 ? (
-                        <div className="flex items-center gap-0.5">
-                          <span
-                            className="min-w-[4.5rem] px-1 text-center text-xs font-medium tabular-nums text-amber-800/90 dark:text-amber-200/85"
-                            role="status"
-                            aria-live="polite"
-                          >
-                            {activeMatchIndex >= 0
-                              ? `${activeMatchIndex + 1} of ${flatMatches.length}`
-                              : `0 of ${flatMatches.length}`}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            disabled={reprocessing}
-                            aria-label="Previous match"
-                            onClick={goPrevMatch}
-                          >
-                            <ChevronUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            disabled={reprocessing}
-                            aria-label="Next match"
-                            onClick={goNextMatch}
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No matches</span>
-                      )
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5 dark:border-border/30">
+              <div className="mb-5 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[rgba(147,147,147,0.12)] bg-white/[0.035] px-3 py-1.5 transition-colors focus-within:border-[rgba(147,147,147,0.22)] focus-within:bg-white/[0.05]">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-white/35" aria-hidden />
                     <Input
-                      id="tr-replace"
-                      value={transcriptReplace}
-                      onChange={(e) => setTranscriptReplace(e.target.value)}
-                      placeholder="Replace with…"
+                      id="tr-find"
+                      value={transcriptFind}
+                      onChange={(e) => setTranscriptFind(e.target.value)}
+                      placeholder="Find in transcript…"
                       disabled={reprocessing}
                       autoComplete="off"
-                      className="h-9 min-w-0 flex-1 border-border/50 bg-background/60 text-sm shadow-sm dark:bg-background/40 sm:max-w-xl"
+                      className="h-7 border-0 bg-transparent px-0 text-sm text-white/85 shadow-none placeholder:text-white/30 focus-visible:ring-0 md:text-sm"
+                      aria-label="Find in reviewed transcript (case-insensitive)"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 shrink-0 border-border/60 text-xs font-medium"
-                      disabled={
-                        reprocessing || !transcriptFind || findReplaceMatchCount === 0
-                      }
-                      onClick={onReplaceAllInTranscript}
-                    >
-                      Replace all
-                    </Button>
                   </div>
+                  {transcriptFind ? (
+                    flatMatches.length > 0 ? (
+                      <div className="flex items-center gap-0.5">
+                        <span
+                          className="min-w-[4.5rem] px-1 text-center text-xs font-medium tabular-nums text-amber-300/85"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {activeMatchIndex >= 0
+                            ? `${activeMatchIndex + 1} of ${flatMatches.length}`
+                            : `0 of ${flatMatches.length}`}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-white/45 hover:bg-white/[0.05] hover:text-white/80"
+                          disabled={reprocessing}
+                          aria-label="Previous match"
+                          onClick={goPrevMatch}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-white/45 hover:bg-white/[0.05] hover:text-white/80"
+                          disabled={reprocessing}
+                          aria-label="Next match"
+                          onClick={goNextMatch}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-white/45">No matches</span>
+                    )
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    id="tr-replace"
+                    value={transcriptReplace}
+                    onChange={(e) => setTranscriptReplace(e.target.value)}
+                    placeholder="Replace with…"
+                    disabled={reprocessing}
+                    autoComplete="off"
+                    className="h-9 min-w-0 flex-1 rounded-lg border-[rgba(147,147,147,0.12)] bg-white/[0.025] text-sm shadow-none placeholder:text-white/30 focus-visible:border-[rgba(147,147,147,0.22)] focus-visible:ring-0 sm:max-w-xl"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-lg border-[rgba(147,147,147,0.14)] bg-transparent text-xs font-medium text-white/70 shadow-none hover:bg-white/[0.04] hover:text-white/90"
+                    disabled={
+                      reprocessing || !transcriptFind || findReplaceMatchCount === 0
+                    }
+                    onClick={onReplaceAllInTranscript}
+                  >
+                    Replace all
+                  </Button>
                 </div>
               </div>
               <div className="flex h-[min(65vh,600px)] w-full min-w-0 gap-2">
@@ -952,34 +950,41 @@ export function TranscriptReviewEditor({
                             else utteranceRefs.current.delete(rowIndex);
                           }}
                           className={cn(
-                            "rounded-lg border bg-card/50 p-4 transition-[box-shadow,ring]",
-                            playingChunkIndex === rowIndex &&
-                              !audioPaused &&
-                              "ring-2 ring-primary/45 border-primary/35",
-                            playingChunkIndex === rowIndex &&
-                              audioPaused &&
-                              "ring-1 ring-muted-foreground/40"
+                            "rounded-xl border p-4 transition-colors duration-200",
+                            playingChunkIndex === rowIndex && !audioPaused
+                              ? "border-[rgba(91,156,246,0.28)] bg-[rgba(91,156,246,0.05)]"
+                              : playingChunkIndex === rowIndex && audioPaused
+                                ? "border-[rgba(147,147,147,0.22)] bg-[rgba(255,255,255,0.03)]"
+                                : "border-[rgba(147,147,147,0.13)] bg-[rgba(255,255,255,0.025)]"
                           )}
                         >
-                          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="font-normal">
-                                {speakerLabel(u.speaker)}
-                              </Badge>
-                              {chunkAudioEnabled ? (
-                                <span className="tabular-nums">
-                                  {formatTime(u.start)} – {formatTime(u.end)}
-                                </span>
-                              ) : null}
-                            </div>
+                          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <p
+                              className={cn(
+                                "text-[13px] font-semibold tracking-[-0.011em]",
+                                playingChunkIndex === rowIndex && !audioPaused
+                                  ? "text-[#5B9CF6]"
+                                  : "text-white/88"
+                              )}
+                            >
+                              {speakerLabel(u.speaker)}
+                            </p>
+                            {chunkAudioEnabled ? (
+                              <span className="text-[11.5px] tabular-nums text-white/38">
+                                {formatTime(u.start)} – {formatTime(u.end)}
+                              </span>
+                            ) : null}
                           </div>
                           {chunkAudioEnabled && isValidChunkTimeRange(u) ? (
-                            <div className="mb-2.5 flex items-center gap-2">
-                              <Button
+                            <div className="mb-3 flex items-center gap-3">
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 shrink-0"
+                                className={cn(
+                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors",
+                                  "border-[rgba(147,147,147,0.20)] bg-white/[0.04] text-white/70",
+                                  "hover:border-[rgba(147,147,147,0.32)] hover:bg-white/[0.08] hover:text-white/90",
+                                  "disabled:cursor-not-allowed disabled:opacity-40"
+                                )}
                                 disabled={reprocessing}
                                 aria-label={
                                   playingChunkIndex === rowIndex && !audioPaused
@@ -989,27 +994,62 @@ export function TranscriptReviewEditor({
                                 onClick={() => toggleChunkAudio(rowIndex)}
                               >
                                 {playingChunkIndex === rowIndex && !audioPaused ? (
-                                  <Pause className="h-4 w-4" />
+                                  <Pause className="h-3 w-3" strokeWidth={2} fill="currentColor" />
                                 ) : (
-                                  <Play className="h-4 w-4" />
+                                  <Play
+                                    className="h-3 w-3 translate-x-[0.5px]"
+                                    strokeWidth={2}
+                                    fill="currentColor"
+                                  />
                                 )}
-                              </Button>
-                              <input
-                                type="range"
-                                className="h-2 min-w-0 flex-1 cursor-pointer accent-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:accent-amber-500"
-                                min={u.start}
-                                max={u.end}
-                                step={0.01}
-                                value={clipSliderValue}
-                                disabled={reprocessing}
-                                aria-valuemin={u.start}
-                                aria-valuemax={u.end}
-                                aria-valuenow={clipSliderValue}
-                                aria-label={`Seek within this utterance (${formatTime(u.start)} to ${formatTime(u.end)})`}
-                                onChange={(e) =>
-                                  seekWithinUtterance(rowIndex, parseFloat(e.target.value))
-                                }
-                              />
+                              </button>
+                              <div className="relative flex min-w-0 flex-1 items-center">
+                                <div
+                                  aria-hidden
+                                  className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/[0.08]"
+                                />
+                                <div
+                                  aria-hidden
+                                  className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[#FBBF24]"
+                                  style={{
+                                    width: `${
+                                      u.end > u.start
+                                        ? Math.max(
+                                            0,
+                                            Math.min(
+                                              100,
+                                              ((clipSliderValue - u.start) / (u.end - u.start)) * 100
+                                            )
+                                          )
+                                        : 0
+                                    }%`,
+                                  }}
+                                />
+                                <input
+                                  type="range"
+                                  className={cn(
+                                    "relative z-10 h-3 w-full cursor-pointer appearance-none bg-transparent",
+                                    "[&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent",
+                                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#FBBF24] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#080F1E] [&::-webkit-slider-thumb]:-mt-[3.5px] [&::-webkit-slider-thumb]:shadow-none",
+                                    "[&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent",
+                                    "[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#080F1E] [&::-moz-range-thumb]:bg-[#FBBF24]",
+                                    "focus-visible:outline-none",
+                                    "disabled:cursor-not-allowed disabled:opacity-50"
+                                  )}
+                                  min={u.start}
+                                  max={u.end}
+                                  step={0.01}
+                                  value={clipSliderValue}
+                                  disabled={reprocessing}
+                                  aria-valuemin={u.start}
+                                  aria-valuemax={u.end}
+                                  aria-valuenow={clipSliderValue}
+                                  aria-label={`Seek within this utterance (${formatTime(u.start)} to ${formatTime(u.end)})`}
+                                  onChange={(e) =>
+                                    seekWithinUtterance(rowIndex, parseFloat(e.target.value))
+                                  }
+                                />
+                              </div>
                             </div>
                           ) : null}
                           {transcriptFind ? (
@@ -1031,7 +1071,7 @@ export function TranscriptReviewEditor({
                               onChange={(e) => updateText(rowIndex, e.target.value)}
                               disabled={reprocessing}
                               rows={4}
-                              className="resize-y text-base leading-relaxed"
+                              className="min-h-[5.5rem] resize-y rounded-md border-0 bg-transparent px-0 py-0 text-[14px] leading-[1.65] text-white/72 shadow-none placeholder:text-white/25 focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
                             />
                           )}
                         </div>

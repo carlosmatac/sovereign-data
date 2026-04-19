@@ -125,22 +125,22 @@ export function AppSidebar({
     : user.email?.slice(0, 2).toUpperCase() ?? "SD";
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarRail />
-      <SidebarHeader className="border-b border-sidebar-border/50">
+      <SidebarHeader className="px-3 pt-4 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
             {state === "expanded" || isMobile ? (
               <Link
                 href="/projects"
-                className="hover:bg-sidebar-accent/50 flex items-center rounded-md px-2 py-3 transition-colors"
+                className="flex items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
               >
                 <Image
                   src="/sovereign_log_apaisado.svg"
                   alt="Sovereign Data — Intelligence Platform"
                   width={900}
                   height={200}
-                  className="w-full max-w-[148px] object-contain opacity-90"
+                  className="w-full max-w-[138px] object-contain opacity-90"
                   priority
                 />
               </Link>
@@ -169,9 +169,17 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-5 px-2 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupLabel
+            className="mb-1 px-2 text-[10.5px] font-semibold uppercase"
+            style={{
+              letterSpacing: "0.10em",
+              color: "rgba(255,255,255,0.42)",
+            }}
+          >
+            Platform
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {platformNavItems.map((item) =>
@@ -182,9 +190,10 @@ export function AppSidebar({
                         asChild
                         isActive={inChatSection}
                         tooltip="Copilot"
+                        className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
                       >
                         <Link href="/chat">
-                          <item.icon className="h-4 w-4" />
+                          <item.icon className="size-[14px]" strokeWidth={1.5} />
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -201,9 +210,10 @@ export function AppSidebar({
                       asChild
                       isActive={pathname.startsWith(item.href)}
                       tooltip={item.title}
+                      className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
                     >
                       <Link href={item.href}>
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className="size-[14px]" strokeWidth={1.5} />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -215,7 +225,15 @@ export function AppSidebar({
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>System</SidebarGroupLabel>
+          <SidebarGroupLabel
+            className="mb-1 px-2 text-[10.5px] font-semibold uppercase"
+            style={{
+              letterSpacing: "0.10em",
+              color: "rgba(255,255,255,0.42)",
+            }}
+          >
+            System
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {systemNavItems.map((item) => (
@@ -224,9 +242,10 @@ export function AppSidebar({
                     asChild
                     isActive={pathname.startsWith(item.href)}
                     tooltip={item.title}
+                    className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
                   >
                     <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="size-[14px]" strokeWidth={1.5} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -237,33 +256,58 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      {/*
+        Account block — lives below a hairline divider so it reads as a
+        separate "system identity" zone, not a floating nav item. Padding
+        and inner gap follow the panel-system tonal hierarchy:
+          - hairline border at sidebar-foreground/0.06 → soft separation
+          - account row uses 28px avatar + tight 2-line stack
+          - whole row stays on the sidebar surface (no extra fill at rest)
+            so the slightly darker sidebar tone keeps reading as "deeper"
+        Behavior: the dropdown trigger / Settings / Sign out paths are
+        unchanged.
+      */}
+      <SidebarFooter
+        className="px-2 pb-3 pt-2.5 group-data-[collapsible=icon]:px-1.5"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
+                  className="h-auto items-center gap-2.5 rounded-[6px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.05] data-[state=open]:bg-white/[0.06] group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!w-9 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                   title={
                     state === "collapsed" && !isMobile
                       ? (user.name ?? user.email ?? "Account menu")
                       : undefined
                   }
                 >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs">
+                  <Avatar className="size-7 shrink-0 group-data-[collapsible=icon]:size-7">
+                    <AvatarFallback
+                      className="text-[10.5px] font-semibold"
+                      style={{
+                        background: "rgba(91,156,246,0.12)",
+                        color: "#9CC2F8",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
                       {initials}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col gap-0.5 leading-none">
-                    <span className="text-sm font-medium">
+                  <div className="flex min-w-0 flex-1 flex-col leading-none">
+                    <span className="truncate text-[12px] font-semibold text-white/92">
                       {user.name ?? "User"}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span
+                      className="mt-[3px] truncate text-[10.5px] text-white/45"
+                      style={{ letterSpacing: "-0.005em" }}
+                    >
                       {user.email}
                     </span>
                   </div>
-                  <ChevronUp className="ml-auto h-4 w-4" />
+                  <ChevronUp className="ml-auto size-3.5 shrink-0 text-white/35 transition-colors duration-150 group-hover/menu-item:text-white/60" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

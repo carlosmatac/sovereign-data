@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -27,15 +28,26 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-md border border-white/10 bg-[oklch(0.18_0.03_264)] px-3 py-2 shadow-xl">
-      <p className="mb-1 max-w-[200px] truncate text-xs font-semibold text-white/90">
+    <div
+      className="rounded-[5px] px-2.5 py-2"
+      style={{
+        background: "#080F1E",
+        border: "1px solid rgba(147,147,147,0.18)",
+        boxShadow:
+          "0 0 0 1px rgba(255,255,255,0.025), 0 8px 24px -6px rgba(0,0,0,0.55)",
+      }}
+    >
+      <p className="mb-1 max-w-[220px] truncate text-[12px] font-semibold text-white/95">
         {label}
       </p>
       {d.country && (
-        <p className="text-[11px] text-white/40 mb-1">{d.country}</p>
+        <p className="mb-1 text-[11px] text-white/40">{d.country}</p>
       )}
-      <p className="text-xs text-white/60">
-        <span className="font-medium text-white/90">{d.total}</span> interviews
+      <p className="text-[11.5px] text-white/65">
+        <span className="font-semibold tabular-nums text-white/95">
+          {d.total}
+        </span>{" "}
+        interviews
       </p>
     </div>
   );
@@ -46,25 +58,39 @@ interface Props {
 }
 
 export function InterviewsByProjectChart({ data }: Props) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   if (!data.length) return null;
 
   const chartData = data.slice(0, 10).map((d) => ({
     ...d,
-    displayName:
-      d.name.length > 22 ? d.name.slice(0, 21) + "…" : d.name,
+    displayName: d.name.length > 22 ? d.name.slice(0, 21) + "…" : d.name,
   }));
 
+  // Fill rule mirrors the donut chart: calm ramp by rank when nothing is
+  // hovered, single bar emphasised with the rest dimmed on hover.
+  const fillFor = (index: number) => {
+    const rankAlpha = Math.max(0.42, 1 - index * 0.08);
+    if (hoveredIndex === null) return `rgba(78,120,207,${rankAlpha})`;
+    if (hoveredIndex === index) return "rgba(91,156,246,1)";
+    return `rgba(78,120,207,${rankAlpha * 0.22})`;
+  };
+
   return (
-    <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 38)}>
+    <ResponsiveContainer
+      width="100%"
+      height={Math.max(200, chartData.length * 42)}
+    >
       <BarChart
         data={chartData}
         layout="vertical"
-        margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
-        barCategoryGap="30%"
+        margin={{ top: 4, right: 20, bottom: 4, left: 0 }}
+        barCategoryGap="28%"
+        onMouseLeave={() => setHoveredIndex(null)}
       >
         <XAxis
           type="number"
-          tick={{ fill: "oklch(0.55 0.018 264)", fontSize: 11 }}
+          tick={{ fill: "rgba(255,255,255,0.42)", fontSize: 11 }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
@@ -73,25 +99,63 @@ export function InterviewsByProjectChart({ data }: Props) {
         <YAxis
           type="category"
           dataKey="displayName"
-          width={130}
-          tick={{ fill: "oklch(0.70 0.018 264)", fontSize: 12 }}
+          width={140}
+          tick={(props) => {
+            const { x, y, payload, index } = props as {
+              x: number;
+              y: number;
+              payload: { value: string };
+              index: number;
+            };
+            const isActive = hoveredIndex === index;
+            const isDimmed = hoveredIndex !== null && !isActive;
+            return (
+              <text
+                x={x}
+                y={y}
+                dy={4}
+                textAnchor="end"
+                style={{
+                  fill: isActive
+                    ? "rgba(255,255,255,0.95)"
+                    : isDimmed
+                      ? "rgba(255,255,255,0.38)"
+                      : "rgba(255,255,255,0.78)",
+                  fontSize: 12,
+                  transition:
+                    "fill 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {payload.value}
+              </text>
+            );
+          }}
           tickLine={false}
           axisLine={false}
         />
         <Tooltip
           content={<CustomTooltip />}
-          cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
+          cursor={{ fill: "rgba(255,255,255,0.025)" }}
+          isAnimationActive={false}
         />
-        <Bar dataKey="total" radius={[0, 3, 3, 0]}>
-          {chartData.map((entry, index) => {
-            const intensity = 1 - index * 0.07;
-            return (
-              <Cell
-                key={entry.name}
-                fill={`oklch(${0.58 + index * 0.02} ${0.14 - index * 0.008} 264 / ${Math.max(0.45, intensity)})`}
-              />
-            );
-          })}
+        <Bar
+          dataKey="total"
+          radius={[0, 3, 3, 0]}
+          isAnimationActive={false}
+          onMouseEnter={(_, index) => setHoveredIndex(index)}
+        >
+          {chartData.map((entry, index) => (
+            <Cell
+              key={entry.name}
+              fill={fillFor(index)}
+              style={{
+                transition:
+                  "fill 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            />
+          ))}
         </Bar>
       </BarChart>
     </ResponsiveContainer>

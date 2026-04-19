@@ -20,54 +20,38 @@ interface TranscriptViewerProps {
 }
 
 /**
- * Layered dark surfaces: soft gradient, inset highlight, light shadow — depth without
- * saturated fills. Each variant reads as a distinct “tone” for speaker separation.
+ * Flat, muted speaker surfaces — no gradients, no blur, no shadows.
+ * Each variant is a single tonal bg + a 2px pastel left accent + a quiet
+ * speaker label. Palette is desaturated so the transcript feels calm and
+ * premium rather than institutional.
  */
 const SPEAKER_VARIANTS = [
   {
+    // Soft blue — primary speaker
     block: cn(
-      "rounded-xl border border-border/45 py-2.5 pl-3.5 pr-3",
-      "border-l-[3px] border-l-primary/28",
-      "bg-gradient-to-br from-primary/[0.09] via-card/55 to-card/[0.22]",
-      "shadow-sm shadow-black/15 ring-1 ring-inset ring-white/[0.06]",
-      "backdrop-blur-[2px]",
-      "dark:border-border/35 dark:from-primary/[0.065] dark:via-card/42 dark:to-card/[0.18] dark:shadow-black/35"
+      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-[rgba(91,156,246,0.055)]",
+      "border-l-2 border-l-[rgba(91,156,246,0.45)]",
+      "py-3 pl-4 pr-4"
     ),
-    badge: cn(
-      "mb-1.5 inline-block rounded-md border border-border/40 px-2 py-0.5 text-xs font-medium",
-      "bg-background/50 text-foreground/90 shadow-sm ring-1 ring-inset ring-white/[0.05]",
-      "dark:bg-background/25 dark:text-foreground/88"
-    ),
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#8EB6F3]",
   },
   {
+    // Soft slate — neutral secondary speaker
     block: cn(
-      "rounded-xl border border-border/45 py-2.5 pl-3.5 pr-3",
-      "border-l-[3px] border-l-foreground/16",
-      "bg-gradient-to-br from-muted/30 via-card/50 to-card/[0.2]",
-      "shadow-sm shadow-black/12 ring-1 ring-inset ring-white/[0.05]",
-      "backdrop-blur-[2px]",
-      "dark:border-border/35 dark:from-muted/18 dark:via-card/38 dark:to-card/[0.15] dark:shadow-black/32"
+      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-white/[0.028]",
+      "border-l-2 border-l-white/25",
+      "py-3 pl-4 pr-4"
     ),
-    badge: cn(
-      "mb-1.5 inline-block rounded-md border border-border/40 px-2 py-0.5 text-xs font-medium",
-      "bg-background/45 text-foreground/88 shadow-sm ring-1 ring-inset ring-white/[0.045]",
-      "dark:bg-background/22 dark:text-foreground/86"
-    ),
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-white/70",
   },
   {
+    // Soft mauve — third speaker / host
     block: cn(
-      "rounded-xl border border-border/45 py-2.5 pl-3.5 pr-3",
-      "border-l-[3px] border-l-muted-foreground/42",
-      "bg-gradient-to-br from-secondary/[0.14] via-card/48 to-muted/[0.12]",
-      "shadow-sm shadow-black/12 ring-1 ring-inset ring-white/[0.055]",
-      "backdrop-blur-[2px]",
-      "dark:border-border/35 dark:from-secondary/[0.1] dark:via-card/36 dark:to-muted/[0.1] dark:shadow-black/30"
+      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-[rgba(167,139,250,0.045)]",
+      "border-l-2 border-l-[rgba(167,139,250,0.40)]",
+      "py-3 pl-4 pr-4"
     ),
-    badge: cn(
-      "mb-1.5 inline-block rounded-md border border-border/40 px-2 py-0.5 text-xs font-medium",
-      "bg-background/48 text-foreground/87 shadow-sm ring-1 ring-inset ring-white/[0.05]",
-      "dark:bg-background/24 dark:text-foreground/85"
-    ),
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#B8A5F6]",
   },
 ] as const;
 
@@ -196,8 +180,8 @@ export function TranscriptViewer({
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[500px] rounded-md border border-border/50 bg-muted/5 p-4 dark:bg-muted/[0.04]">
-          <div className="space-y-3.5">
+        <ScrollArea className="h-[500px] rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-transparent p-4">
+          <div className="space-y-2.5">
             {filteredSegments.map((seg, i) => {
               const variant = seg.speaker
                 ? speakerVariants.get(seg.speaker)
@@ -206,12 +190,16 @@ export function TranscriptViewer({
               return (
                 <div
                   key={i}
-                  className={variant ? cn("group", variant.block) : "group"}
+                  className={
+                    variant
+                      ? cn("group", variant.block)
+                      : "group rounded-[10px] border border-[rgba(147,147,147,0.08)] bg-white/[0.018] px-4 py-3"
+                  }
                 >
                   {seg.speaker && variant && (
-                    <span className={variant.badge}>{seg.speaker}</span>
+                    <p className={cn("mb-1.5", variant.label)}>{seg.speaker}</p>
                   )}
-                  <p className="text-sm leading-relaxed text-foreground/90">
+                  <p className="text-[13.5px] leading-[1.65] text-white/78">
                     {searchQuery ? (
                       <HighlightText
                         text={seg.text}
@@ -225,7 +213,7 @@ export function TranscriptViewer({
               );
             })}
             {filteredSegments.length === 0 && searchQuery && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <p className="py-8 text-center text-sm text-white/40">
                 No matches found for &ldquo;{searchQuery}&rdquo;
               </p>
             )}
@@ -257,7 +245,7 @@ function HighlightText({
         regex.test(part) ? (
           <mark
             key={i}
-            className="rounded-sm bg-amber-500/14 px-0.5 text-foreground dark:bg-amber-400/10"
+            className="rounded-sm bg-amber-400/18 px-0.5 text-white/90"
           >
             {part}
           </mark>

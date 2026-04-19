@@ -163,7 +163,7 @@ function WarRoomEmpty() {
 
 function GoalCard({ kpis }: { kpis: DealKpis }) {
   return (
-    <Card>
+    <Card className="sv-hover-card">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
@@ -200,7 +200,7 @@ function GoalCard({ kpis }: { kpis: DealKpis }) {
 function FinancialCards({ kpis }: { kpis: DealKpis }) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
-      <Card>
+      <Card className="sv-hover-card">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">
             Cash Deals Signed
@@ -215,7 +215,7 @@ function FinancialCards({ kpis }: { kpis: DealKpis }) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="sv-hover-card">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">
             Pending Collection
@@ -232,7 +232,7 @@ function FinancialCards({ kpis }: { kpis: DealKpis }) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="sv-hover-card">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Barter Volume</CardTitle>
           <Repeat2 className="h-4 w-4 text-purple-600" />
@@ -256,7 +256,7 @@ function PipelineHealthCard({ stages }: { stages: PipelineStage[] }) {
   const total = stages.reduce((s, st) => s + st.count, 0);
 
   return (
-    <Card>
+    <Card className="sv-hover-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ function DealsPreview({ deals }: { deals: Deal[] }) {
   }, [deals, stageFilter, typeFilter]);
 
   return (
-    <Card>
+    <Card className="sv-hover-card">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
