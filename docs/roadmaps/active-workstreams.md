@@ -21,6 +21,7 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 - **In progress:** [`admin-entity-governance-dashboard.md`](../features/on-going/admin-entity-governance-dashboard.md) — entity governance UI at `/admin/entities`.
 - **In progress:** [`fix-context-entity-ingestion.md`](../features/on-going/fix-context-entity-ingestion.md) — strict source-grounded entity persistence (drop ungrounded mentions + contaminated relationships) across audio, document/PDF, and reviewed-text reprocess.
+- **In progress:** [`editable-relationship-governance.md`](../features/on-going/editable-relationship-governance.md) — interview-scoped MVP for editing/rejecting LLM relationships; decisions survive reprocess (migration `00023`). **Phase 1.5 (2026-04-19):** rejected rows are now excluded from active graph / connections / chat / report views, and the `relation_type` enum gained `affiliated_with`, `operates_in`, `governs`, `customer_of` (migration `00024`).
 
 ---
 

@@ -26,21 +26,17 @@ import {
   type MatchMethod,
 } from "@/lib/entities/ground-mentions";
 import { normalizeEntityName } from "@/lib/entities/normalize";
+import type { RelationType } from "@/types/database";
 
 export interface ExtractedRelationship {
   source_name: string;
   target_name: string;
-  relation_type:
-    | "business_partner"
-    | "competitor"
-    | "regulator"
-    | "critic"
-    | "ally"
-    | "subsidiary"
-    | "investor"
-    | "advisor"
-    | "supplier"
-    | "acquirer";
+  /**
+   * Single source of truth for relation type values is `RelationType` in
+   * `src/types/database.ts`. Keep this aligned with the Postgres enum
+   * (migrations `00004` + `00024`).
+   */
+  relation_type: RelationType;
   confidence: number;
   evidence_text: string | null;
 }
@@ -74,6 +70,23 @@ export interface PersistenceGateInput {
    * and their normalized forms, plus upload-anchor name → anchor entity id.
    */
   entityIdMap: Map<string, string>;
+  /**
+   * `(source|target|relation_type)` keys for relationships an editor has
+   * previously rejected on this interview. Any LLM output matching a
+   * key in this set is dropped before persistence so reprocess can never
+   * silently re-create a row a human has already vetoed.
+   * See docs/features/on-going/editable-relationship-governance.md
+   */
+  rejectedRelationshipKeys?: ReadonlySet<string>;
+}
+
+/** Canonical key for an interview-scoped relationship triple. */
+export function relationshipKey(
+  sourceEntityId: string,
+  targetEntityId: string,
+  relationType: ExtractedRelationship["relation_type"]
+): string {
+  return `${sourceEntityId}|${targetEntityId}|${relationType}`;
 }
 
 export interface PersistenceGateStats {
@@ -93,6 +106,11 @@ export interface PersistenceGateStats {
   relationshipsKept: number;
   /** Relationship rows dropped because at least one endpoint did not survive. */
   relationshipsDropped: number;
+  /**
+   * Relationship rows dropped because an editor previously rejected the same
+   * `(source, target, relation_type)` triple on this interview.
+   */
+  relationshipsSuppressedByEditorial: number;
 }
 
 export interface PersistenceGateOutput {
@@ -117,6 +135,7 @@ export function applyPersistenceGate(
     groundedMap,
     relationships,
     entityIdMap,
+    rejectedRelationshipKeys,
   } = input;
 
   const persistedEntityIds = new Set<string>();
@@ -156,6 +175,7 @@ export function applyPersistenceGate(
 
   const relationshipRows: RelationshipRow[] = [];
   let relationshipsDropped = 0;
+  let relationshipsSuppressedByEditorial = 0;
 
   for (const rel of relationships) {
     const sourceId = resolveNameToEntityId(rel.source_name, entityIdMap);
@@ -168,6 +188,15 @@ export function applyPersistenceGate(
       !persistedEntityIds.has(targetId)
     ) {
       relationshipsDropped += 1;
+      continue;
+    }
+
+    if (
+      rejectedRelationshipKeys?.has(
+        relationshipKey(sourceId, targetId, rel.relation_type)
+      )
+    ) {
+      relationshipsSuppressedByEditorial += 1;
       continue;
     }
 
@@ -188,6 +217,7 @@ export function applyPersistenceGate(
     droppedByPolicy,
     relationshipsKept: relationshipRows.length,
     relationshipsDropped,
+    relationshipsSuppressedByEditorial,
   };
 
   return {

@@ -188,12 +188,15 @@ export async function buildReportIntelligenceLayer(args: {
           "entity_id, interview_id, chunk_id, context, sentiment, entities(id, name, type, project_id, canonical_entity_id, normalized_name, metadata)"
         )
         .in("interview_id", interviewIds),
+      // Reports represent active intelligence — exclude editorially
+      // rejected relationships. See docs/features/on-going/editable-relationship-governance.md
       admin
         .from("entity_relationships")
         .select(
           "source_entity_id, target_entity_id, relation_type, confidence, evidence_text, interview_id, source_entity:entities!entity_relationships_source_entity_id_fkey(id, name, type, project_id, canonical_entity_id, normalized_name, metadata), target_entity:entities!entity_relationships_target_entity_id_fkey(id, name, type, project_id, canonical_entity_id, normalized_name, metadata)"
         )
-        .in("interview_id", interviewIds),
+        .in("interview_id", interviewIds)
+        .neq("review_status", "rejected"),
     ]);
 
   if (interviewsData.error) throw interviewsData.error;

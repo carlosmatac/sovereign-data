@@ -106,10 +106,15 @@ export async function getRelationships(
   const edges: RelationshipEdge[] = [];
 
   // Outgoing (entity is source)
+  // Editorial rule: editorially `rejected` relationships are kept in the
+  // DB for the interview-detail review UI and reprocess suppression, but
+  // must NOT surface in the chat agent's relationship lookups (active
+  // operational view). See docs/features/on-going/editable-relationship-governance.md
   const { data: outgoing } = await admin
     .from("entity_relationships")
     .select("relation_type, confidence, evidence_text, interview_id, target_entity_id, entities!entity_relationships_target_entity_id_fkey(name, type)")
     .eq("source_entity_id", entityId)
+    .neq("review_status", "rejected")
     .order("confidence", { ascending: false })
     .limit(30);
   for (const row of outgoing ?? []) {
@@ -125,11 +130,12 @@ export async function getRelationships(
     });
   }
 
-  // Incoming (entity is target)
+  // Incoming (entity is target) — same editorial filter as outgoing.
   const { data: incoming } = await admin
     .from("entity_relationships")
     .select("relation_type, confidence, evidence_text, interview_id, source_entity_id, entities!entity_relationships_source_entity_id_fkey(name, type)")
     .eq("target_entity_id", entityId)
+    .neq("review_status", "rejected")
     .order("confidence", { ascending: false })
     .limit(30);
 

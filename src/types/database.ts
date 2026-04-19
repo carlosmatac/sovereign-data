@@ -27,16 +27,67 @@ export type UserRole = "owner" | "editor" | "viewer";
 export type PlatformRole = "member" | "platform_admin" | "superuser";
 
 export type RelationType =
-  | "business_partner"
-  | "competitor"
-  | "regulator"
-  | "critic"
-  | "ally"
-  | "subsidiary"
-  | "investor"
-  | "advisor"
+  // ── Preferred taxonomy (v2, migration 00024) ─────────────────────────────
   | "supplier"
-  | "acquirer";
+  | "competitor"
+  | "investor"
+  | "subsidiary"
+  | "acquirer"
+  | "critic"
+  | "advisor"
+  | "regulator"
+  | "affiliated_with"
+  | "operates_in"
+  | "governs"
+  | "customer_of"
+  // ── Legacy (kept for existing rows; new extractions discouraged) ─────────
+  | "business_partner"
+  | "ally";
+
+/**
+ * Canonical list of relation types, kept in sync with the DB enum.
+ *
+ * Order matters: the **preferred v2 taxonomy** is listed first so any UI
+ * that iterates this constant (e.g. the relation-type dropdown on the
+ * interview detail page) surfaces the better labels above the legacy ones.
+ *
+ * Legacy values (`business_partner`, `ally`) remain valid so historical
+ * rows render naturally, but extraction guidance prefers the v2 values.
+ */
+export const RELATION_TYPE_VALUES = [
+  "supplier",
+  "competitor",
+  "investor",
+  "subsidiary",
+  "acquirer",
+  "critic",
+  "advisor",
+  "regulator",
+  "affiliated_with",
+  "operates_in",
+  "governs",
+  "customer_of",
+  "business_partner",
+  "ally",
+] as const satisfies ReadonlyArray<RelationType>;
+
+/** Editorial state on `entity_relationships` (added in migration 00023). */
+export type RelationshipReviewStatus = "pending" | "approved" | "rejected";
+export type RelationshipOrigin = "llm" | "human_created" | "human_edited";
+
+/**
+ * Review statuses that count as **active** in the operational graph
+ * (Network Explorer edges + connections panel, chat-tool relationship
+ * lookups, report intelligence, dashboard counts).
+ *
+ * `rejected` is intentionally excluded — rejected rows survive in the DB
+ * for editorial workflows (interview-detail review UI, suppression on
+ * reprocess) but must not appear as active relationships anywhere else.
+ */
+export const ACTIVE_RELATIONSHIP_REVIEW_STATUSES: readonly RelationshipReviewStatus[] = [
+  "pending",
+  "approved",
+];
 
 export type SourceType = "audio" | "document" | "video" | "text";
 
@@ -642,6 +693,11 @@ export interface Database {
           evidence_text: string | null;
           interview_id: string;
           created_at: string;
+          review_status: RelationshipReviewStatus;
+          origin: RelationshipOrigin;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -652,6 +708,11 @@ export interface Database {
           evidence_text?: string | null;
           interview_id: string;
           created_at?: string;
+          review_status?: RelationshipReviewStatus;
+          origin?: RelationshipOrigin;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          updated_at?: string;
         };
         Update: {
           id?: string;
@@ -662,6 +723,11 @@ export interface Database {
           evidence_text?: string | null;
           interview_id?: string;
           created_at?: string;
+          review_status?: RelationshipReviewStatus;
+          origin?: RelationshipOrigin;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          updated_at?: string;
         };
         Relationships: [
           {
@@ -1068,6 +1134,8 @@ export interface Database {
       entity_type: EntityType;
       user_role: UserRole;
       relation_type: RelationType;
+      relationship_review_status: RelationshipReviewStatus;
+      relationship_origin: RelationshipOrigin;
       source_type: SourceType;
       snippet_platform: SnippetPlatform;
       snippet_tone: SnippetTone;

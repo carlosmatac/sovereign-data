@@ -53,9 +53,13 @@ export default async function DashboardPage() {
       .select("id, title, status, created_at, projects(name, country)")
       .order("created_at", { ascending: false })
       .limit(12),
+    // Active relationship count — matches what the Network Explorer
+    // surfaces. Editorially rejected rows survive in the DB but are not
+    // counted as active here. See docs/features/on-going/editable-relationship-governance.md
     admin
       .from("entity_relationships")
-      .select("id", { count: "exact", head: true }),
+      .select("id", { count: "exact", head: true })
+      .neq("review_status", "rejected"),
     admin
       .from("interviews")
       .select("id, status, topics, project_id, projects(name)")

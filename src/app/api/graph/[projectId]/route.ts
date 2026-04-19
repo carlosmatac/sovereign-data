@@ -102,10 +102,19 @@ export async function GET(
   }
 
   // ── Step 4: Get relationships for these interviews ─────────────
+  //
+  // Editorial rule (see docs/features/on-going/editable-relationship-governance.md):
+  // a `rejected` row is preserved in the DB for editorial workflows
+  // (interview-detail review UI, suppression on reprocess) but must NOT
+  // appear as an active edge in the operational graph or connections
+  // panel. We treat `pending` and `approved` as active here, mirroring
+  // the `ACTIVE_RELATIONSHIP_REVIEW_STATUSES` constant in
+  // `src/types/database.ts`.
   const { data: relationships, error: relsError } = await admin
     .from("entity_relationships")
     .select("id, source_entity_id, target_entity_id, relation_type, confidence")
-    .in("interview_id", interviewIds);
+    .in("interview_id", interviewIds)
+    .neq("review_status", "rejected");
 
   if (relsError) {
     return NextResponse.json({ error: relsError.message }, { status: 500 });

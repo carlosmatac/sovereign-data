@@ -97,18 +97,33 @@ const ExtractionSchema = z.object({
         ),
       relation_type: z
         .enum([
-          "business_partner",
-          "competitor",
-          "regulator",
-          "critic",
-          "ally",
-          "subsidiary",
-          "investor",
-          "advisor",
+          // ── Preferred taxonomy (v2) ─────────────────────────────────
           "supplier",
+          "competitor",
+          "investor",
+          "subsidiary",
           "acquirer",
+          "critic",
+          "advisor",
+          "regulator",
+          "affiliated_with",
+          "operates_in",
+          "governs",
+          "customer_of",
+          // ── Legacy (kept compatible; prefer values above) ───────────
+          "business_partner",
+          "ally",
         ])
-        .describe("Type of relationship between source and target"),
+        .describe(
+          "Type of relationship between source and target. Prefer the v2 taxonomy. Selection guidance:\n" +
+            "- affiliated_with: PERSON ↔ ORG/COMPANY/GOVERNMENT generic association (employee, director, manager, ministry official, spokesperson, marketing lead, senior staff). Use this — NOT business_partner — for almost every person↔org link.\n" +
+            "- operates_in: COMPANY/ORGANIZATION ↔ LOCATION/COUNTRY where the org has operational presence, an office, projects or activity. Use this — NOT business_partner / ally — for org↔country.\n" +
+            "- governs: GOVERNMENT/regulator ↔ COMPANY/ORGANIZATION/COUNTRY institutional control (ministry oversight, central bank, regulatory authority).\n" +
+            "- customer_of: source buys goods/services from target. Pair with `supplier` (target sells to source).\n" +
+            "- supplier: source sells goods/services to target.\n" +
+            "- competitor / investor / subsidiary / acquirer / critic / advisor / regulator: only when the transcript clearly establishes that specific dynamic.\n" +
+            "- business_partner / ally: legacy generic types; only emit when no other type fits and the transcript explicitly frames it as a partnership/alliance."
+        ),
       confidence: z
         .number()
         .min(0)
@@ -261,6 +276,12 @@ INSTRUCTIONS:
 - Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
 - Risks and opportunities should be actionable intelligence, not generic statements.
 - RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.
+- RELATIONSHIP TYPE SELECTION (important — avoid generic catch-all labels):
+  * For PERSON ↔ COMPANY / ORGANIZATION / GOVERNMENT: prefer "affiliated_with" (covers executives, directors, managers, ministry officials, spokespersons, marketing leads, senior staff). Do NOT use "business_partner" for a person-to-organisation tie.
+  * For COMPANY / ORGANIZATION ↔ LOCATION / COUNTRY: prefer "operates_in" when the org has operational presence, offices, projects, or activity in that location. Do NOT use "business_partner" or "ally" for an organisation-to-country tie.
+  * For GOVERNMENT / regulator ↔ COMPANY / ORGANIZATION / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
+  * For commercial sales: pair "supplier" (seller → buyer) and "customer_of" (buyer → seller).
+  * Only use "business_partner" or "ally" when no other type fits AND the transcript explicitly frames the link as a partnership or alliance.
 - If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.`,
       }),
     "extractIntelligence"

@@ -359,6 +359,7 @@ describe("applyPersistenceGate — stats", () => {
       droppedByPolicy: 2,
       relationshipsKept: 0,
       relationshipsDropped: 0,
+      relationshipsSuppressedByEditorial: 0,
     });
   });
 });
