@@ -27,6 +27,7 @@ import {
   resolveExtractedEntities,
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
+import { applyPersistenceGate } from "@/lib/ai/persistence-gate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -545,42 +546,19 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     supabaseClient: supabase,
   });
 
-  const groundedEntityIds = new Set<string>();
-  const mentionRows: Array<{
-    entity_id: string;
-    interview_id: string;
-    chunk_id: string | null;
-    context: string | null;
-    sentiment: string | null;
-  }> = [];
+  // Persistence gate: only `exact`/`alias` grounded mentions are written,
+  // and only relationships whose endpoints survived the gate are written.
+  // Silent `chunk_id = null` fallback is intentionally gone.
+  const gated = applyPersistenceGate({
+    interviewId,
+    entitiesForGrounding,
+    groundedMap,
+    relationships: extraction.relationships,
+    entityIdMap,
+  });
 
-  for (const [entityId, mentions] of groundedMap.entries()) {
-    groundedEntityIds.add(entityId);
-    for (const gm of mentions) {
-      mentionRows.push({
-        entity_id: gm.entityId,
-        interview_id: interviewId,
-        chunk_id: gm.chunkId,
-        context: gm.context,
-        sentiment: gm.sentiment,
-      });
-    }
-  }
-
-  for (const entity of entitiesForGrounding) {
-    if (!groundedEntityIds.has(entity.entityId)) {
-      mentionRows.push({
-        entity_id: entity.entityId,
-        interview_id: interviewId,
-        chunk_id: null,
-        context: null,
-        sentiment: entity.sentiment,
-      });
-    }
-  }
-
-  for (let i = 0; i < mentionRows.length; i += 50) {
-    const batch = mentionRows.slice(i, i + 50);
+  for (let i = 0; i < gated.mentionRows.length; i += 50) {
+    const batch = gated.mentionRows.slice(i, i + 50);
     const { error: mentionError } = await supabase
       .from("entity_mentions")
       .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
@@ -624,30 +602,15 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     }
   }
 
-  for (const rel of extraction.relationships) {
-    const sourceId =
-      entityIdMap.get(rel.source_name) ??
-      entityIdMap.get(normalizeEntityName(rel.source_name));
-    const targetId =
-      entityIdMap.get(rel.target_name) ??
-      entityIdMap.get(normalizeEntityName(rel.target_name));
-    if (sourceId && targetId) {
-      const { error: relError } = await supabase.from("entity_relationships").upsert(
-        {
-          source_entity_id: sourceId,
-          target_entity_id: targetId,
-          relation_type: rel.relation_type,
-          confidence: rel.confidence,
-          evidence_text: rel.evidence_text ?? null,
-          interview_id: interviewId,
-        },
-        {
-          onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
-        }
-      );
-      if (relError) {
-        console.error("Failed to upsert relationship:", relError);
+  for (const row of gated.relationshipRows) {
+    const { error: relError } = await supabase.from("entity_relationships").upsert(
+      row,
+      {
+        onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
       }
+    );
+    if (relError) {
+      console.error("Failed to upsert relationship:", relError);
     }
   }
 
@@ -671,7 +634,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   await updateInterviewStatus(interviewId, "COMPLETED", completedPatch);
 
   console.log(
-    `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} entities (from ${rawEntities.length} raw), ${extraction.relationships.length} relationships`
+    `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} resolved entities (from ${rawEntities.length} raw), ` +
+      `persistence gate kept ${gated.stats.persistedEntities}/${gated.stats.totalEntities} entities ` +
+      `(ungrounded=${gated.stats.ungrounded}, dropped_by_policy=${gated.stats.droppedByPolicy}), ` +
+      `relationships kept=${gated.stats.relationshipsKept} dropped=${gated.stats.relationshipsDropped}`
   );
 
   try {

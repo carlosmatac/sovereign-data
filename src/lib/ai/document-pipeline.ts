@@ -1,8 +1,12 @@
 // ============================================
-// Document (PDF) Pipeline — thin wrapper
+// Document (PDF) + Text Pipeline — thin wrapper
 // ============================================
 // Delegates to the shared runIntelPipelineFromCanonicalSource runner.
 // Enters at EXTRACTING — bypasses AssemblyAI transcription entirely.
+//
+// All entity resolution, grounding, and persistence (including the
+// persistence gate that drops ungrounded entities + contaminated
+// relationships) lives in the shared runner — see `pipeline.ts`.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeTranscriptDisplay } from "@/lib/transcript/normalizeDisplay";

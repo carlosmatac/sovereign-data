@@ -264,8 +264,15 @@ Additional metadata stored per chunk:
   3. **Anchor context** — primary interviewee/institution inferred from contextual clues (name tokens, honorific patterns, org token overlap) even when ASR misspells the name (confidence: MEDIUM)
   4. **Conservative fuzzy** — high-threshold trigram similarity (≥ 0.75) on capitalized word sequences (confidence: MEDIUM only if sharing a distinctive token)
 - Grounded mentions are persisted with `chunk_id` + `context` (evidence excerpt).
-- Entities that cannot be grounded to any chunk receive a fallback interview-level mention (null chunk_id).
 - A backfill endpoint (`POST /api/interviews/[id]/backfill-mentions`) can re-ground existing ungrounded mentions.
+
+**Persistence gate** (`src/lib/ai/persistence-gate.ts`):
+- A pure function `applyPersistenceGate()` decides what leaves the pipeline into `entity_mentions` and `entity_relationships`. Both `pipeline.ts` (audio + reviewed reprocess) and `document-pipeline.ts` (PDF) call it after grounding, before the batched upserts.
+- **Strict source-grounding rule**: an entity is persisted only if it has at least one grounded mention whose `matchMethod` is persistable. The persistable set is `{exact, alias}` (`PERSISTABLE_MATCH_METHODS` in `ground-mentions.ts`). `anchor_context` and `fuzzy` remain active during grounding for internal resolution / chunk coverage but are **not sufficient** to promote an entity into persisted output.
+- There is **no** silent `chunk_id = null` fallback for ungrounded entities — entities without explicit textual evidence in the source are dropped from the persisted graph for this interview.
+- **Relationships** are persisted only when both source and target survived the gate. Relationships referencing an ungrounded endpoint are dropped.
+- Upload anchors (`intervieweeName`, `intervieweeOrg`) still flow into internal resolution (`resolveExtractedEntities`, chunk normalization, `entityIdMap`) and remain reachable through `interviews.interviewee_entity_id` / `interviewee_org_entity_id`. They do not, however, grant a free pass into `entity_mentions` — the anchor must also appear explicitly (exact or known alias) in the text to be persisted as a mention.
+- Per-run stats are logged: `persistence gate kept K/N entities (ungrounded=…, dropped_by_policy=…), relationships kept=… dropped=…`.
 
 **Relationship persistence**:
 - Builds an `entityIdMap` (name → UUID) from matched/created entities.
@@ -368,6 +375,7 @@ HNSW was chosen over IVFFlat for better recall at Sovereign's scale without peri
 | Anchor-aware chunk normalization | `src/lib/chunks/anchor-normalization.ts` |
 | Entity matching | `src/lib/entities/match.ts` |
 | Hybrid entity grounding | `src/lib/entities/ground-mentions.ts` |
+| Persistence gate (entity/relationship) | `src/lib/ai/persistence-gate.ts` |
 | Entity normalization | `src/lib/entities/normalize.ts` |
 | Backfill mentions API | `src/app/api/interviews/[id]/backfill-mentions/route.ts` |
 | Transcript display | `src/lib/transcript/normalizeDisplay.ts` |
