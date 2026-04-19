@@ -107,8 +107,22 @@ Use **`interview_review_entities`** (relational) for auditability, querying, and
 | Review UI + save draft + seeds | `src/app/(dashboard)/interviews/[id]/review/page.tsx`, `src/components/interviews/transcript-review-editor.tsx` |
 | Entity search API | `src/app/api/projects/[projectId]/entities/search/route.ts` |
 | Server actions | `src/app/actions/interview-review.ts` |
-| Parse `transcript_full` → initial utterances | `src/lib/interviews/transcript-utterances-from-full.ts` |
+| Parse `transcript_full` → initial utterances | `src/lib/interviews/transcript-utterances-from-full.ts` (`parseTranscriptFullToUtterances` for AssemblyAI bracket transcripts; `parseTextInterviewToUtterances` for `source_type='text' \| 'document'`) |
 | Reprocess API + UI button | `POST /api/interviews/[id]/reprocess-review`, `TranscriptReviewEditor` “Run reprocessing” |
+
+### Text & document sources
+
+`source_type='text'` and `source_type='document'` rows have no AssemblyAI `source_utterances` to seed the editor from. The review page falls back to **`parseTextInterviewToUtterances(transcript_full, structure_hint)`**, which mirrors the structure detection used by `chunkTextInterview`:
+
+| Detected / hinted structure | Utterance shape | Speaker codes |
+|-----------------------------|-----------------|---------------|
+| `qa_structured` | One utterance per Q-line and per A-line (`Q:` / `Question:` / `Pregunta:` / `P:` and `A:` / `Answer:` / `Respuesta:` / `R:`). Blank line after a Q implicitly opens an A. | `Q` → "Question", `A` → "Answer" |
+| `speaker_transcript` | One utterance per speaker turn (consecutive lines under the same `Name:` are merged). | `<speaker name>` (identity) |
+| `article_style` / `freeform` | One utterance per blank-line-separated paragraph; single-line input → one utterance. | `P` → "Paragraph" |
+
+Synthetic timestamps (`start = i`, `end = i + 1`) are emitted because text/document sources have no audio playback (`chunkAudioEnabled === false` in the editor) and the search rail uses character lengths, not time, for positioning. The parser-derived `speakerMap` is overlaid onto `interview.speaker_map` so the existing UI keeps working without branching on `source_type`. Tests: `src/__tests__/transcript-utterances-from-text.test.ts`.
+
+Reprocess flow is unchanged: editing produces `reviewed_utterances` with these synthetic timestamps, and `reprocessInterviewFromReview` continues to call the shared `runIntelPipelineFromCanonicalSource` runner with `chunkUtterances` from the saved draft.
 
 **UX note:** Unsaved transcript edits are kept in the browser when you add/remove seed entities (we do not reset local utterance state on every server refresh). A full page reload or navigating away and back loads the last **saved** draft from the database.
 

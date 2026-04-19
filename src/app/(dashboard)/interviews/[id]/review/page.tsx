@@ -9,15 +9,33 @@ import {
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
 import {
+  parseTextInterviewToUtterances,
   parseTranscriptFullToUtterances,
   sourceUtterancesToReviewedUtterances,
 } from "@/lib/interviews/transcript-utterances-from-full";
+import type { TextStructureType } from "@/lib/ai/chunking-text-interview";
 import type {
   ReviewedUtterance,
   SourceType,
   SourceUtterance,
   SpeakerMap,
 } from "@/types/database";
+
+const VALID_TEXT_STRUCTURES: ReadonlySet<TextStructureType> = new Set([
+  "qa_structured",
+  "speaker_transcript",
+  "article_style",
+  "freeform",
+]);
+
+function readStructureHint(meta: unknown): TextStructureType | undefined {
+  if (!meta || typeof meta !== "object") return undefined;
+  const v = (meta as Record<string, unknown>).structure_type;
+  if (typeof v !== "string") return undefined;
+  return VALID_TEXT_STRUCTURES.has(v as TextStructureType)
+    ? (v as TextStructureType)
+    : undefined;
+}
 
 function isStoredReviewedUtterances(v: unknown): v is ReviewedUtterance[] {
   if (!Array.isArray(v) || v.length === 0) return false;
@@ -64,7 +82,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, source_type, audio_url, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, source_metadata, audio_url, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
     )
     .eq("id", id)
     .single();
@@ -76,7 +94,11 @@ export default async function InterviewTranscriptReviewPage({
   const userRole = await getUserProjectRole(interview.project_id);
   const canEdit = userRole === "owner" || userRole === "editor";
 
+  const sourceType = interview.source_type as SourceType;
+  const dbSpeakerMap = (interview.speaker_map as SpeakerMap) ?? {};
+
   let initialUtterances: ReviewedUtterance[] = [];
+  let derivedSpeakerMap: SpeakerMap = {};
   let parseWarning: string | null = null;
 
   if (isStoredReviewedUtterances(interview.reviewed_utterances)) {
@@ -84,17 +106,37 @@ export default async function InterviewTranscriptReviewPage({
   } else if (isSourceUtterances(interview.source_utterances)) {
     initialUtterances = sourceUtterancesToReviewedUtterances(interview.source_utterances);
   } else if (interview.transcript_full) {
-    const speakerMap = (interview.speaker_map as SpeakerMap) ?? {};
-    initialUtterances = parseTranscriptFullToUtterances(
-      interview.transcript_full,
-      speakerMap,
-      interview.audio_duration
-    );
+    // Text + document sources have no AssemblyAI source_utterances. Use a
+    // structure-aware parser that mirrors `chunkTextInterview` so the editor
+    // shows the same logical units the chunker will see on reprocess.
+    if (sourceType === "text" || sourceType === "document") {
+      const result = parseTextInterviewToUtterances(
+        interview.transcript_full,
+        readStructureHint(interview.source_metadata)
+      );
+      initialUtterances = result.utterances;
+      derivedSpeakerMap = result.speakerMap;
+    } else {
+      initialUtterances = parseTranscriptFullToUtterances(
+        interview.transcript_full,
+        dbSpeakerMap,
+        interview.audio_duration
+      );
+    }
+
     if (initialUtterances.length === 0) {
       parseWarning =
-        "Could not parse speaker-labelled blocks from the stored transcript. If this interview uses a non-standard format, use a completed audio interview or paste fixes after a future import.";
+        "Could not parse the stored transcript into editable segments. If this interview uses a non-standard format, paste fixes after re-uploading.";
     }
   }
+
+  // Overlay parser-derived labels (Q/A/P/<speaker>) onto whatever the DB has
+  // so the existing speakerMap-based UI keeps working without branching on
+  // source_type. DB values win when both define the same code.
+  const effectiveSpeakerMap: SpeakerMap = {
+    ...derivedSpeakerMap,
+    ...dbSpeakerMap,
+  };
 
   const { data: seedRows } = await supabase
     .from("interview_review_entities")
@@ -135,13 +177,13 @@ export default async function InterviewTranscriptReviewPage({
       interviewId={id}
       projectId={interview.project_id}
       interviewTitle={interview.title}
-      speakerMap={(interview.speaker_map as SpeakerMap) ?? {}}
+      speakerMap={effectiveSpeakerMap}
       initialUtterances={initialUtterances}
       reviewStatus={interview.transcript_review_status}
       lastIntelSource={interview.last_intel_source}
       seeds={seeds}
       parseWarning={parseWarning}
-      sourceType={interview.source_type as SourceType}
+      sourceType={sourceType}
       audioUrl={interview.audio_url}
     />
   );

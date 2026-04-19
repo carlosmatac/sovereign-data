@@ -966,9 +966,11 @@ export function TranscriptReviewEditor({
                               <Badge variant="outline" className="font-normal">
                                 {speakerLabel(u.speaker)}
                               </Badge>
-                              <span className="tabular-nums">
-                                {formatTime(u.start)} – {formatTime(u.end)}
-                              </span>
+                              {chunkAudioEnabled ? (
+                                <span className="tabular-nums">
+                                  {formatTime(u.start)} – {formatTime(u.end)}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           {chunkAudioEnabled && isValidChunkTimeRange(u) ? (

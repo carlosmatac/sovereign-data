@@ -527,7 +527,7 @@ export default function UploadInterviewPage() {
                     disabled={loading}
                   >
                     <Type className="h-4 w-4" />
-                    Texto
+                    Text
                   </button>
                 </div>
                 {sourceType === "document" && (

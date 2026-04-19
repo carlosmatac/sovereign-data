@@ -85,7 +85,10 @@ Five-PR refactor that unifies the audio and PDF ingestion pipelines under a sing
 
 ## Deferred
 
-- Review/reprocess UI for `text_interview` sources
 - OCR for scanned PDFs
 - `internal_note` as a fully-wired source
 - `video` source type
+
+## Follow-ups shipped
+
+- Review UI for `text` and `document` sources (no AssemblyAI utterances) — see [interview-transcript-review.md](./interview-transcript-review.md). The transcript review page now renders editable Q/A, speaker, and paragraph utterances from `transcript_full` using `parseTextInterviewToUtterances`, mirroring the structure detection in `chunkTextInterview`. Reprocess flow is unchanged: `reviewed_utterances` continues to feed the shared runner via `reprocessInterviewFromReview`.
