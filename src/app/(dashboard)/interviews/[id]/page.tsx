@@ -494,7 +494,7 @@ export default async function InterviewDetailPage({
 
             {/* Entity Relationships */}
             {relationshipItems.length > 0 && (
-              <Card>
+              <Card id="relationships" className="scroll-mt-20">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <Link2 className="h-4 w-4 text-[#8EB6F3]" />

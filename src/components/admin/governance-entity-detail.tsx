@@ -28,6 +28,12 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { GovernanceEntityDetail } from "@/lib/admin/load-governance-entities";
 import { GOVERNANCE_ALIAS_PREVIEW_LIMIT } from "@/lib/admin/load-governance-entities";
+import type {
+  GovernanceRelationshipDirectionFilter,
+  GovernanceRelationshipRow,
+  GovernanceRelationshipStatusFilter,
+} from "@/lib/admin/load-governance-relationships";
+import { GovernanceRelationshipsSection } from "@/components/admin/governance-relationships-section";
 import type { EntityType } from "@/types/database";
 import { updateGovernedEntity } from "@/app/actions/admin-entity-governance";
 
@@ -43,9 +49,22 @@ const ENTITY_TYPES: EntityType[] = [
 interface Props {
   entity: GovernanceEntityDetail;
   isSuperuser: boolean;
+  relationships: {
+    rows: GovernanceRelationshipRow[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    statusFilter: GovernanceRelationshipStatusFilter;
+    directionFilter: GovernanceRelationshipDirectionFilter;
+  };
 }
 
-export function GovernanceEntityDetailPanel({ entity, isSuperuser }: Props) {
+export function GovernanceEntityDetailPanel({
+  entity,
+  isSuperuser,
+  relationships,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(entity.name);
@@ -319,6 +338,19 @@ export function GovernanceEntityDetailPanel({ entity, isSuperuser }: Props) {
           </p>
         ) : null}
       </section>
+
+      <Separator />
+
+      <GovernanceRelationshipsSection
+        entityId={entity.id}
+        rows={relationships.rows}
+        page={relationships.page}
+        pageSize={relationships.pageSize}
+        totalCount={relationships.totalCount}
+        totalPages={relationships.totalPages}
+        statusFilter={relationships.statusFilter}
+        directionFilter={relationships.directionFilter}
+      />
 
       <div className="text-muted-foreground flex flex-wrap gap-3 border-t pt-6 text-xs">
         {isSuperuser ? (
