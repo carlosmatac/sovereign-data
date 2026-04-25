@@ -5,6 +5,12 @@ import {
   hasEntityGovernanceAccess,
 } from "@/lib/auth/platform-roles";
 import { loadGovernedEntityDetail } from "@/lib/admin/load-governance-entities";
+import {
+  GOVERNANCE_RELATIONSHIPS_PAGE_SIZE,
+  loadRelationshipsForEntity,
+  type GovernanceRelationshipDirectionFilter,
+  type GovernanceRelationshipStatusFilter,
+} from "@/lib/admin/load-governance-relationships";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GovernanceEntityDetailPanel } from "@/components/admin/governance-entity-detail";
@@ -17,12 +23,61 @@ import { ArrowLeft } from "lucide-react";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-interface Props {
-  params: Promise<{ id: string }>;
+const STATUS_FILTER_VALUES: GovernanceRelationshipStatusFilter[] = [
+  "all",
+  "active",
+  "pending",
+  "approved",
+  "rejected",
+];
+const DIRECTION_FILTER_VALUES: GovernanceRelationshipDirectionFilter[] = [
+  "all",
+  "incoming",
+  "outgoing",
+];
+
+function parseStatusFilter(
+  raw: string | undefined
+): GovernanceRelationshipStatusFilter {
+  if (raw && (STATUS_FILTER_VALUES as string[]).includes(raw)) {
+    return raw as GovernanceRelationshipStatusFilter;
+  }
+  return "all";
 }
 
-export default async function AdminEntityDetailPage({ params }: Props) {
+function parseDirectionFilter(
+  raw: string | undefined
+): GovernanceRelationshipDirectionFilter {
+  if (raw && (DIRECTION_FILTER_VALUES as string[]).includes(raw)) {
+    return raw as GovernanceRelationshipDirectionFilter;
+  }
+  return "all";
+}
+
+function parsePage(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "1", 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
+}
+
+interface Props {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{
+    rel_status?: string;
+    rel_direction?: string;
+    rel_page?: string;
+  }>;
+}
+
+export default async function AdminEntityDetailPage({
+  params,
+  searchParams,
+}: Props) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const statusFilter = parseStatusFilter(sp.rel_status);
+  const directionFilter = parseDirectionFilter(sp.rel_direction);
+  const page = parsePage(sp.rel_page);
 
   if (!UUID_RE.test(id)) {
     redirect("/admin/entities?notice=invalid_id");
@@ -43,7 +98,16 @@ export default async function AdminEntityDetailPage({ params }: Props) {
   }
 
   const isSuperuser = roles.includes("superuser");
-  const result = await loadGovernedEntityDetail(id);
+  const [result, relationships] = await Promise.all([
+    loadGovernedEntityDetail(id),
+    loadRelationshipsForEntity({
+      entityId: id,
+      page,
+      pageSize: GOVERNANCE_RELATIONSHIPS_PAGE_SIZE,
+      statusFilter,
+      directionFilter,
+    }),
+  ]);
 
   if (!result.ok) {
     if (result.reason === "not_found") {
@@ -121,7 +185,19 @@ export default async function AdminEntityDetailPage({ params }: Props) {
         </p>
       </header>
 
-      <GovernanceEntityDetailPanel entity={entity} isSuperuser={isSuperuser} />
+      <GovernanceEntityDetailPanel
+        entity={entity}
+        isSuperuser={isSuperuser}
+        relationships={{
+          rows: relationships.rows,
+          page: relationships.page,
+          pageSize: relationships.pageSize,
+          totalCount: relationships.totalCount,
+          totalPages: relationships.totalPages,
+          statusFilter,
+          directionFilter,
+        }}
+      />
     </div>
   );
 }

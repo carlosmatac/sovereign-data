@@ -1,5 +1,5 @@
 ---
-title: "Editable relationship governance (interview-scoped MVP)"
+title: "Editable relationship governance (interview-scoped MVP + admin Phase 2)"
 status: on-going
 owner: ventura
 priority: high
@@ -219,3 +219,135 @@ order — no UI change required.
 - Removing legacy values from the DB or TS.
 - Redesigning graph coloring / edge styling for the new types.
 - Global admin relationships page (still phase 2).
+
+---
+
+## Phase 2 — Admin entity governance Relationships section (2026-04-19)
+
+Adds an editable Relationships section **inside** the existing Entity
+Governance detail panel at `/admin/entities/[id]`. Intentionally
+**not** a standalone `/admin/relationships` route — that would balloon
+into a different product. Reuses the editorial model (`review_status`,
+`origin`, etc.) and the existing relationship editorial server actions.
+
+### A. Problem
+
+After Phase 1 + 1.5, admins could see a `relationship_count` on an
+entity in `/admin/entities/[id]` but had **no way to inspect or manage
+the actual rows**. The interview-detail page only edits relationships
+of a single interview, and platform admins are not always project
+members of the interviews where a problematic edge originated.
+
+### B. Approach
+
+1. **New admin loader** (`src/lib/admin/load-governance-relationships.ts`)
+   returns paginated rows for one entity (incoming + outgoing,
+   **including rejected**). Distinct from `getRelationships` in
+   `src/lib/ai/entity-lookup.ts` which is chat-oriented and excludes
+   rejected rows.
+   - Stable row shape `GovernanceRelationshipRow` — relationship id,
+     source/target ids + names + types, relation type, confidence,
+     evidence, interview id + title, `review_status`, `origin`,
+     `reviewed_at`, `reviewed_by`, `updated_at`, `direction`
+     (`incoming`/`outgoing` relative to the queried entity), and the
+     `related_entity_*` triple (the entity on the OTHER side of the
+     edge — convenience for the admin table).
+   - Filters: `statusFilter` (`all` | `active` | `pending` | `approved`
+     | `rejected`), `directionFilter` (`all` | `incoming` | `outgoing`).
+   - Pagination via `page` + `pageSize`
+     (`GOVERNANCE_RELATIONSHIPS_PAGE_SIZE = 25`).
+   - Service-role only — call after `hasEntityGovernanceAccess`.
+
+2. **Shared editorial actions** (`src/app/actions/relationship-editorial.ts`).
+   The existing `approve / reject / restore / updateRelationshipType`
+   server actions now accept either auth path:
+   - project owner / editor (existing interview-detail flow), OR
+   - `platform_admin` / `superuser` (new admin governance flow).
+   Pure predicate extracted to `src/lib/auth/relationship-editor.ts`
+   (`canEditRelationship`) so the rule is unit-testable without
+   Supabase. After every mutation we now `revalidatePath` both the
+   interview path AND `/admin/entities` plus `/admin/entities/[source]`
+   and `/admin/entities/[target]` so admin surfaces refresh.
+
+3. **New admin UI section**
+   (`src/components/admin/governance-relationships-section.tsx`)
+   rendered below the Aliases section in the existing
+   `GovernanceEntityDetailPanel`. It is a simple table:
+   direction badge, related entity (linked to its admin detail), relation
+   type + evidence preview, status badge, origin, confidence, source
+   interview (linked to `/interviews/[id]#relationships`), action menu
+   (change type / approve / reject / restore). Rejected rows render
+   visually de-emphasized but remain visible. Status + direction
+   selectors are URL-driven via `?rel_status=…&rel_direction=…&rel_page=…`
+   so the page is refreshable / linkable.
+
+4. **Interview detail anchor**. Added `id="relationships"` to the
+   Relationships card on `/interviews/[id]` so admin links from the
+   governance table jump directly to the editable card.
+
+### C. Files touched
+
+**New:**
+- `src/lib/admin/load-governance-relationships.ts`
+- `src/lib/auth/relationship-editor.ts`
+- `src/components/admin/governance-relationships-section.tsx`
+- `src/__tests__/governance-relationships-loader.test.ts`
+- `src/__tests__/relationship-editor-permissions.test.ts`
+
+**Updated:**
+- `src/app/actions/relationship-editorial.ts` (auth gate widened, admin
+  paths revalidated)
+- `src/components/admin/governance-entity-detail.tsx` (renders new section)
+- `src/app/(dashboard)/admin/entities/[id]/page.tsx` (loads relationships,
+  parses `rel_status` / `rel_direction` / `rel_page` search params)
+- `src/app/(dashboard)/interviews/[id]/page.tsx` (adds `#relationships`
+  anchor on the Relationships card)
+
+### D. Acceptance / how to validate
+
+1. Open `/admin/entities/[id]` for an entity with several connected
+   relationships — the Relationships table renders all of them,
+   including any `rejected` rows (de-emphasized).
+2. Approve / reject / restore from the action menu → the row re-renders
+   with the new status badge after revalidate.
+3. Change relation type → the original row becomes `rejected (Edited)`,
+   a new approved row carries the new type. Same behavior as the
+   interview-detail flow because the same server actions are used.
+4. Status filter (`Rejected only`) shows only rejected rows; direction
+   filter (`Incoming` / `Outgoing`) restricts accordingly. Filters
+   compose; page resets to 1 when a filter changes.
+5. Source interview link navigates to `/interviews/[id]#relationships`
+   and lands on the editable card.
+6. As a platform admin who is **NOT** a project member of the source
+   interview, all editorial actions still succeed. As a project viewer
+   with no platform role, all actions still fail with `Insufficient
+   permissions` (regression guard in `relationship-editor-permissions.test.ts`).
+7. `vitest run` is green (112 tests including the 23 new ones).
+
+### E. Tests
+
+- `src/__tests__/governance-relationships-loader.test.ts` — 13 tests
+  covering: invalid id short-circuit, incoming + outgoing inclusion,
+  rejected rows visible by default, hydrated metadata (`direction`,
+  `related_entity_*`, `interview_title`), status filter (all four
+  modes), direction filter, combined filters, and pagination
+  (`totalCount` / `totalPages` / no overlap between pages).
+- `src/__tests__/relationship-editor-permissions.test.ts` — 10 tests
+  covering: project owner/editor allowed (existing behavior), project
+  viewer rejected, no project + no platform role rejected,
+  `platform_admin` and `superuser` allowed even without project
+  membership, combined paths.
+
+### F. Out of scope (still deferred)
+
+- Standalone `/admin/relationships` route or cross-entity browser.
+- Manual relationship creation from the admin panel.
+- Reverse-direction toggle (swap source/target).
+- Bulk approve / reject.
+- Cross-interview suppression of a `(source, target, relation_type)`
+  triple.
+- Admin override of project-editor restrictions on the interview
+  detail page itself (admins still need read access via the project to
+  view a full interview).
+- Relationship history / audit log.
+- Graph redesign.

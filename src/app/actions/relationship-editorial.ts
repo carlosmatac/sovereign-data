@@ -3,18 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchPlatformRolesForUser } from "@/lib/auth/platform-roles";
+import { canEditRelationship } from "@/lib/auth/relationship-editor";
 import {
   RELATION_TYPE_VALUES,
   type RelationType,
+  type UserRole,
 } from "@/types/database";
 
 /**
- * Server actions for editorial corrections on `entity_relationships`,
- * scoped to a single interview. See
- * docs/features/on-going/editable-relationship-governance.md.
+ * Server actions for editorial corrections on `entity_relationships`.
  *
- * Permission model mirrors `interview-speakers.ts`:
- *   getUser() → admin client → project_members owner/editor only.
+ * Originally scoped to a single interview's project editors only. Phase 2
+ * (admin entity governance Relationships section) extends the gate so the
+ * SAME actions can also be invoked from `/admin/entities/[id]` by users
+ * with `platform_admin` or `superuser`, even when they are not project
+ * members. See docs/features/on-going/editable-relationship-governance.md.
+ *
+ * Permission model (either path is sufficient):
+ *   1. Project owner/editor for the relationship's interview's project.
+ *   2. platform_admin / superuser (entity governance access).
+ *
+ * Mutations always go through the admin client after `getUser()` (sacred
+ * rule from HANDOVER.md).
  */
 
 type ActionResult = { success: true } | { error: string };
@@ -32,7 +43,7 @@ type EditorContext = {
   interviewId: string;
 };
 
-async function requireInterviewEditorForRelationship(
+async function requireRelationshipEditor(
   relationshipId: string
 ): Promise<{ ok: true; ctx: EditorContext } | { ok: false; error: string }> {
   const supabase = await createClient();
@@ -61,14 +72,20 @@ async function requireInterviewEditorForRelationship(
   if (interviewError) return { ok: false, error: interviewError.message };
   if (!interview) return { ok: false, error: "Interview not found" };
 
-  const { data: membership } = await admin
-    .from("project_members")
-    .select("role")
-    .eq("project_id", interview.project_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Look up both auth paths in parallel; either is sufficient.
+  const [membershipRes, platformRoles] = await Promise.all([
+    admin
+      .from("project_members")
+      .select("role")
+      .eq("project_id", interview.project_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    fetchPlatformRolesForUser(supabase, user.id),
+  ]);
 
-  if (!membership || membership.role === "viewer") {
+  const projectRole = (membershipRes.data?.role ?? null) as UserRole | null;
+
+  if (!canEditRelationship({ projectRole, platformRoles })) {
     return { ok: false, error: "Insufficient permissions" };
   }
 
@@ -98,15 +115,33 @@ function isValidRelationType(value: string): value is RelationType {
 }
 
 /**
+ * Refresh both the interview detail (project-editor flow) and the admin
+ * entity governance pages (admin flow). We don't know which surface
+ * triggered the action, so refresh both — cheap and safe.
+ */
+function revalidateRelationshipSurfaces(args: {
+  interviewId: string;
+  sourceEntityId: string;
+  targetEntityId: string;
+}) {
+  revalidatePath(`/interviews/${args.interviewId}`);
+  revalidatePath("/admin/entities");
+  revalidatePath(`/admin/entities/${args.sourceEntityId}`);
+  if (args.targetEntityId !== args.sourceEntityId) {
+    revalidatePath(`/admin/entities/${args.targetEntityId}`);
+  }
+}
+
+/**
  * Reject a relationship. The row is preserved so reprocess (and the
  * persistence gate) know not to recreate this exact triple.
  */
 export async function rejectRelationship(
   relationshipId: string
 ): Promise<ActionResult> {
-  const gate = await requireInterviewEditorForRelationship(relationshipId);
+  const gate = await requireRelationshipEditor(relationshipId);
   if (!gate.ok) return { error: gate.error };
-  const { admin, userId, interviewId } = gate.ctx;
+  const { admin, userId, relationship, interviewId } = gate.ctx;
 
   const { error } = await admin
     .from("entity_relationships")
@@ -119,7 +154,11 @@ export async function rejectRelationship(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/interviews/${interviewId}`);
+  revalidateRelationshipSurfaces({
+    interviewId,
+    sourceEntityId: relationship.source_entity_id,
+    targetEntityId: relationship.target_entity_id,
+  });
   return { success: true };
 }
 
@@ -127,9 +166,9 @@ export async function rejectRelationship(
 export async function approveRelationship(
   relationshipId: string
 ): Promise<ActionResult> {
-  const gate = await requireInterviewEditorForRelationship(relationshipId);
+  const gate = await requireRelationshipEditor(relationshipId);
   if (!gate.ok) return { error: gate.error };
-  const { admin, userId, interviewId } = gate.ctx;
+  const { admin, userId, relationship, interviewId } = gate.ctx;
 
   const { error } = await admin
     .from("entity_relationships")
@@ -142,7 +181,11 @@ export async function approveRelationship(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/interviews/${interviewId}`);
+  revalidateRelationshipSurfaces({
+    interviewId,
+    sourceEntityId: relationship.source_entity_id,
+    targetEntityId: relationship.target_entity_id,
+  });
   return { success: true };
 }
 
@@ -150,9 +193,9 @@ export async function approveRelationship(
 export async function restoreRelationship(
   relationshipId: string
 ): Promise<ActionResult> {
-  const gate = await requireInterviewEditorForRelationship(relationshipId);
+  const gate = await requireRelationshipEditor(relationshipId);
   if (!gate.ok) return { error: gate.error };
-  const { admin, interviewId } = gate.ctx;
+  const { admin, relationship, interviewId } = gate.ctx;
 
   const { error } = await admin
     .from("entity_relationships")
@@ -165,7 +208,11 @@ export async function restoreRelationship(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/interviews/${interviewId}`);
+  revalidateRelationshipSurfaces({
+    interviewId,
+    sourceEntityId: relationship.source_entity_id,
+    targetEntityId: relationship.target_entity_id,
+  });
   return { success: true };
 }
 
@@ -187,7 +234,7 @@ export async function updateRelationshipType(
     return { error: "Invalid relation type" };
   }
 
-  const gate = await requireInterviewEditorForRelationship(relationshipId);
+  const gate = await requireRelationshipEditor(relationshipId);
   if (!gate.ok) return { error: gate.error };
   const { admin, userId, relationship, interviewId } = gate.ctx;
 
@@ -252,6 +299,10 @@ export async function updateRelationshipType(
     if (insertError) return { error: insertError.message };
   }
 
-  revalidatePath(`/interviews/${interviewId}`);
+  revalidateRelationshipSurfaces({
+    interviewId,
+    sourceEntityId: relationship.source_entity_id,
+    targetEntityId: relationship.target_entity_id,
+  });
   return { success: true };
 }
