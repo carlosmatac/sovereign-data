@@ -12,4 +12,4 @@ See [`../README.md`](../README.md) for the full lifecycle.
 
 | Doc | Summary |
 |-----|--------|
-| *(none)* | Move specs here from `to-do/` when implementation starts. |
+| [editable-relationship-governance.md](./editable-relationship-governance.md) | Interview-scoped MVP: editors can correct/reject LLM-extracted relationships; decisions survive reprocess. Phase 1.5 (2026-04-19) excludes rejected rows from active graph views and adds the v2 taxonomy values (`affiliated_with`, `operates_in`, `governs`, `customer_of`). |

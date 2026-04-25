@@ -27,7 +27,7 @@ import {
   resolveExtractedEntities,
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
-import { applyPersistenceGate } from "@/lib/ai/persistence-gate";
+import { applyPersistenceGate, relationshipKey } from "@/lib/ai/persistence-gate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -455,6 +455,27 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     }
   }
 
+  // Editorial suppression: any (source, target, relation_type) the user has
+  // previously rejected on this interview must NOT be re-inserted by the LLM.
+  // The clear-RPC keeps these rows alive on reprocess; we read them so the
+  // persistence gate can drop matching new rows before upsert.
+  // See docs/features/on-going/editable-relationship-governance.md
+  const { data: rejectedRows, error: rejectedError } = await supabase
+    .from("entity_relationships")
+    .select("source_entity_id, target_entity_id, relation_type")
+    .eq("interview_id", interviewId)
+    .eq("review_status", "rejected");
+
+  if (rejectedError) {
+    console.error("Failed to load rejected relationship suppression list:", rejectedError);
+  }
+
+  const rejectedRelationshipKeys = new Set<string>(
+    (rejectedRows ?? []).map((r) =>
+      relationshipKey(r.source_entity_id, r.target_entity_id, r.relation_type)
+    )
+  );
+
   const chunkRows = enrichedChunks.map((ec, i) => ({
     interview_id: interviewId,
     chunk_index: ec.chunk.chunkIndex,
@@ -555,6 +576,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     groundedMap,
     relationships: extraction.relationships,
     entityIdMap,
+    rejectedRelationshipKeys,
   });
 
   for (let i = 0; i < gated.mentionRows.length; i += 50) {
@@ -603,10 +625,17 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   }
 
   for (const row of gated.relationshipRows) {
+    // `ignoreDuplicates: true` guarantees that a row already carrying any
+    // editorial state (approved / rejected / human_edited / human_created)
+    // is never overwritten by a fresh LLM pass. Rejected rows are also
+    // pre-filtered upstream by the persistence gate; this is belt + braces
+    // for approved / human_edited triples that the LLM may legitimately
+    // re-extract on reprocess.
     const { error: relError } = await supabase.from("entity_relationships").upsert(
-      row,
+      { ...row, origin: "llm", review_status: "pending" },
       {
         onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
+        ignoreDuplicates: true,
       }
     );
     if (relError) {

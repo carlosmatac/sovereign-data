@@ -13,7 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
   ArrowLeft,
-  ArrowRight,
   Briefcase,
   Clock,
   Hash,
@@ -38,8 +37,17 @@ import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
 import { EditableSpeakersCard } from "@/components/interviews/editable-speakers-card";
 import { EditableInterviewTitle } from "@/components/interviews/editable-interview-title";
+import {
+  RelationshipsList,
+  type RelationshipListItem,
+} from "@/components/interviews/relationships-list";
 import { IconWell } from "@/components/panels";
-import type { SpeakerMap } from "@/types/database";
+import type {
+  RelationType,
+  RelationshipOrigin,
+  RelationshipReviewStatus,
+  SpeakerMap,
+} from "@/types/database";
 
 export default async function InterviewDetailPage({
   params,
@@ -79,11 +87,26 @@ export default async function InterviewDetailPage({
     .select("*, entities(*)")
     .eq("interview_id", id);
 
-  // Fetch entity relationships for this interview
+  // Fetch entity relationships for this interview (incl. editorial state).
   const { data: relationships } = await supabase
     .from("entity_relationships")
-    .select("*")
+    .select(
+      "id, source_entity_id, target_entity_id, relation_type, confidence, evidence_text, review_status, origin"
+    )
     .eq("interview_id", id);
+
+  const relationshipItems: RelationshipListItem[] = (relationships ?? []).map(
+    (r) => ({
+      id: r.id,
+      source_entity_id: r.source_entity_id,
+      target_entity_id: r.target_entity_id,
+      relation_type: r.relation_type as RelationType,
+      confidence: r.confidence,
+      evidence_text: r.evidence_text,
+      review_status: r.review_status as RelationshipReviewStatus,
+      origin: r.origin as RelationshipOrigin,
+    })
+  );
 
   // Marketing snippets (optional UI — see FEATURE_FLAGS + docs/features/done/interview-ui-visibility.md)
   const { data: snippets } = FEATURE_FLAGS.interviewMarketingAssetsUi
@@ -470,7 +493,7 @@ export default async function InterviewDetailPage({
             )}
 
             {/* Entity Relationships */}
-            {relationships && relationships.length > 0 && (
+            {relationshipItems.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
@@ -480,50 +503,16 @@ export default async function InterviewDetailPage({
                     </CardTitle>
                   </div>
                   <CardDescription>
-                    {relationships.length} connection{relationships.length !== 1 ? "s" : ""} identified
+                    {relationshipItems.length} connection{relationshipItems.length !== 1 ? "s" : ""} identified
+                    {canEdit ? " · editor controls available" : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {relationships.map((rel) => {
-                      const source =
-                        entityNameMap[rel.source_entity_id];
-                      const target =
-                        entityNameMap[rel.target_entity_id];
-                      if (!source || !target) return null;
-
-                      return (
-                        <li
-                          key={rel.id}
-                          className="rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-white/[0.022] px-3.5 py-3"
-                        >
-                          <div className="flex items-center gap-2 text-[13px] tracking-[-0.005em] text-white/88">
-                            <span className="truncate font-medium">
-                              {source.name}
-                            </span>
-                            <ArrowRight className="h-3 w-3 shrink-0 text-white/30" />
-                            <span className="truncate font-medium">
-                              {target.name}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#8EB6F3]/85">
-                              <span className="h-1 w-1 rounded-full bg-[#8EB6F3]/70" />
-                              {rel.relation_type.replace(/_/g, " ")}
-                            </span>
-                            <span className="text-[10.5px] tabular-nums text-white/35">
-                              {Math.round(rel.confidence * 100)}% confidence
-                            </span>
-                          </div>
-                          {rel.evidence_text && (
-                            <p className="mt-2 border-l border-white/10 pl-3 text-[12px] leading-[1.55] italic text-white/50">
-                              &ldquo;{rel.evidence_text}&rdquo;
-                            </p>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <RelationshipsList
+                    relationships={relationshipItems}
+                    entityNameMap={entityNameMap}
+                    canEdit={canEdit}
+                  />
                 </CardContent>
               </Card>
             )}
