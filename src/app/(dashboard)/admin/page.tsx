@@ -43,7 +43,7 @@ export default async function AdminHomePage() {
             color: "rgba(255,255,255,0.42)",
           }}
         >
-          Sovereign · Administration
+          Aksum · Administration
         </p>
         <h1
           className="text-[28px] font-semibold text-white"

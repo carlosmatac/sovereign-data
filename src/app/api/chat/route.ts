@@ -450,7 +450,7 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
 
       lookupEntity: tool({
         description:
-          "Look up a person, company, or organization in the Sovereign intelligence database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
+          "Look up a person, company, or organization in the Aksum intelligence database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
         inputSchema: z.object({
           name: z
             .string()

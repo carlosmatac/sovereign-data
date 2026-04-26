@@ -369,7 +369,7 @@ async function synthesizeIntelligence(args: {
   const { object } = await generateObject({
     model: openai("gpt-4o"),
     schema: ReportSynthesisSchema,
-    prompt: `You are designing the shared intelligence substrate for Sovereign Data reports.
+    prompt: `You are designing the shared intelligence substrate for Aksum reports.
 
 Your job is to convert interview evidence into reusable report blocks that can be remixed across templates without losing provenance or nuance.
 

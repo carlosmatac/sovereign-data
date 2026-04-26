@@ -11,7 +11,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
  * sidebar trigger — nothing more.
  *
  * Anatomy (left → right):
- *   [SidebarTrigger]   SOVEREIGN · INTELLIGENCE PLATFORM
+ *   [SidebarTrigger]   AKSUM · INTELLIGENCE PLATFORM
  *
  * Deliberate omissions:
  *   - No traffic-light dots. Those are a landing-only presentation device
@@ -56,7 +56,7 @@ export function DashboardInsetHeader() {
           color: "rgba(255,255,255,0.32)",
         }}
       >
-        Sovereign · Intelligence Platform
+        Aksum · Intelligence Platform
       </span>
     </header>
   );

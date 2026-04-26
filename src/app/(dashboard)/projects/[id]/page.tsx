@@ -231,7 +231,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 <CardTitle className="text-sm font-medium">
                   Your Role
                 </CardTitle>
-                <img src="/sovereign_logo.svg" alt="SD" className="h-4 w-4 text-muted-foreground" />
+                <img src="/aksum_white.svg" alt="" aria-hidden className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold capitalize">{role}</div>

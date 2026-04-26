@@ -519,7 +519,7 @@ function EmptyState() {
           />
         </div>
         <h2 className="text-lg font-semibold tracking-tight">
-          Sovereign Data
+          Aksum
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Ask analytical questions; responses read as structured briefs with
@@ -534,7 +534,7 @@ function EmptyState() {
           {[
             {
               icon: ({ className }: { className?: string }) => (
-                <img src="/sovereign_logo.svg" alt="" className={className} aria-hidden />
+                <img src="/aksum_white.svg" alt="" className={className} aria-hidden />
               ),
               text: "What are the key risks in Mozambique's energy sector?",
             },

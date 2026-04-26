@@ -54,7 +54,7 @@ const entityTypeColors: Record<string, string> = {
 };
 
 const SdIcon = ({ className }: { className?: string }) => (
-  <img src="/sovereign_logo.svg" alt="SD" className={className} />
+  <img src="/aksum_white.svg" alt="" className={className} aria-hidden />
 );
 
 const entityTypeIcons: Record<string, React.ReactNode> = {

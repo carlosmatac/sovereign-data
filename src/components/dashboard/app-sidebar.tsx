@@ -136,27 +136,27 @@ export function AppSidebar({
                 className="flex items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
               >
                 <Image
-                  src="/sovereign_log_apaisado.svg"
-                  alt="Sovereign Data — Intelligence Platform"
-                  width={900}
-                  height={200}
-                  className="w-full max-w-[138px] object-contain opacity-90"
+                  src="/aksum_white_long.svg"
+                  alt="Aksum — Intelligence Platform"
+                  width={2186}
+                  height={885}
+                  className="h-8 w-auto object-contain opacity-90"
                   priority
                 />
               </Link>
             ) : (
               <SidebarMenuButton
                 asChild
-                tooltip={{ children: "Sovereign Data — Projects" }}
+                tooltip={{ children: "Aksum — Projects" }}
                 className="group-data-[collapsible=icon]:!h-auto group-data-[collapsible=icon]:!min-h-10 group-data-[collapsible=icon]:!w-full group-data-[collapsible=icon]:!max-w-none group-data-[collapsible=icon]:!shrink-0 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:!px-1.5 overflow-visible"
               >
                 <Link
                   href="/projects"
-                  aria-label="Sovereign Data — go to projects"
+                  aria-label="Aksum — go to projects"
                   className="flex w-full items-center justify-center"
                 >
                   <Image
-                    src="/sovereign_logo.svg"
+                    src="/aksum_white.svg"
                     alt=""
                     width={32}
                     height={32}

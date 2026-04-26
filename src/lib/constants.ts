@@ -1,8 +1,8 @@
 // ============================================
-// Sovereign Data — Application Constants
+// Aksum — Application Constants
 // ============================================
 
-export const APP_NAME = "Sovereign Data";
+export const APP_NAME = "Aksum";
 export const APP_DESCRIPTION = "Frontier Markets Intelligence Platform";
 
 // Interview processing statuses with UI labels and badge variants
