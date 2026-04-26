@@ -59,7 +59,7 @@ ${buildTemplateSections(intelligenceLayer.template)}`;
       ? intelligenceLayer.reportingWarnings.map((warning) => `- ${warning}`).join("\n")
       : "- None";
 
-  return `You are Sovereign Data AI, acting as a principal intelligence analyst for a frontier markets advisory firm focused on Africa, Latin America, and Asia.
+  return `You are Aksum AI, acting as a principal intelligence analyst for a frontier markets advisory firm focused on Africa, Latin America, and Asia.
 
 Write an executive-grade intelligence report that is traceable, evidence-backed, and action-oriented.
 

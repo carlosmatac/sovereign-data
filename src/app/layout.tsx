@@ -19,15 +19,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sovereign Data — Frontier Markets Intelligence",
+  title: "Aksum — Frontier Markets Intelligence",
   description:
     "Transform exclusive interviews into actionable business intelligence for emerging markets.",
   icons: {
     icon: [
-      { url: "/sovereign_negro.svg", type: "image/svg+xml" },
+      { url: "/aksum_white.svg", type: "image/svg+xml" },
     ],
     apple: [
-      { url: "/sovereign_negro.svg", type: "image/svg+xml" },
+      { url: "/aksum_white.svg", type: "image/svg+xml" },
     ],
   },
 };

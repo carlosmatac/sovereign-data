@@ -57,7 +57,7 @@ export default async function ReportsPage() {
               color: "rgba(255,255,255,0.42)",
             }}
           >
-            Sovereign · Reports
+            Aksum · Reports
           </p>
           <h1
             className="font-normal text-white"
