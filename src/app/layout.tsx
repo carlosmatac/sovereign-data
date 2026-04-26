@@ -24,10 +24,10 @@ export const metadata: Metadata = {
     "Transform exclusive interviews into actionable business intelligence for emerging markets.",
   icons: {
     icon: [
-      { url: "/aksum_white.svg", type: "image/svg+xml" },
+      { url: "/aksum_icon.svg", type: "image/svg+xml" },
     ],
     apple: [
-      { url: "/aksum_white.svg", type: "image/svg+xml" },
+      { url: "/aksum_icon.svg", type: "image/svg+xml" },
     ],
   },
 };
