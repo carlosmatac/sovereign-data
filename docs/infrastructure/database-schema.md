@@ -216,7 +216,7 @@ Knowledge graph nodes. Supports both project-scoped and global entities.
 |--------|------|-------|
 | `id` | `UUID` | PK |
 | `name` | `TEXT` | NOT NULL |
-| `type` | `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` |
+| `type` | `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT`, `COUNTRY`, `SECTOR`, `COMMODITY`, `PUBLIC_INSTITUTION`, `STATE_OWNED_ENTERPRISE`, `LAW_OR_POLICY`, `MEDIA_OR_PUBLICATION` |
 | `description` | `TEXT` | |
 | `metadata` | `JSONB` | |
 | `project_id` | `UUID` | FK → `projects`, nullable. NULL = global entity |
@@ -467,7 +467,7 @@ Added in `00018_platform_role_superuser.sql` (replaces `is_platform_admin` from 
 | Enum | Values | Migration |
 |------|--------|-----------|
 | `interview_status` | `PROCESSING`, `TRANSCRIBING`, `EXTRACTING`, `EMBEDDING`, `COMPLETED`, `FAILED` | `00001` |
-| `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT` | `00001` |
+| `entity_type` | `PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT`, `COUNTRY`, `SECTOR`, `COMMODITY`, `PUBLIC_INSTITUTION`, `STATE_OWNED_ENTERPRISE`, `LAW_OR_POLICY`, `MEDIA_OR_PUBLICATION` | `00001`, `00025` |
 | `user_role` | `owner`, `editor`, `viewer` | `00001` |
 | `platform_role` | `member`, `platform_admin`, `superuser` | `00016`, `00018` |
 | `relation_type` | `business_partner`, `competitor`, `regulator`, `critic`, `ally`, `subsidiary`, `investor`, `advisor`, `supplier`, `acquirer` | `00004` |
@@ -502,6 +502,7 @@ Added in `00018_platform_role_superuser.sql` (replaces `is_platform_admin` from 
 | `00015_interview_anchor_entity_ids.sql` | Anchor entity FK columns on `interviews` |
 | `00016_platform_user_roles.sql` | `platform_role` enum, `user_platform_roles`, RLS, `handle_new_user` assigns `member`, backfill |
 | `00018_platform_role_superuser.sql` | Add `superuser`; migrate existing `platform_admin` → `superuser`; `is_superuser()`, `has_entity_governance_access()`; drop `is_platform_admin()` |
+| `00025_entity_type_expansion.sql` | Add V1 entity types for countries, sectors, commodities, public institutions, SOEs, laws/policies, and media/publications |
 
 ---
 

@@ -14,16 +14,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GovernanceEntitiesTable } from "@/components/admin/governance-entities-table";
 import { ArrowLeft, Database } from "lucide-react";
-import type { EntityType } from "@/types/database";
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
+import { isEntityType } from "@/types/database";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,9 +52,7 @@ export default async function AdminEntitiesPage({ searchParams }: Props) {
   const q = typeof params.q === "string" ? params.q : "";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const typeParam = typeof params.type === "string" ? params.type : "all";
-  const typeFilter = ENTITY_TYPES.includes(typeParam as EntityType)
-    ? typeParam
-    : "all";
+  const typeFilter = isEntityType(typeParam) ? typeParam : "all";
   const scopeRaw = typeof params.scope === "string" ? params.scope : "all";
   const scope =
     scopeRaw === "global" || scopeRaw === "project" ? scopeRaw : "all";

@@ -64,12 +64,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import type {
-  EntityType,
-  InterviewStatus,
-  ReviewedUtterance,
-  SourceType,
-  TranscriptReviewStatus,
+import {
+  ENTITY_TYPE_VALUES,
+  type EntityType,
+  type InterviewStatus,
+  type ReviewedUtterance,
+  type SourceType,
+  type TranscriptReviewStatus,
 } from "@/types/database";
 import type { SpeakerMap } from "@/types/database";
 import {
@@ -247,15 +248,6 @@ function HighlightedTranscriptTextarea({
     </div>
   );
 }
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
 
 export type ReviewSeedRow = {
   id: string;
@@ -1242,7 +1234,7 @@ export function TranscriptReviewEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ENTITY_TYPES.map((t) => (
+                  {ENTITY_TYPE_VALUES.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>

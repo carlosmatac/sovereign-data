@@ -44,6 +44,13 @@ const ENTITY_ICON_BY_TYPE: Record<string, React.ReactNode> = {
   ORGANIZATION: <SdIcon className="h-3.5 w-3.5" />,
   LOCATION: <MapPin className="h-3.5 w-3.5" />,
   EVENT: <Clock className="h-3.5 w-3.5" />,
+  COUNTRY: <MapPin className="h-3.5 w-3.5" />,
+  SECTOR: <Building2 className="h-3.5 w-3.5" />,
+  COMMODITY: <Building2 className="h-3.5 w-3.5" />,
+  PUBLIC_INSTITUTION: <SdIcon className="h-3.5 w-3.5" />,
+  STATE_OWNED_ENTERPRISE: <Building2 className="h-3.5 w-3.5" />,
+  LAW_OR_POLICY: <Clock className="h-3.5 w-3.5" />,
+  MEDIA_OR_PUBLICATION: <SdIcon className="h-3.5 w-3.5" />,
 };
 
 export function EntityMentionsList({

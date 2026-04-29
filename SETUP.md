@@ -115,7 +115,7 @@ All schema lives in **`supabase/migrations/`**. On the **shared** Supabase proje
 
 Current numbered files (verify after `git pull` — list may grow):
 
-`00001_initial_schema.sql` → `00002_fix_rls_recursion.sql` → `00003_fix_created_by_default.sql` → `00004_graph_and_content.sql` → `00005_team_invitation_support.sql` → `00006_reports.sql` → `00007_report_sharing.sql` → `00008_expected_speakers.sql` → `00009_entity_normalization.sql` → `00010_interview_primary_entities.sql` → `00011_transcript_display.sql` → `00012_interview_scoped_search.sql` → `00013_interview_transcript_review.sql`
+`00001_initial_schema.sql` → `00002_fix_rls_recursion.sql` → `00003_fix_created_by_default.sql` → `00004_graph_and_content.sql` → `00005_team_invitation_support.sql` → `00006_reports.sql` → `00007_report_sharing.sql` → `00008_expected_speakers.sql` → `00009_entity_normalization.sql` → `00010_interview_primary_entities.sql` → `00011_transcript_display.sql` → `00012_interview_scoped_search.sql` → `00013_interview_transcript_review.sql` → `00014_interview_source_utterances.sql` → `00015_interview_anchor_entity_ids.sql` → `00016_platform_user_roles.sql` → `00017_validated_positions.sql` → `00018_platform_role_superuser.sql` → `00019_chat_persistence.sql` → `00020_chat_conversation_title_user_set.sql` → `00021_interviewee_title.sql` → `00022_semantic_source_type.sql` → `00023_relationship_editorial.sql` → `00024_relationship_taxonomy_v2.sql` → `00025_entity_type_expansion.sql`
 
 **Typical developer:** you do **nothing** here except stay in sync with `main` and ask the lead if a **new** migration appears — whoever has Dashboard access runs the new SQL in the **Supabase SQL Editor** once for the shared project.
 
@@ -126,6 +126,7 @@ One-off scripts (not automatic migrations):
 | `supabase/setup-storage.sql` | Storage bucket + policies (already applied on shared project) |
 | `supabase/enable-realtime.sql` | Realtime for `interviews` (already applied on shared project) |
 | `supabase/migrations/scripts/reset-interview-derived-data.sql` | **Destructive** data reset for interviews/entities/reports (Spanish comments; coordinate before use) |
+| `scripts/reset-database.ts` | **Destructive** full product-data reset: projects, interviews, graph data, aliases, validated positions, reports, chats, and `interview-audio` Storage; preserves auth users, profiles, and platform roles |
 
 Schema reference: [`docs/infrastructure/database-schema.md`](./docs/infrastructure/database-schema.md).
 
@@ -164,7 +165,7 @@ Other scripts:
 These can **delete or wipe shared data**. Do **not** run against the shared project without explicit agreement.
 
 ```bash
-# Wipes projects, interviews, graph data, reports, storage audio — preserves auth users
+# Wipes projects, interviews, graph data, reports, chats, and storage audio — preserves auth users
 npx tsx scripts/reset-database.ts
 ```
 

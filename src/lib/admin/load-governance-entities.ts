@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { EntityType } from "@/types/database";
+import { isEntityType, type EntityType } from "@/types/database";
 
 export const GOVERNANCE_ENTITIES_PAGE_SIZE = 25;
 
@@ -20,15 +20,6 @@ export type GovernanceEntityListRow = {
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
 
 function escapeIlikePattern(raw: string): string {
   return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -111,9 +102,8 @@ export async function loadGovernanceEntitiesList(args: {
     );
   }
 
-  const typeOk = ENTITY_TYPES.includes(args.typeFilter as EntityType);
-  if (typeOk) {
-    query = query.eq("type", args.typeFilter as EntityType);
+  if (isEntityType(args.typeFilter)) {
+    query = query.eq("type", args.typeFilter);
   }
 
   if (args.scope === "global") {

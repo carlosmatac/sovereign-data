@@ -23,7 +23,7 @@ import {
   X,
   Link2,
 } from "lucide-react";
-import type { EntityType, RelationType } from "@/types/database";
+import { ENTITY_TYPE_VALUES, type EntityType, type RelationType } from "@/types/database";
 
 interface EnrichedEntity {
   id: string;
@@ -51,6 +51,13 @@ const entityTypeColors: Record<string, string> = {
   ORGANIZATION: "bg-orange-950/50 text-orange-200 ring-1 ring-orange-500/25",
   LOCATION: "bg-rose-950/50 text-rose-200 ring-1 ring-rose-500/25",
   EVENT: "bg-amber-950/50 text-amber-200 ring-1 ring-amber-500/25",
+  COUNTRY: "bg-sky-950/50 text-sky-200 ring-1 ring-sky-500/25",
+  SECTOR: "bg-green-950/50 text-green-200 ring-1 ring-green-500/25",
+  COMMODITY: "bg-yellow-950/50 text-yellow-200 ring-1 ring-yellow-500/25",
+  PUBLIC_INSTITUTION: "bg-violet-950/50 text-violet-200 ring-1 ring-violet-500/25",
+  STATE_OWNED_ENTERPRISE: "bg-teal-950/50 text-teal-200 ring-1 ring-teal-500/25",
+  LAW_OR_POLICY: "bg-fuchsia-950/50 text-fuchsia-200 ring-1 ring-fuchsia-500/25",
+  MEDIA_OR_PUBLICATION: "bg-pink-950/50 text-pink-200 ring-1 ring-pink-500/25",
 };
 
 const SdIcon = ({ className }: { className?: string }) => (
@@ -64,16 +71,14 @@ const entityTypeIcons: Record<string, React.ReactNode> = {
   ORGANIZATION: <SdIcon className="h-4 w-4" />,
   LOCATION: <MapPin className="h-4 w-4" />,
   EVENT: <Clock className="h-4 w-4" />,
+  COUNTRY: <MapPin className="h-4 w-4" />,
+  SECTOR: <Building2 className="h-4 w-4" />,
+  COMMODITY: <Building2 className="h-4 w-4" />,
+  PUBLIC_INSTITUTION: <SdIcon className="h-4 w-4" />,
+  STATE_OWNED_ENTERPRISE: <Building2 className="h-4 w-4" />,
+  LAW_OR_POLICY: <Clock className="h-4 w-4" />,
+  MEDIA_OR_PUBLICATION: <SdIcon className="h-4 w-4" />,
 };
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
 
 export function NetworkExplorer({
   entities,
@@ -168,7 +173,7 @@ export function NetworkExplorer({
             >
               All ({entities.length})
             </Button>
-            {ENTITY_TYPES.map((type) => {
+            {ENTITY_TYPE_VALUES.map((type) => {
               const count = typeCounts[type] ?? 0;
               if (count === 0) return null;
               return (

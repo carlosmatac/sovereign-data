@@ -10,8 +10,10 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
-import type { EntityType } from "@/types/database";
+import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
 import { withRetry } from "./retry";
+
+export const EntityTypeSchema = z.enum(ENTITY_TYPE_VALUES);
 
 const ExtractionSchema = z.object({
   summary: z
@@ -62,14 +64,7 @@ const ExtractionSchema = z.object({
         .describe(
           "Your best guess at the correct/canonical spelling of this entity's full name. If you're confident the transcript spelling is correct, repeat it. If the primary person or institution was provided, use that exact spelling when you believe the mention refers to them."
         ),
-      type: z.enum([
-        "PERSON",
-        "COMPANY",
-        "GOVERNMENT",
-        "ORGANIZATION",
-        "LOCATION",
-        "EVENT",
-      ]),
+      type: EntityTypeSchema,
       description: z
         .string()
         .describe(
@@ -116,9 +111,9 @@ const ExtractionSchema = z.object({
         ])
         .describe(
           "Type of relationship between source and target. Prefer the v2 taxonomy. Selection guidance:\n" +
-            "- affiliated_with: PERSON ↔ ORG/COMPANY/GOVERNMENT generic association (employee, director, manager, ministry official, spokesperson, marketing lead, senior staff). Use this — NOT business_partner — for almost every person↔org link.\n" +
-            "- operates_in: COMPANY/ORGANIZATION ↔ LOCATION/COUNTRY where the org has operational presence, an office, projects or activity. Use this — NOT business_partner / ally — for org↔country.\n" +
-            "- governs: GOVERNMENT/regulator ↔ COMPANY/ORGANIZATION/COUNTRY institutional control (ministry oversight, central bank, regulatory authority).\n" +
+            "- affiliated_with: PERSON ↔ ORG/COMPANY/GOVERNMENT/PUBLIC_INSTITUTION/STATE_OWNED_ENTERPRISE/MEDIA_OR_PUBLICATION generic association (employee, director, manager, ministry official, spokesperson, marketing lead, senior staff). Use this — NOT business_partner — for almost every person↔org-like link.\n" +
+            "- operates_in: COMPANY/ORGANIZATION/PUBLIC_INSTITUTION/STATE_OWNED_ENTERPRISE/MEDIA_OR_PUBLICATION ↔ LOCATION/COUNTRY where the org has operational presence, offices, projects or activity. Use this — NOT business_partner / ally — for org↔country.\n" +
+            "- governs: GOVERNMENT/PUBLIC_INSTITUTION/regulator ↔ COMPANY/ORGANIZATION/STATE_OWNED_ENTERPRISE/COUNTRY institutional control or oversight.\n" +
             "- customer_of: source buys goods/services from target. Pair with `supplier` (target sells to source).\n" +
             "- supplier: source sells goods/services to target.\n" +
             "- competitor / investor / subsidiary / acquirer / critic / advisor / regulator: only when the transcript clearly establishes that specific dynamic.\n" +
@@ -163,6 +158,21 @@ const SOURCE_OVERLAYS: Record<string, string> = {
   "text+published_article":
     "This is a published article. Attribution of statements to sources is important; distinguish between the author's voice and quoted entities.",
 };
+
+const ENTITY_TYPE_GUIDANCE = `ENTITY TYPE SELECTION (important — use the most specific type available):
+- PERSON: named individual people only. Do not use for job titles or roles by themselves.
+- COMPANY: private companies and commercial firms that are not primarily state-owned.
+- GOVERNMENT: national/subnational government as an actor or administration when no specific institution is named.
+- ORGANIZATION: NGOs, associations, multilaterals, non-company institutions that do not fit a more specific type.
+- LOCATION: cities, regions, physical places, ports, fields, corridors, or non-country geography.
+- EVENT: named conferences, elections, meetings, crises, or time-bounded happenings. Do not use for laws/policies.
+- COUNTRY: sovereign countries or country actors (e.g. Nigeria, Ghana, Colombia). Prefer COUNTRY over GOVERNMENT/LOCATION for country names.
+- SECTOR: economic sectors such as energy, telecoms, agriculture, mining, banking, or infrastructure.
+- COMMODITY: traded resources/materials such as natural gas, oil, cocoa, lithium, copper, gold, or wheat.
+- PUBLIC_INSTITUTION: ministries, regulators, agencies, central banks, commissions, courts, public authorities.
+- STATE_OWNED_ENTERPRISE: state-controlled companies/utilities such as NNPC, TCN, national oil companies, public power utilities.
+- LAW_OR_POLICY: laws, acts, reforms, tariffs, subsidy policies, regulations, policy frameworks (e.g. Petroleum Industry Act).
+- MEDIA_OR_PUBLICATION: media outlets, publishers, newspapers, wire services, publications (e.g. Reuters, FT, Portafolio).`;
 
 /**
  * Stage 1: Extract raw structured intelligence from a transcript.
@@ -266,6 +276,7 @@ ${transcript}
 INSTRUCTIONS:
 - Focus on geopolitical risks, market opportunities, regulatory changes, and power dynamics.
 - Extract EVERY named entity (people, companies, government bodies, locations).
+- ${ENTITY_TYPE_GUIDANCE}
 - For each entity, provide BOTH:
   - raw_name: the name as it appears in the transcript (may contain ASR misspellings)
   - canonical_name: your best guess at the correct full name
@@ -277,9 +288,9 @@ INSTRUCTIONS:
 - Risks and opportunities should be actionable intelligence, not generic statements.
 - RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.
 - RELATIONSHIP TYPE SELECTION (important — avoid generic catch-all labels):
-  * For PERSON ↔ COMPANY / ORGANIZATION / GOVERNMENT: prefer "affiliated_with" (covers executives, directors, managers, ministry officials, spokespersons, marketing leads, senior staff). Do NOT use "business_partner" for a person-to-organisation tie.
-  * For COMPANY / ORGANIZATION ↔ LOCATION / COUNTRY: prefer "operates_in" when the org has operational presence, offices, projects, or activity in that location. Do NOT use "business_partner" or "ally" for an organisation-to-country tie.
-  * For GOVERNMENT / regulator ↔ COMPANY / ORGANIZATION / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
+  * For PERSON ↔ COMPANY / ORGANIZATION / GOVERNMENT / PUBLIC_INSTITUTION / STATE_OWNED_ENTERPRISE / MEDIA_OR_PUBLICATION: prefer "affiliated_with" (covers executives, directors, managers, ministry officials, spokespersons, marketing leads, senior staff). Do NOT use "business_partner" for a person-to-organisation tie.
+  * For COMPANY / ORGANIZATION / PUBLIC_INSTITUTION / STATE_OWNED_ENTERPRISE / MEDIA_OR_PUBLICATION ↔ LOCATION / COUNTRY: prefer "operates_in" when the org has operational presence, offices, projects, or activity in that location. Do NOT use "business_partner" or "ally" for an organisation-to-country tie.
+  * For GOVERNMENT / PUBLIC_INSTITUTION / regulator ↔ COMPANY / ORGANIZATION / STATE_OWNED_ENTERPRISE / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
   * For commercial sales: pair "supplier" (seller → buyer) and "customer_of" (buyer → seller).
   * Only use "business_partner" or "ally" when no other type fits AND the transcript explicitly frames the link as a partnership or alliance.
 - If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.`,

@@ -51,7 +51,7 @@ function sanitizeOptionalAnchor(value: FormDataEntryValue | null): string | null
  *   - interviewee_org: string (optional)
  *   - interviewee_title: string (optional, job title / role metadata only)
  *   - interviewee_entity_id: UUID string (optional, must match a PERSON in project/global)
- *   - interviewee_org_entity_id: UUID string (optional, COMPANY/ORGANIZATION/GOVERNMENT)
+ *   - interviewee_org_entity_id: UUID string (optional, org-like entity type)
  *
  * Uses admin client for DB writes (auth verified via getUser first).
  */

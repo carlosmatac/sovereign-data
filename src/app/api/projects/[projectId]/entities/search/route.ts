@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserProjectRole } from "@/lib/auth/project-role";
-import type { EntityType } from "@/types/database";
+import { isEntityType, type EntityType } from "@/types/database";
 
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
+export function parseEntityTypeFilters(args: {
+  typeParam: string;
+  typesParam: string;
+}): EntityType[] | null {
+  const typesList = args.typesParam
+    .split(",")
+    .map((t) => t.trim())
+    .filter(isEntityType);
+
+  const typeFilter = isEntityType(args.typeParam) ? args.typeParam : null;
+
+  return typesList.length > 0 ? typesList : typeFilter !== null ? [typeFilter] : null;
+}
 
 /**
  * GET /api/projects/[projectId]/entities/search?q=&type=&types=
@@ -29,17 +34,7 @@ export async function GET(
   const typeParam = request.nextUrl.searchParams.get("type")?.trim() ?? "";
   const typesParam = request.nextUrl.searchParams.get("types")?.trim() ?? "";
 
-  const typesList = typesParam
-    .split(",")
-    .map((t) => t.trim())
-    .filter((t): t is EntityType => ENTITY_TYPES.includes(t as EntityType));
-
-  const typeFilter = ENTITY_TYPES.includes(typeParam as EntityType)
-    ? (typeParam as EntityType)
-    : null;
-
-  const typeFilters: EntityType[] | null =
-    typesList.length > 0 ? typesList : typeFilter !== null ? [typeFilter] : null;
+  const typeFilters = parseEntityTypeFilters({ typeParam, typesParam });
 
   if (q.length < 2) {
     return NextResponse.json({ entities: [] as const });
