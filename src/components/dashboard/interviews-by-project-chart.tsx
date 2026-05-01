@@ -47,7 +47,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
         <span className="font-semibold tabular-nums text-white/95">
           {d.total}
         </span>{" "}
-        interviews
+        sources
       </p>
     </div>
   );

@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/card";
 import {
   ArrowLeft,
+  BookOpen,
   MapPin,
-  Mic,
   MessageSquare,
   Users,
   Calendar,
@@ -140,7 +140,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             <Button asChild>
               <Link href={`/interviews/upload?project=${projectId}`}>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Interview
+                Add Source
               </Link>
             </Button>
           )}
@@ -179,14 +179,14 @@ export default async function ProjectDetailPage({ params }: Props) {
               <Card className="sv-hover-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Interviews
+                    Intelligence
                   </CardTitle>
-                  <Mic className="h-4 w-4 text-muted-foreground" />
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{interviewCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    View all interviews
+                    View all intelligence
                   </p>
                 </CardContent>
               </Card>
@@ -239,7 +239,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                   {role === "owner"
                     ? "Full project control"
                     : role === "editor"
-                      ? "Can upload & edit interviews"
+                      ? "Can add & edit sources"
                       : "Read-only access"}
                 </p>
               </CardContent>
@@ -258,15 +258,15 @@ export default async function ProjectDetailPage({ params }: Props) {
               <CardContent className="flex flex-col gap-2">
                 <Button variant="outline" size="sm" asChild className="justify-start">
                   <Link href={`/interviews?project=${projectId}`}>
-                    <Mic className="mr-2 h-4 w-4" />
-                    View Interviews
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    View Intelligence
                   </Link>
                 </Button>
                 {canEdit && (
                   <Button variant="outline" size="sm" asChild className="justify-start">
                     <Link href={`/interviews/upload?project=${projectId}`}>
                       <Upload className="mr-2 h-4 w-4" />
-                      Upload Interview
+                      Add Source
                     </Link>
                   </Button>
                 )}

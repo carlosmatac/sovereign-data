@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
   ArrowLeft,
@@ -200,7 +199,7 @@ export default async function InterviewDetailPage({
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Interviews
+          Back to Intelligence
         </Link>
       </div>
 

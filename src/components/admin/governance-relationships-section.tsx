@@ -273,7 +273,7 @@ export function GovernanceRelationshipsSection({
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[110px]">Origin</TableHead>
               <TableHead className="w-[100px] text-right">Confidence</TableHead>
-              <TableHead>Source interview</TableHead>
+              <TableHead>Source</TableHead>
               <TableHead className="w-[60px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

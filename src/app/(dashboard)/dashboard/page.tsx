@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  Mic,
+  BookOpen,
   FolderKanban,
   Users,
   CheckCircle2,
@@ -136,7 +136,7 @@ export default async function DashboardPage() {
   const snapshotScope = `${projectCount.toLocaleString()} ${
     projectCount === 1 ? "project" : "projects"
   } · ${interviewCount.toLocaleString()} ${
-    interviewCount === 1 ? "interview" : "interviews"
+    interviewCount === 1 ? "source" : "sources"
   }`;
 
   return (
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
           href="/interviews/upload"
           icon={<Upload className="h-[12px] w-[12px]" strokeWidth={1.8} />}
         >
-          Upload Interview
+          Add Source
         </TonalActionButton>
       </div>
 
@@ -184,10 +184,10 @@ export default async function DashboardPage() {
         />
         <StatLink
           href="/interviews"
-          label="Interviews"
+          label="Intelligence"
           value={interviewCount}
           sub={`${completedCount} completed · ${processingCount} processing`}
-          icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.6} />}
+          icon={<BookOpen className="h-[12px] w-[12px]" strokeWidth={1.6} />}
           accent="#818CF8"
         />
         <StatLink
@@ -202,20 +202,20 @@ export default async function DashboardPage() {
 
       {/* ── Primary grid: Recent + side rail ─────────────────── */}
       <div className="grid gap-4 lg:grid-cols-12">
-        {/* Recent Interviews — spans 8 cols on wide */}
+        {/* Recent Intelligence — spans 8 cols on wide */}
         <div className="lg:col-span-8">
           <SectionSurface
             tone="lifted"
             className="flex h-full flex-col"
             header={{
-              title: "Recent Interviews",
-              subtitle: "Latest uploaded recordings",
+              title: "Recent Intelligence",
+              subtitle: "Latest uploaded sources",
               right: (
                 <Link
                   href="/interviews"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55 transition-colors duration-150 hover:text-white"
                 >
-                  View all
+                  View all intelligence
                   <ArrowUpRight className="h-[11px] w-[11px]" />
                 </Link>
               ),
@@ -224,17 +224,17 @@ export default async function DashboardPage() {
           >
             {recentInterviews.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-                <Mic
+                <BookOpen
                   className="mb-3 h-8 w-8 text-white/22"
                   strokeWidth={1.5}
                 />
                 <p className="text-[13px] text-white/55">
-                  No interviews yet.{" "}
+                  No sources yet.{" "}
                   <Link
                     href="/interviews/upload"
                     className="text-white/85 underline decoration-white/30 underline-offset-2 transition-colors duration-150 hover:text-white"
                   >
-                    Upload your first one.
+                    Add your first source.
                   </Link>
                 </p>
               </div>
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
             tone="lifted"
             header={{
               title: "Pipeline Status",
-              subtitle: "Interview processing",
+              subtitle: "Source processing",
             }}
             bodyClassName="px-4 py-3.5"
           >
@@ -311,7 +311,12 @@ export default async function DashboardPage() {
                   label="Total"
                   count={interviewCount}
                   accent="#94A3B8"
-                  icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+                  icon={
+                    <BookOpen
+                      className="h-[12px] w-[12px]"
+                      strokeWidth={1.8}
+                    />
+                  }
                   bold
                 />
               </div>
@@ -328,7 +333,7 @@ export default async function DashboardPage() {
               {
                 href: "/interviews/upload",
                 icon: Upload,
-                label: "Upload Interview",
+                label: "Add Source",
                 accent: "#5FA6A8", // dusty teal
               },
               {
@@ -389,8 +394,8 @@ export default async function DashboardPage() {
             <SectionSurface
               tone="lifted"
               header={{
-                title: "Interviews by Project",
-                subtitle: "Completed interviews per project",
+                title: "Intelligence by Project",
+                subtitle: "Completed sources per project",
                 right: (
                   <TrendingUp
                     className="h-[13px] w-[13px] text-white/45"
@@ -417,7 +422,7 @@ export default async function DashboardPage() {
               tone="lifted"
               header={{
                 title: "Topic Distribution",
-                subtitle: `Top ${topTopics.length} themes across all interviews`,
+                subtitle: `Top ${topTopics.length} themes across all sources`,
                 right: (
                   <Hash
                     className="h-[13px] w-[13px] text-white/45"
