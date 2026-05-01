@@ -26,7 +26,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
     <div
       className="rounded-[5px] px-2.5 py-2"
       style={{
-        background: "#080F1E",
+        background: "#0E1119",
         border: "1px solid rgba(147,147,147,0.18)",
         boxShadow:
           "0 0 0 1px rgba(255,255,255,0.025), 0 8px 24px -6px rgba(0,0,0,0.55)",

@@ -3,49 +3,37 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 /**
- * Real product top bar — Sovereign workspace chrome.
+ * Aksum workspace top bar — chrome label.
  *
- * This is the chrome strip that sits at the head of the central workspace
- * panel inside the shared dashboard layout. It carries the application
- * identity (uppercase product label at 10px / 0.07em tracking) and the
- * sidebar trigger — nothing more.
+ * On desktop, the sidebar collapse/expand control lives inside the
+ * sidebar itself (see `AppSidebar`), where it spatially belongs — this
+ * strip carries only the application identity label.
+ *
+ * On mobile (`<md`) the sidebar is rendered as a Sheet drawer that has
+ * no visible edge to expand from, so we keep a hamburger trigger here
+ * gated by `md:hidden`. Desktop never shows it.
  *
  * Anatomy (left → right):
- *   [SidebarTrigger]   AKSUM · INTELLIGENCE PLATFORM
+ *   [≡ on mobile]   AKSUM · INTELLIGENCE PLATFORM
  *
- * Deliberate omissions:
- *   - No traffic-light dots. Those are a landing-only presentation device
- *     (they imply "this is a window inside a webpage"); inside the actual
- *     product they're fiction.
- *   - No "Live" status pill. The product is always live when the user is
- *     looking at it — the pill carries no operational information.
- *
- * Behavioural requirements preserved:
- *   - `SidebarTrigger` is still the primary control for collapsing /
- *     expanding the sidebar on every viewport (including the mobile sheet
- *     toggle). It sits at the leading edge so it remains thumb-reachable.
- *   - Header height kept at ≈ 44px so the SidebarInset body layout / scroll
- *     region calculations stay intact.
- *
- * Composition note: this header lives *inside* the rounded central panel
- * (see `(dashboard)/layout.tsx`). The strip uses the same top-to-bottom
- * gradient as the landing's WindowChrome — `#0D1B32` → `#0B1729` — and a
- * single hairline `rgba(147,147,147,0.10)` bottom border so it reads as a
- * structural band of the workspace, not an isolated control row.
+ * The strip uses a desaturated graphite/navy gradient so it reads as a
+ * subtle structural band rather than a saturated blue chrome. Header
+ * height kept at ≈ 44px so the SidebarInset body layout / scroll
+ * region calculations stay intact.
  */
 export function DashboardInsetHeader() {
   return (
     <header
       role="banner"
-      className="flex h-11 shrink-0 items-center gap-3 px-3 md:px-4"
+      className="flex h-11 shrink-0 items-center gap-2 px-4 md:px-5"
       style={{
-        background: "linear-gradient(to bottom, #0D1B32, #0B1729)",
-        borderBottom: "1px solid rgba(147,147,147,0.10)",
+        background: "linear-gradient(to bottom, #0E1118, #0B0D12)",
+        borderBottom: "1px solid rgba(147,147,147,0.08)",
       }}
     >
       <SidebarTrigger
-        className="-ml-0.5 size-7 shrink-0 text-white/55 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95"
-        aria-label="Toggle navigation"
+        aria-label="Open navigation"
+        className="-ml-1 size-7 shrink-0 text-white/55 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 md:hidden"
       />
 
       <span

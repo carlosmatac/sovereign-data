@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -127,23 +128,45 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarRail />
-      <SidebarHeader className="px-3 pt-4 pb-3">
-        <SidebarMenu>
+      {/*
+        Sidebar header — owns its own collapse control.
+
+        Spatially the collapse/expand toggle belongs to the sidebar (it
+        controls the sidebar), so it lives here rather than in the
+        central workspace chrome. Layout:
+
+          Expanded:   [ AKSUM wordmark ─────── (collapse) ]
+          Collapsed:  [ ▢ mark ]
+                      [ (expand) ]   ← stacked, both visible
+
+        The mark/wordmark stays a `<Link>` to /projects (preserves
+        existing nav). The trigger is a separate icon button — both are
+        always reachable; SidebarRail still works as a click-the-edge
+        affordance.
+      */}
+      <SidebarHeader className="px-3 pt-4 pb-3 group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:px-1.5">
+        <SidebarMenu className="group-data-[collapsible=icon]:gap-1.5">
           <SidebarMenuItem>
             {state === "expanded" || isMobile ? (
-              <Link
-                href="/projects"
-                className="flex items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
-              >
-                <Image
-                  src="/aksum_white_long.svg"
-                  alt="Aksum — Intelligence Platform"
-                  width={2186}
-                  height={885}
-                  className="h-8 w-auto object-contain opacity-90"
-                  priority
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  href="/projects"
+                  className="-ml-0.5 flex min-w-0 items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
+                >
+                  <Image
+                    src="/aksum_white_long.svg"
+                    alt="Aksum — Intelligence Platform"
+                    width={2186}
+                    height={885}
+                    className="h-8 w-auto object-contain opacity-90"
+                    priority
+                  />
+                </Link>
+                <SidebarTrigger
+                  aria-label="Collapse sidebar"
+                  className="size-7 shrink-0 rounded-[5px] border border-transparent text-white/45 transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/85"
                 />
-              </Link>
+              </div>
             ) : (
               <SidebarMenuButton
                 asChild
@@ -166,6 +189,14 @@ export function AppSidebar({
               </SidebarMenuButton>
             )}
           </SidebarMenuItem>
+          {state === "collapsed" && !isMobile ? (
+            <SidebarMenuItem className="hidden md:list-item">
+              <SidebarTrigger
+                aria-label="Expand sidebar"
+                className="!h-9 !w-full rounded-[5px] border border-transparent text-white/45 transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/85"
+              />
+            </SidebarMenuItem>
+          ) : null}
         </SidebarMenu>
       </SidebarHeader>
 

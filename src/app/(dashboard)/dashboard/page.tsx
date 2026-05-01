@@ -200,13 +200,23 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* ── Primary grid: Recent + side rail ─────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-12">
+      {/* ── Primary grid: Recent + side rail ─────────────────── *
+       *
+       * Layout note — the Recent Interviews panel and the right rail
+       * intentionally `items-start` rather than stretching to a shared
+       * height. Forcing them to equal height (the old `h-full` recipe)
+       * inflated Recent Interviews into a huge dead rectangle whenever
+       * the list was short, which made the dashboard feel template-y.
+       *
+       * The right rail now decides its own natural height; Recent
+       * Interviews shrinks to its content. The chart row below resets
+       * the visual rhythm.
+       */}
+      <div className="grid items-start gap-4 lg:grid-cols-12">
         {/* Recent Interviews — spans 8 cols on wide */}
         <div className="lg:col-span-8">
           <SectionSurface
             tone="lifted"
-            className="flex h-full flex-col"
             header={{
               title: "Recent Interviews",
               subtitle: "Latest uploaded recordings",
@@ -220,15 +230,15 @@ export default async function DashboardPage() {
                 </Link>
               ),
             }}
-            bodyClassName="flex min-h-0 flex-1 flex-col p-2"
+            bodyClassName="p-2"
           >
             {recentInterviews.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+              <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
                 <Mic
-                  className="mb-3 h-8 w-8 text-white/22"
+                  className="mb-3 h-7 w-7 text-white/22"
                   strokeWidth={1.5}
                 />
-                <p className="text-[13px] text-white/55">
+                <p className="text-[12.5px] text-white/55">
                   No interviews yet.{" "}
                   <Link
                     href="/interviews/upload"
@@ -239,7 +249,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-1">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -318,64 +328,88 @@ export default async function DashboardPage() {
             </div>
           </SectionSurface>
 
-          {/* Quick Actions */}
+          {/* Quick Actions — single-column action module
+            *
+            * Replaced the old 2×2 equal-weight tile grid (which made
+            * every action feel equally important and template-y) with
+            * a vertical list that establishes a clear hierarchy:
+            *
+            *   [ Upload Interview ]   ← primary, slightly lifted
+            *   ─────────────────────
+            *   • Copilot            ↗
+            *   • Network Explorer   ↗
+            *   • New Project        ↗
+            *
+            * Each row aligns to a consistent 14px icon well, leaves
+            * the trailing chevron muted at rest and lifts on hover,
+            * matching the shared `sv-hover-card` motion vocabulary.
+            */}
           <SectionSurface
             tone="lifted"
             header={{ title: "Quick Actions" }}
-            bodyClassName="grid grid-cols-2 gap-2 p-3"
+            bodyClassName="flex flex-col gap-1 p-2"
           >
+            <PrimaryQuickAction
+              href="/interviews/upload"
+              icon={Upload}
+              label="Upload Interview"
+              caption="Add a new recording"
+            />
+            <div
+              aria-hidden
+              className="my-1 h-px"
+              style={{ background: "rgba(147,147,147,0.10)" }}
+            />
             {[
-              {
-                href: "/interviews/upload",
-                icon: Upload,
-                label: "Upload Interview",
-                accent: "#5FA6A8", // dusty teal
-              },
               {
                 href: "/chat",
                 icon: MessageSquare,
                 label: "Copilot",
-                accent: "#A78BFA", // soft violet
+                caption: "Ask the intelligence layer",
+                accent: "#A78BFA",
               },
               {
                 href: "/network",
                 icon: Network,
                 label: "Network Explorer",
-                accent: "#818CF8", // faded indigo
+                caption: "Browse entities & relationships",
+                accent: "#818CF8",
               },
               {
                 href: "/projects/new",
                 icon: FolderKanban,
                 label: "New Project",
-                accent: "#D4B77C", // restrained amber / sand
+                caption: "Start a fresh workspace",
+                accent: "#D4B77C",
               },
-            ].map(({ href, icon: Icon, label, accent }) => (
+            ].map(({ href, icon: Icon, label, caption, accent }) => (
               <Link
                 key={href}
                 href={href}
-                className="sv-hover-card group relative flex items-center gap-2.5 overflow-hidden rounded-[5px] border border-[rgba(147,147,147,0.15)] py-2.5 pl-[13px] pr-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
-                style={{
-                  backgroundColor: `color-mix(in srgb, ${accent} 4%, transparent)`,
-                }}
+                className="group flex items-center gap-2.5 rounded-[5px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.035]"
               >
                 <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full opacity-70 transition-opacity duration-150 group-hover:opacity-100"
-                  style={{ backgroundColor: accent }}
-                />
-                <span
-                  className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px]"
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${accent} 11%, transparent)`,
-                  }}
+                  className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[4px] transition-colors duration-150 group-hover:bg-[color-mix(in_srgb,var(--accent-color)_14%,transparent)]"
+                  style={
+                    {
+                      backgroundColor: `color-mix(in srgb, ${accent} 9%, transparent)`,
+                      ["--accent-color" as string]: accent,
+                    } as React.CSSProperties
+                  }
                 >
                   <Icon
-                    className="h-[13px] w-[13px]"
+                    className="h-[12.5px] w-[12.5px]"
                     strokeWidth={1.7}
                     style={{ color: accent }}
                   />
                 </span>
-                <span className="truncate">{label}</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-white/80 transition-colors duration-150 group-hover:text-white">
+                  {label}
+                </span>
+                <ArrowUpRight
+                  className="h-[11px] w-[11px] shrink-0 text-white/25 transition-colors duration-150 group-hover:text-white/65"
+                  strokeWidth={1.8}
+                />
               </Link>
             ))}
           </SectionSurface>
@@ -403,8 +437,8 @@ export default async function DashboardPage() {
               <div
                 className="rounded-[4px] p-2"
                 style={{
-                  background: "#070D1A",
-                  border: "1px solid rgba(147,147,147,0.10)",
+                  background: "#07080C",
+                  border: "1px solid rgba(147,147,147,0.08)",
                 }}
               >
                 <InterviewsByProjectChart data={projectBreakdown} />
@@ -430,8 +464,8 @@ export default async function DashboardPage() {
               <div
                 className="rounded-[4px] p-2"
                 style={{
-                  background: "#070D1A",
-                  border: "1px solid rgba(147,147,147,0.10)",
+                  background: "#07080C",
+                  border: "1px solid rgba(147,147,147,0.08)",
                 }}
               >
                 <TopicDistributionChart data={topTopics} />
@@ -615,6 +649,64 @@ function StatusWell({ status }: { status: InterviewStatus }) {
     <IconWell accent={color} size={28}>
       <span style={{ color }}>{icon}</span>
     </IconWell>
+  );
+}
+
+/**
+ * Primary action row inside the Quick Actions module.
+ *
+ * Sits at the top of the action list with a slightly lifted tonal
+ * fill so it reads as the headline action ("Upload Interview"), while
+ * the secondary actions below are ghost rows. Borrows the tonal
+ * action button vocabulary (subtle white tint + hairline border) but
+ * with a generous two-line stack (label + caption) to read as a
+ * module entry rather than a chip.
+ */
+function PrimaryQuickAction({
+  href,
+  icon: Icon,
+  label,
+  caption,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  caption: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="sv-hover-card group flex items-center gap-3 rounded-[5px] border px-2.5 py-2.5"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderColor: "rgba(147,147,147,0.14)",
+      }}
+    >
+      <span
+        className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-150 group-hover:bg-white/[0.07]"
+        style={{
+          backgroundColor: "rgba(255,255,255,0.04)",
+          borderColor: "rgba(147,147,147,0.18)",
+        }}
+      >
+        <Icon className="h-[13px] w-[13px]" strokeWidth={1.7} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="truncate text-[12.5px] font-semibold text-white/92">
+          {label}
+        </span>
+        <span
+          className="mt-[3px] truncate text-[10.5px] text-white/45"
+          style={{ letterSpacing: "-0.005em" }}
+        >
+          {caption}
+        </span>
+      </div>
+      <ArrowUpRight
+        className="h-[12px] w-[12px] shrink-0 text-white/35 transition-colors duration-150 group-hover:text-white/75"
+        strokeWidth={1.8}
+      />
+    </Link>
   );
 }
 

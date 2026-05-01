@@ -45,7 +45,7 @@ export default async function NetworkPage() {
           className="rounded-[6px] border border-dashed py-14 text-center"
           style={{
             borderColor: "rgba(147,147,147,0.22)",
-            background: "#080F1E",
+            background: "#0B0E14",
           }}
         >
           <p className="text-[13px] text-white/60">

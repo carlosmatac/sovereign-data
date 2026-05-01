@@ -1022,9 +1022,9 @@ export function TranscriptReviewEditor({
                                   className={cn(
                                     "relative z-10 h-3 w-full cursor-pointer appearance-none bg-transparent",
                                     "[&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent",
-                                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#FBBF24] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#080F1E] [&::-webkit-slider-thumb]:-mt-[3.5px] [&::-webkit-slider-thumb]:shadow-none",
+                                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#FBBF24] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0B0E14] [&::-webkit-slider-thumb]:-mt-[3.5px] [&::-webkit-slider-thumb]:shadow-none",
                                     "[&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent",
-                                    "[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#080F1E] [&::-moz-range-thumb]:bg-[#FBBF24]",
+                                    "[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0B0E14] [&::-moz-range-thumb]:bg-[#FBBF24]",
                                     "focus-visible:outline-none",
                                     "disabled:cursor-not-allowed disabled:opacity-50"
                                   )}
