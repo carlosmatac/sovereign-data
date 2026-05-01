@@ -99,23 +99,37 @@ export function EntityMentionsList({
   };
 
   return (
-    <div className="space-y-2">
+    /*
+     * Dense intelligence index — not an article column.
+     *
+     * Rows render as compact 4-line stacks:
+     *   [icon] [name + edit]
+     *          [description (clamped to 2 lines)]
+     *          [type pill · sentiment]
+     *
+     * On hover the row lifts to a faint white tint (`bg-white/[0.035]`)
+     * matching the rest of the panel system. Description is clamped to
+     * 2 lines so a single verbose entity can't blow out the row; the
+     * full text is available on the entity detail page (existing nav)
+     * and via the `title` tooltip while hovering.
+     */
+    <div className="flex flex-col">
       {mentions.map((mention) => {
         const isEditing = editingMentionId === mention.mentionId;
 
         return (
           <div
             key={mention.mentionId}
-            className="flex items-start gap-2 rounded-md p-2 hover:bg-muted"
+            className="group flex items-start gap-2 rounded-[5px] px-1.5 py-1.5 transition-colors duration-150 hover:bg-white/[0.035]"
           >
-            <div className="mt-0.5 text-muted-foreground">
+            <div className="mt-[2px] shrink-0 text-muted-foreground">
               {ENTITY_ICON_BY_TYPE[mention.type] ?? (
                 <SdIcon className="h-3.5 w-3.5" />
               )}
             </div>
             <div className="min-w-0 flex-1">
               {isEditing ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Input
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
@@ -130,66 +144,78 @@ export function EntityMentionsList({
                       }
                     }}
                     autoFocus
-                    className="h-8"
+                    className="h-7 text-[12px]"
                     disabled={isPending}
                   />
                   <Button
                     size="icon"
                     variant="outline"
-                    className="h-8 w-8"
+                    className="h-7 w-7 shrink-0"
                     onClick={() => saveEdit(mention.entityId)}
                     disabled={isPending}
                   >
                     {isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-3 w-3" />
                     )}
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8"
+                    className="h-7 w-7 shrink-0"
                     onClick={cancelEditing}
                     disabled={isPending}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-medium">{mention.name}</p>
+                <div className="flex items-center gap-1">
+                  <p
+                    className="truncate text-[12.5px] font-medium leading-tight text-foreground"
+                    title={mention.name}
+                  >
+                    {mention.name}
+                  </p>
                   {canEdit && (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      className="h-5 w-5 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
                       onClick={() => startEditing(mention.mentionId, mention.name)}
                       disabled={isPending}
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Pencil className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
               )}
 
               {mention.description && (
-                <p className="text-xs text-muted-foreground">
+                <p
+                  className="mt-[2px] line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+                  title={mention.description}
+                >
                   {mention.description}
                 </p>
               )}
-              <div className="mt-0.5 flex items-center gap-2">
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                  {mention.type}
+              <div className="mt-[3px] flex items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className="h-[16px] rounded-[3px] px-1 py-0 text-[9.5px] font-medium uppercase leading-none"
+                  style={{ letterSpacing: "0.04em" }}
+                >
+                  {mention.type.replace(/_/g, " ")}
                 </Badge>
                 {mention.sentiment && (
                   <span
-                    className={`text-[10px] ${
+                    className={`text-[10px] capitalize leading-none ${
                       mention.sentiment === "positive"
-                        ? "text-green-600"
+                        ? "text-emerald-400/85"
                         : mention.sentiment === "negative"
-                          ? "text-red-600"
-                          : "text-gray-500"
+                          ? "text-red-400/85"
+                          : "text-muted-foreground"
                     }`}
                   >
                     {mention.sentiment}

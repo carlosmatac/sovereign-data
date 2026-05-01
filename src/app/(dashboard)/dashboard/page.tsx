@@ -200,21 +200,38 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* ── Primary grid: Recent + side rail ─────────────────── *
+      {/* ── Primary grid: 8/4 column split ─────────────────────── *
        *
-       * Layout note — the Recent Interviews panel and the right rail
-       * intentionally `items-start` rather than stretching to a shared
-       * height. Forcing them to equal height (the old `h-full` recipe)
-       * inflated Recent Interviews into a huge dead rectangle whenever
-       * the list was short, which made the dashboard feel template-y.
+       * Layout note — the dashboard is now a true 2-column workspace
+       * rather than a "row of boxes followed by another row of boxes".
+       * Each column owns its own vertical stack and decides its own
+       * natural height (`items-start`):
        *
-       * The right rail now decides its own natural height; Recent
-       * Interviews shrinks to its content. The chart row below resets
-       * the visual rhythm.
+       *   left col (col-span-8):
+       *     · Recent Interviews
+       *     · Charts row (Interviews-by-Project + Topic Distribution
+       *       side-by-side via an inner 2-col grid)
+       *   right rail (col-span-4):
+       *     · Pipeline Status
+       *     · Quick Actions
+       *
+       * Why: previously Recent Interviews sat alone in col-span-8 and
+       * the charts sat in a second full-width grid below, so when the
+       * interview list was short the right rail still pushed the
+       * primary row to ~400px tall while the left column stayed at
+       * ~120px — creating a giant dead rectangle below Recent
+       * Interviews. Pulling the charts up into the left column fills
+       * that vertical space with real content; the right rail's height
+       * is now matched by Recent + charts on the left, so the first
+       * viewport feels intentional even with one interview.
+       *
+       * Behaviour preserved: charts still only render when there is
+       * data (`projectBreakdown` / `topTopics`). On `<lg` breakpoints
+       * everything stacks into a single column unchanged.
        */}
       <div className="grid items-start gap-4 lg:grid-cols-12">
-        {/* Recent Interviews — spans 8 cols on wide */}
-        <div className="lg:col-span-8">
+        {/* Left column — Recent Interviews + charts */}
+        <div className="flex flex-col gap-4 lg:col-span-8">
           <SectionSurface
             tone="lifted"
             header={{
@@ -276,9 +293,74 @@ export default async function DashboardPage() {
               </div>
             )}
           </SectionSurface>
+
+          {/*
+           * Charts row — pulled into the left column so they sit
+           * adjacent to the right rail rather than below the entire
+           * primary grid. On wide breakpoints the two charts stand
+           * side-by-side via an inner 2-col grid; on narrow they
+           * stack. Only renders when there is data on either side.
+           */}
+          {hasCharts && (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {projectBreakdown.length > 0 && (
+                <SectionSurface
+                  tone="lifted"
+                  header={{
+                    title: "Interviews by Project",
+                    subtitle: "Completed interviews per project",
+                    right: (
+                      <TrendingUp
+                        className="h-[13px] w-[13px] text-white/45"
+                        strokeWidth={1.6}
+                      />
+                    ),
+                  }}
+                  bodyClassName="p-3"
+                >
+                  <div
+                    className="rounded-[4px] p-2"
+                    style={{
+                      background: "#07080C",
+                      border: "1px solid rgba(147,147,147,0.08)",
+                    }}
+                  >
+                    <InterviewsByProjectChart data={projectBreakdown} />
+                  </div>
+                </SectionSurface>
+              )}
+
+              {topTopics.length > 0 && (
+                <SectionSurface
+                  tone="lifted"
+                  header={{
+                    title: "Topic Distribution",
+                    subtitle: `Top ${topTopics.length} themes across all interviews`,
+                    right: (
+                      <Hash
+                        className="h-[13px] w-[13px] text-white/45"
+                        strokeWidth={1.6}
+                      />
+                    ),
+                  }}
+                  bodyClassName="p-3"
+                >
+                  <div
+                    className="rounded-[4px] p-2"
+                    style={{
+                      background: "#07080C",
+                      border: "1px solid rgba(147,147,147,0.08)",
+                    }}
+                  >
+                    <TopicDistributionChart data={topTopics} />
+                  </div>
+                </SectionSurface>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right rail — spans 4 cols on wide */}
+        {/* Right rail — Pipeline Status + Quick Actions */}
         <div className="flex flex-col gap-4 lg:col-span-4">
           {/* Pipeline Status (top of rail — most informational) */}
           <SectionSurface
@@ -415,65 +497,6 @@ export default async function DashboardPage() {
           </SectionSurface>
         </div>
       </div>
-
-      {/* ── Analytics Row — Charts ─────────────────────────────── */}
-      {hasCharts && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {projectBreakdown.length > 0 && (
-            <SectionSurface
-              tone="lifted"
-              header={{
-                title: "Interviews by Project",
-                subtitle: "Completed interviews per project",
-                right: (
-                  <TrendingUp
-                    className="h-[13px] w-[13px] text-white/45"
-                    strokeWidth={1.6}
-                  />
-                ),
-              }}
-              bodyClassName="p-3"
-            >
-              <div
-                className="rounded-[4px] p-2"
-                style={{
-                  background: "#07080C",
-                  border: "1px solid rgba(147,147,147,0.08)",
-                }}
-              >
-                <InterviewsByProjectChart data={projectBreakdown} />
-              </div>
-            </SectionSurface>
-          )}
-
-          {topTopics.length > 0 && (
-            <SectionSurface
-              tone="lifted"
-              header={{
-                title: "Topic Distribution",
-                subtitle: `Top ${topTopics.length} themes across all interviews`,
-                right: (
-                  <Hash
-                    className="h-[13px] w-[13px] text-white/45"
-                    strokeWidth={1.6}
-                  />
-                ),
-              }}
-              bodyClassName="p-3"
-            >
-              <div
-                className="rounded-[4px] p-2"
-                style={{
-                  background: "#07080C",
-                  border: "1px solid rgba(147,147,147,0.08)",
-                }}
-              >
-                <TopicDistributionChart data={topTopics} />
-              </div>
-            </SectionSurface>
-          )}
-        </div>
-      )}
     </div>
   );
 }
