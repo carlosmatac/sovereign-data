@@ -13,13 +13,55 @@ export type InterviewStatus =
   | "COMPLETED"
   | "FAILED";
 
-export type EntityType =
-  | "PERSON"
-  | "COMPANY"
-  | "GOVERNMENT"
-  | "ORGANIZATION"
-  | "LOCATION"
-  | "EVENT";
+/**
+ * Canonical entity type list, kept in sync with the PostgreSQL `entity_type`
+ * enum. UIs, API allowlists, Zod schemas, and entity helpers should consume
+ * this constant instead of duplicating local arrays.
+ */
+export const ENTITY_TYPE_VALUES = [
+  "PERSON",
+  "COMPANY",
+  "GOVERNMENT",
+  "ORGANIZATION",
+  "LOCATION",
+  "EVENT",
+  "COUNTRY",
+  "SECTOR",
+  "COMMODITY",
+  "PUBLIC_INSTITUTION",
+  "STATE_OWNED_ENTERPRISE",
+  "LAW_OR_POLICY",
+  "MEDIA_OR_PUBLICATION",
+] as const;
+
+export type EntityType = (typeof ENTITY_TYPE_VALUES)[number];
+
+const ENTITY_TYPE_SET: ReadonlySet<string> = new Set(ENTITY_TYPE_VALUES);
+
+export function isEntityType(value: unknown): value is EntityType {
+  return typeof value === "string" && ENTITY_TYPE_SET.has(value);
+}
+
+/**
+ * Entity types that behave like organizations/institutions for upload anchors,
+ * position prefetch, and broad person↔institution relationship semantics.
+ */
+export const ORG_LIKE_ENTITY_TYPES = [
+  "COMPANY",
+  "GOVERNMENT",
+  "ORGANIZATION",
+  "PUBLIC_INSTITUTION",
+  "STATE_OWNED_ENTERPRISE",
+  "MEDIA_OR_PUBLICATION",
+] as const satisfies ReadonlyArray<EntityType>;
+
+const ORG_LIKE_ENTITY_TYPE_SET: ReadonlySet<string> = new Set(ORG_LIKE_ENTITY_TYPES);
+
+export function isOrgLikeEntityType(
+  value: unknown
+): value is (typeof ORG_LIKE_ENTITY_TYPES)[number] {
+  return typeof value === "string" && ORG_LIKE_ENTITY_TYPE_SET.has(value);
+}
 
 export type UserRole = "owner" | "editor" | "viewer";
 

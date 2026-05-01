@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,17 +34,8 @@ import type {
   GovernanceRelationshipStatusFilter,
 } from "@/lib/admin/load-governance-relationships";
 import { GovernanceRelationshipsSection } from "@/components/admin/governance-relationships-section";
-import type { EntityType } from "@/types/database";
+import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
 import { updateGovernedEntity } from "@/app/actions/admin-entity-governance";
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
 
 interface Props {
   entity: GovernanceEntityDetail;
@@ -70,12 +61,6 @@ export function GovernanceEntityDetailPanel({
   const [name, setName] = useState(entity.name);
   const [description, setDescription] = useState(entity.description ?? "");
   const [type, setType] = useState<EntityType>(entity.type);
-
-  useEffect(() => {
-    setName(entity.name);
-    setDescription(entity.description ?? "");
-    setType(entity.type);
-  }, [entity.id, entity.name, entity.description, entity.type]);
 
   const isRedirect = entity.canonical_entity_id !== null;
   const canonicalHref = entity.canonical_target
@@ -239,7 +224,7 @@ export function GovernanceEntityDetailPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTITY_TYPES.map((t) => (
+                {ENTITY_TYPE_VALUES.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
                   </SelectItem>

@@ -7,7 +7,7 @@
 // and ensures descriptions are populated.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, EntityType } from "@/types/database";
+import { isOrgLikeEntityType, type Database, type EntityType } from "@/types/database";
 import { normalizeEntityName } from "./normalize";
 import { matchOrCreateEntity } from "./match";
 
@@ -439,11 +439,7 @@ function isPersonType(type: EntityType): boolean {
 }
 
 function isOrgType(type: EntityType): boolean {
-  return (
-    type === "COMPANY" ||
-    type === "GOVERNMENT" ||
-    type === "ORGANIZATION"
-  );
+  return isOrgLikeEntityType(type);
 }
 
 function deriveResolutionConfidence(

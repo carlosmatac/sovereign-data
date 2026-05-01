@@ -8,8 +8,9 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { ORG_LIKE_ENTITY_TYPES } from "@/types/database";
 
-const ORG_ENTITY_TYPES_PARAM = "COMPANY,ORGANIZATION,GOVERNMENT";
+const ORG_ENTITY_TYPES_PARAM = ORG_LIKE_ENTITY_TYPES.join(",");
 
 type Kind = "person" | "organization";
 
@@ -154,7 +155,7 @@ export function InterviewAnchorEntityInput({
       >
         <ul className="py-1" role="listbox">
           {results.map((e) => (
-            <li key={e.id} role="option">
+            <li key={e.id} role="option" aria-selected={false}>
               <button
                 type="button"
                 className="hover:bg-accent focus:bg-accent flex w-full rounded-sm px-2 py-1.5 text-left text-sm outline-none"

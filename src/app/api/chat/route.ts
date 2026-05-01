@@ -33,6 +33,7 @@ import {
   buildSystemPrompt,
   type CopilotMode,
 } from "@/lib/chat/prompt-builder";
+import { isOrgLikeEntityType } from "@/types/database";
 
 interface RagChunk {
   chunk_id: string;
@@ -282,12 +283,7 @@ export async function POST(request: NextRequest) {
       temporalClassification.organization_name.trim(),
       projectId
     );
-    if (
-      match &&
-      (match.type === "COMPANY" ||
-        match.type === "ORGANIZATION" ||
-        match.type === "GOVERNMENT")
-    ) {
+    if (match && isOrgLikeEntityType(match.type)) {
       resolvedOrgEntityId = match.id;
     }
   }

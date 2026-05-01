@@ -9,16 +9,7 @@ import {
   hasEntityGovernanceAccess,
 } from "@/lib/auth/platform-roles";
 import { normalizeEntityName } from "@/lib/entities/normalize";
-import type { EntityType } from "@/types/database";
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
+import { isEntityType, type EntityType } from "@/types/database";
 
 type ActionResult = { success?: true; error?: string };
 
@@ -152,7 +143,7 @@ export async function updateGovernedEntity(
   }
 
   if (input.type !== undefined) {
-    if (!ENTITY_TYPES.includes(input.type)) {
+    if (!isEntityType(input.type)) {
       return { error: "Invalid entity type" };
     }
     if (input.type !== row.type) {

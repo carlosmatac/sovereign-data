@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, ZoomIn, ZoomOut, Maximize2, X } from "lucide-react";
 import type { GraphData, GraphNode, GraphEdge } from "@/app/api/graph/[projectId]/route";
+import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -27,17 +28,6 @@ interface EntityGraphProps {
 
 // ── Entity palette ───────────────────────────────────────────────
 
-const ENTITY_TYPES = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-] as const;
-
-type EntityType = (typeof ENTITY_TYPES)[number];
-
 const NODE_COLORS: Record<EntityType, string> = {
   PERSON: "#60a5fa",
   COMPANY: "#34d399",
@@ -45,6 +35,13 @@ const NODE_COLORS: Record<EntityType, string> = {
   ORGANIZATION: "#fb923c",
   LOCATION: "#f87171",
   EVENT: "#fbbf24",
+  COUNTRY: "#38bdf8",
+  SECTOR: "#22c55e",
+  COMMODITY: "#f59e0b",
+  PUBLIC_INSTITUTION: "#c084fc",
+  STATE_OWNED_ENTERPRISE: "#2dd4bf",
+  LAW_OR_POLICY: "#e879f9",
+  MEDIA_OR_PUBLICATION: "#f472b6",
 };
 
 function nodeColor(type: string): string {
@@ -759,7 +756,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
         <span className="mr-0.5 text-[11px] uppercase tracking-[0.08em] text-white/40">
           Show
         </span>
-        {ENTITY_TYPES.map((type) => {
+        {ENTITY_TYPE_VALUES.map((type) => {
           const active = !hiddenTypes.has(type);
           const accent = nodeColor(type);
           return (
@@ -960,7 +957,7 @@ export function EntityGraph({ projects, initialProjectId }: EntityGraphProps) {
         {/* ── Legend (bottom-left, hidden when info card is open) ── */}
         {!isEmpty && !error && !focusedNode && (
           <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-lg border border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
-            {ENTITY_TYPES.filter((t) => !hiddenTypes.has(t)).map((type) => (
+            {ENTITY_TYPE_VALUES.filter((t) => !hiddenTypes.has(t)).map((type) => (
               <div
                 key={type}
                 className="flex items-center gap-1.5 text-[11px] text-muted-foreground"

@@ -23,16 +23,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import type { GovernanceEntityListRow } from "@/lib/admin/load-governance-entities";
-import type { EntityType } from "@/types/database";
-
-const ENTITY_TYPES: EntityType[] = [
-  "PERSON",
-  "COMPANY",
-  "GOVERNMENT",
-  "ORGANIZATION",
-  "LOCATION",
-  "EVENT",
-];
+import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
 
 type ProjectOption = { id: string; name: string };
 
@@ -149,7 +140,7 @@ export function GovernanceEntitiesTable({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
-                {ENTITY_TYPES.map((t) => (
+                {ENTITY_TYPE_VALUES.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
                   </SelectItem>

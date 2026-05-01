@@ -164,7 +164,7 @@ Uses Vercel AI SDK's `generateObject` with `openai("gpt-4o-mini")` and a Zod sch
 | `summary` | `string` | Executive summary of the interview |
 | `sentiment` | `object` | Overall sentiment, score (-1 to 1), positive/negative highlights |
 | `topics` | `string[]` | Key topics discussed |
-| `entities` | `array` | Name, type (`PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT`), description, sentiment |
+| `entities` | `array` | Name, type from `ENTITY_TYPE_VALUES` (`PERSON`, `COMPANY`, `GOVERNMENT`, `ORGANIZATION`, `LOCATION`, `EVENT`, `COUNTRY`, `SECTOR`, `COMMODITY`, `PUBLIC_INSTITUTION`, `STATE_OWNED_ENTERPRISE`, `LAW_OR_POLICY`, `MEDIA_OR_PUBLICATION`), description, sentiment |
 | `relationships` | `array` | Source entity, target entity, relation type, confidence (0–1), evidence text |
 | `risks` | `string[]` | Identified risks |
 | `opportunities` | `string[]` | Identified opportunities |

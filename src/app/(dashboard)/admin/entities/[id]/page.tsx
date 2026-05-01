@@ -186,6 +186,7 @@ export default async function AdminEntityDetailPage({
       </header>
 
       <GovernanceEntityDetailPanel
+        key={entity.id}
         entity={entity}
         isSuperuser={isSuperuser}
         relationships={{

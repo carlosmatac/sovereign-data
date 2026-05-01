@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, EntityType } from "@/types/database";
-
-const ORG_TYPES: EntityType[] = ["COMPANY", "ORGANIZATION", "GOVERNMENT"];
+import {
+  isOrgLikeEntityType,
+  type Database,
+} from "@/types/database";
 
 /**
  * Ensures an entity ID is safe to store on interviews as an upload anchor:
@@ -26,7 +27,7 @@ export async function validateInterviewAnchorEntityId(
 
   if (params.role === "person") {
     if (data.type !== "PERSON") return { ok: false };
-  } else if (!ORG_TYPES.includes(data.type as EntityType)) {
+  } else if (!isOrgLikeEntityType(data.type)) {
     return { ok: false };
   }
 
