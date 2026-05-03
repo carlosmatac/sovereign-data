@@ -200,13 +200,40 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* ── Primary grid: Recent + side rail ─────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-12">
-        {/* Recent Intelligence — spans 8 cols on wide */}
-        <div className="lg:col-span-8">
+      {/* ── Primary grid: 8/4 column split ─────────────────────── *
+       *
+       * Layout note — the dashboard is now a true 2-column workspace
+       * rather than a "row of boxes followed by another row of boxes".
+       * Each column owns its own vertical stack and decides its own
+       * natural height (`items-start`):
+       *
+       *   left col (col-span-8):
+       *     · Recent Intelligence
+       *     · Charts row (Intelligence-by-Project + Topic Distribution
+       *       side-by-side via an inner 2-col grid)
+       *   right rail (col-span-4):
+       *     · Pipeline Status
+       *     · Quick Actions
+       *
+       * Why: previously Recent Interviews sat alone in col-span-8 and
+       * the charts sat in a second full-width grid below, so when the
+       * interview list was short the right rail still pushed the
+       * primary row to ~400px tall while the left column stayed at
+       * ~120px — creating a giant dead rectangle below Recent
+       * Interviews. Pulling the charts up into the left column fills
+       * that vertical space with real content; the right rail's height
+       * is now matched by Recent + charts on the left, so the first
+       * viewport feels intentional even with one interview.
+       *
+       * Behaviour preserved: charts still only render when there is
+       * data (`projectBreakdown` / `topTopics`). On `<lg` breakpoints
+       * everything stacks into a single column unchanged.
+       */}
+      <div className="grid items-start gap-4 lg:grid-cols-12">
+        {/* Left column — Recent Intelligence + charts */}
+        <div className="flex flex-col gap-4 lg:col-span-8">
           <SectionSurface
             tone="lifted"
-            className="flex h-full flex-col"
             header={{
               title: "Recent Intelligence",
               subtitle: "Latest uploaded sources",
@@ -220,15 +247,15 @@ export default async function DashboardPage() {
                 </Link>
               ),
             }}
-            bodyClassName="flex min-h-0 flex-1 flex-col p-2"
+            bodyClassName="p-2"
           >
             {recentInterviews.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+              <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
                 <BookOpen
-                  className="mb-3 h-8 w-8 text-white/22"
+                  className="mb-3 h-7 w-7 text-white/22"
                   strokeWidth={1.5}
                 />
-                <p className="text-[13px] text-white/55">
+                <p className="text-[12.5px] text-white/55">
                   No sources yet.{" "}
                   <Link
                     href="/interviews/upload"
@@ -239,7 +266,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="sv-scroll-soft flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-1">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -266,9 +293,74 @@ export default async function DashboardPage() {
               </div>
             )}
           </SectionSurface>
+
+          {/*
+           * Charts row — pulled into the left column so they sit
+           * adjacent to the right rail rather than below the entire
+           * primary grid. On wide breakpoints the two charts stand
+           * side-by-side via an inner 2-col grid; on narrow they
+           * stack. Only renders when there is data on either side.
+           */}
+          {hasCharts && (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {projectBreakdown.length > 0 && (
+                <SectionSurface
+                  tone="lifted"
+                  header={{
+                    title: "Intelligence by Project",
+                    subtitle: "Completed sources per project",
+                    right: (
+                      <TrendingUp
+                        className="h-[13px] w-[13px] text-white/45"
+                        strokeWidth={1.6}
+                      />
+                    ),
+                  }}
+                  bodyClassName="p-3"
+                >
+                  <div
+                    className="rounded-[4px] p-2"
+                    style={{
+                      background: "#07080C",
+                      border: "1px solid rgba(147,147,147,0.08)",
+                    }}
+                  >
+                    <InterviewsByProjectChart data={projectBreakdown} />
+                  </div>
+                </SectionSurface>
+              )}
+
+              {topTopics.length > 0 && (
+                <SectionSurface
+                  tone="lifted"
+                  header={{
+                    title: "Topic Distribution",
+                    subtitle: `Top ${topTopics.length} themes across all sources`,
+                    right: (
+                      <Hash
+                        className="h-[13px] w-[13px] text-white/45"
+                        strokeWidth={1.6}
+                      />
+                    ),
+                  }}
+                  bodyClassName="p-3"
+                >
+                  <div
+                    className="rounded-[4px] p-2"
+                    style={{
+                      background: "#07080C",
+                      border: "1px solid rgba(147,147,147,0.08)",
+                    }}
+                  >
+                    <TopicDistributionChart data={topTopics} />
+                  </div>
+                </SectionSurface>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right rail — spans 4 cols on wide */}
+        {/* Right rail — Pipeline Status + Quick Actions */}
         <div className="flex flex-col gap-4 lg:col-span-4">
           {/* Pipeline Status (top of rail — most informational) */}
           <SectionSurface
@@ -323,128 +415,93 @@ export default async function DashboardPage() {
             </div>
           </SectionSurface>
 
-          {/* Quick Actions */}
+          {/* Quick Actions — single-column action module
+            *
+            * Replaced the old 2×2 equal-weight tile grid (which made
+            * every action feel equally important and template-y) with
+            * a vertical list that establishes a clear hierarchy:
+            *
+            *   [ Add Source ]   ← primary, slightly lifted
+            *   ─────────────────────
+            *   • Copilot            ↗
+            *   • Network Explorer   ↗
+            *   • New Project        ↗
+            *
+            * Each row aligns to a consistent 14px icon well, leaves
+            * the trailing chevron muted at rest and lifts on hover,
+            * matching the shared `sv-hover-card` motion vocabulary.
+            */}
           <SectionSurface
             tone="lifted"
             header={{ title: "Quick Actions" }}
-            bodyClassName="grid grid-cols-2 gap-2 p-3"
+            bodyClassName="flex flex-col gap-1 p-2"
           >
+            <PrimaryQuickAction
+              href="/interviews/upload"
+              icon={Upload}
+              label="Add Source"
+              caption="Add a new source"
+            />
+            <div
+              aria-hidden
+              className="my-1 h-px"
+              style={{ background: "rgba(147,147,147,0.10)" }}
+            />
             {[
-              {
-                href: "/interviews/upload",
-                icon: Upload,
-                label: "Add Source",
-                accent: "#5FA6A8", // dusty teal
-              },
               {
                 href: "/chat",
                 icon: MessageSquare,
                 label: "Copilot",
-                accent: "#A78BFA", // soft violet
+                caption: "Ask the intelligence layer",
+                accent: "#A78BFA",
               },
               {
                 href: "/network",
                 icon: Network,
                 label: "Network Explorer",
-                accent: "#818CF8", // faded indigo
+                caption: "Browse entities & relationships",
+                accent: "#818CF8",
               },
               {
                 href: "/projects/new",
                 icon: FolderKanban,
                 label: "New Project",
-                accent: "#D4B77C", // restrained amber / sand
+                caption: "Start a fresh workspace",
+                accent: "#D4B77C",
               },
-            ].map(({ href, icon: Icon, label, accent }) => (
+            ].map(({ href, icon: Icon, label, caption, accent }) => (
               <Link
                 key={href}
                 href={href}
-                className="sv-hover-card group relative flex items-center gap-2.5 overflow-hidden rounded-[5px] border border-[rgba(147,147,147,0.15)] py-2.5 pl-[13px] pr-2.5 text-[11.5px] font-medium text-white/80 hover:text-white"
-                style={{
-                  backgroundColor: `color-mix(in srgb, ${accent} 4%, transparent)`,
-                }}
+                className="group flex items-center gap-2.5 rounded-[5px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.035]"
               >
                 <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full opacity-70 transition-opacity duration-150 group-hover:opacity-100"
-                  style={{ backgroundColor: accent }}
-                />
-                <span
-                  className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[4px]"
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${accent} 11%, transparent)`,
-                  }}
+                  className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[4px] transition-colors duration-150 group-hover:bg-[color-mix(in_srgb,var(--accent-color)_14%,transparent)]"
+                  style={
+                    {
+                      backgroundColor: `color-mix(in srgb, ${accent} 9%, transparent)`,
+                      ["--accent-color" as string]: accent,
+                    } as React.CSSProperties
+                  }
                 >
                   <Icon
-                    className="h-[13px] w-[13px]"
+                    className="h-[12.5px] w-[12.5px]"
                     strokeWidth={1.7}
                     style={{ color: accent }}
                   />
                 </span>
-                <span className="truncate">{label}</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-white/80 transition-colors duration-150 group-hover:text-white">
+                  {label}
+                </span>
+                <ArrowUpRight
+                  className="h-[11px] w-[11px] shrink-0 text-white/25 transition-colors duration-150 group-hover:text-white/65"
+                  strokeWidth={1.8}
+                />
               </Link>
             ))}
           </SectionSurface>
         </div>
       </div>
-
-      {/* ── Analytics Row — Charts ─────────────────────────────── */}
-      {hasCharts && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {projectBreakdown.length > 0 && (
-            <SectionSurface
-              tone="lifted"
-              header={{
-                title: "Intelligence by Project",
-                subtitle: "Completed sources per project",
-                right: (
-                  <TrendingUp
-                    className="h-[13px] w-[13px] text-white/45"
-                    strokeWidth={1.6}
-                  />
-                ),
-              }}
-              bodyClassName="p-3"
-            >
-              <div
-                className="rounded-[4px] p-2"
-                style={{
-                  background: "#070D1A",
-                  border: "1px solid rgba(147,147,147,0.10)",
-                }}
-              >
-                <InterviewsByProjectChart data={projectBreakdown} />
-              </div>
-            </SectionSurface>
-          )}
-
-          {topTopics.length > 0 && (
-            <SectionSurface
-              tone="lifted"
-              header={{
-                title: "Topic Distribution",
-                subtitle: `Top ${topTopics.length} themes across all sources`,
-                right: (
-                  <Hash
-                    className="h-[13px] w-[13px] text-white/45"
-                    strokeWidth={1.6}
-                  />
-                ),
-              }}
-              bodyClassName="p-3"
-            >
-              <div
-                className="rounded-[4px] p-2"
-                style={{
-                  background: "#070D1A",
-                  border: "1px solid rgba(147,147,147,0.10)",
-                }}
-              >
-                <TopicDistributionChart data={topTopics} />
-              </div>
-            </SectionSurface>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -620,6 +677,64 @@ function StatusWell({ status }: { status: InterviewStatus }) {
     <IconWell accent={color} size={28}>
       <span style={{ color }}>{icon}</span>
     </IconWell>
+  );
+}
+
+/**
+ * Primary action row inside the Quick Actions module.
+ *
+ * Sits at the top of the action list with a slightly lifted tonal
+ * fill so it reads as the headline action ("Upload Interview"), while
+ * the secondary actions below are ghost rows. Borrows the tonal
+ * action button vocabulary (subtle white tint + hairline border) but
+ * with a generous two-line stack (label + caption) to read as a
+ * module entry rather than a chip.
+ */
+function PrimaryQuickAction({
+  href,
+  icon: Icon,
+  label,
+  caption,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  caption: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="sv-hover-card group flex items-center gap-3 rounded-[5px] border px-2.5 py-2.5"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderColor: "rgba(147,147,147,0.14)",
+      }}
+    >
+      <span
+        className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-150 group-hover:bg-white/[0.07]"
+        style={{
+          backgroundColor: "rgba(255,255,255,0.04)",
+          borderColor: "rgba(147,147,147,0.18)",
+        }}
+      >
+        <Icon className="h-[13px] w-[13px]" strokeWidth={1.7} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="truncate text-[12.5px] font-semibold text-white/92">
+          {label}
+        </span>
+        <span
+          className="mt-[3px] truncate text-[10.5px] text-white/45"
+          style={{ letterSpacing: "-0.005em" }}
+        >
+          {caption}
+        </span>
+      </div>
+      <ArrowUpRight
+        className="h-[12px] w-[12px] shrink-0 text-white/35 transition-colors duration-150 group-hover:text-white/75"
+        strokeWidth={1.8}
+      />
+    </Link>
   );
 }
 

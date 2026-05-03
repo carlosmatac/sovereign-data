@@ -13,20 +13,28 @@
  */
 
 // ─── Color · Surfaces ─────────────────────────────────────────────────────────
-// The whole system lives on two almost-identical near-black navy surfaces.
-// Outer panel is `panel`. Inner nested cards use `surface` (one step darker).
-// `canvas` is only for large data surfaces like the network graph.
+// April 2026 polish pass: the surface family was pulled away from
+// saturated SaaS-blue toward graphite/near-black with a *subtle* cool
+// undertone. The accent palette below (chart, entity, status) is
+// intentionally untouched.
+//
+//   surface             before        after        delta
+//   panel               #070E1F       #08090F      → graphite shell
+//   surface             #080F1E       #0B0E14      → graphite, lifted
+//   canvas              #050C1A       #07080C      → recessed near-black
+//   chromeTop           #0D1B32       #0E1118      → desaturated chrome
+//   chromeBottom        #0B1729       #0B0D12      → desaturated chrome
 
 export const colorSurface = {
   /** Outer panel background. Use on `PanelShell`, `AppSurface`, report panel. */
-  panel: "#070E1F",
+  panel: "#08090F",
   /** Nested card / detail card / inline surface. Always inside a `panel`. */
-  surface: "#080F1E",
+  surface: "#0B0E14",
   /** Very dark canvas reserved for SVG data surfaces (graphs, maps). */
-  canvas: "#050C1A",
+  canvas: "#07080C",
   /** Used only for window-chrome gradients (top and bottom stops). */
-  chromeTop: "#0D1B32",
-  chromeBottom: "#0B1729",
+  chromeTop: "#0E1118",
+  chromeBottom: "#0B0D12",
 } as const
 
 // ─── Color · Borders & Dividers ───────────────────────────────────────────────
@@ -168,7 +176,7 @@ export const gradientChrome =
  * AppSurface (sidebar + content) compositions.
  */
 export const gradientSheen =
-  "linear-gradient(135deg, rgba(255,255,255,0.012) 0%, #070E1F 28%)"
+  "linear-gradient(135deg, rgba(255,255,255,0.012) 0%, #08090F 28%)"
 
 // ─── Accent backgrounds / borders (tonal) ─────────────────────────────────────
 // When an accent is used as a fill for pills, badges or node wells, its

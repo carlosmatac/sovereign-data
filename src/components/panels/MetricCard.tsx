@@ -31,8 +31,8 @@ import * as React from "react"
 export type MetricCardTone = "default" | "lifted"
 
 const METRIC_TONE_CLASS: Record<MetricCardTone, string> = {
-  default: "bg-[#080F1E] border-[rgba(147,147,147,0.15)]",
-  lifted: "bg-[#0B1325] border-[rgba(147,147,147,0.18)]",
+  default: "bg-[#0B0E14] border-[rgba(147,147,147,0.15)]",
+  lifted: "bg-[#0E1119] border-[rgba(147,147,147,0.18)]",
 }
 
 export interface MetricCardProps {

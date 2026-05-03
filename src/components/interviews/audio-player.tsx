@@ -116,7 +116,7 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
 
   if (error) {
     return (
-      <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#080F1E] px-4 py-3 text-[12.5px] text-white/55">
+      <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#0B0E14] px-4 py-3 text-[12.5px] text-white/55">
         Audio file unavailable.
       </div>
     );
@@ -125,7 +125,7 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#080F1E] px-4 py-3">
+    <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#0B0E14] px-4 py-3">
       {/* Hidden native audio element */}
       <audio ref={audioRef} src={src} preload="metadata" />
 
@@ -195,18 +195,18 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
                 aria-valuenow={currentTime}
                 className="
                   relative z-[1] h-8 w-full cursor-pointer appearance-none bg-transparent outline-none
-                  focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080F1E]
+                  focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0E14]
                   [&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full
                   [&::-webkit-slider-runnable-track]:bg-transparent
                   [&::-webkit-slider-thumb]:mt-[calc((3px-10px)/2)]
                   [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:w-[10px]
                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:border-[2px] [&::-webkit-slider-thumb]:border-[#080F1E]
+                  [&::-webkit-slider-thumb]:border-[2px] [&::-webkit-slider-thumb]:border-[#0B0E14]
                   [&::-webkit-slider-thumb]:bg-[#FBBF24]
                   [&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent
                   [&::-moz-range-thumb]:h-[10px] [&::-moz-range-thumb]:w-[10px]
                   [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[2px]
-                  [&::-moz-range-thumb]:border-[#080F1E] [&::-moz-range-thumb]:bg-[#FBBF24]
+                  [&::-moz-range-thumb]:border-[#0B0E14] [&::-moz-range-thumb]:bg-[#FBBF24]
                 "
               />
             </>

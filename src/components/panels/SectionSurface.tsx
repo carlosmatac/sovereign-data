@@ -22,16 +22,21 @@ import { PanelHeader, type PanelHeaderProps } from "./PanelHeader";
  *   </SectionSurface>
  */
 /**
- * Tone controls the surface elevation in the 3-level hierarchy:
+ * Tone controls the surface elevation in the 3-level hierarchy.
  *
- *   • `default` — `#080F1E` / border 0.13. Use when the surface sits directly
- *     on the outer shell (`#070A14`), i.e. on most route pages.
- *   • `lifted`  — `#0B1325` / border 0.16. Use when the surface sits on the
- *     workspace canvas (`#080F1E`) and needs to read as one tonal step above
- *     it. The dashboard uses this so the chain reads as
- *     sidebar (deepest) → workspace → card → inner well (back to workspace).
- *   • `well`    — `#070D1A` / border 0.10. Use for *recessed* inner regions
- *     (chart container, status interior) inside a `lifted` card.
+ * April 2026 polish pass — surface tones desaturated from the previous
+ * SaaS-blue family to graphite/near-black with subtle cool undertone:
+ *
+ *   • `default` — `#0B0E14` / border 0.13. Use when the surface sits
+ *     directly on the outer shell (`#08090E`), i.e. on most route
+ *     pages. Matches the new workspace tone exactly.
+ *   • `lifted`  — `#0E1119` / border 0.16. Use when the surface sits on
+ *     the workspace canvas (`#0B0E14`) and needs to read as one tonal
+ *     step above it. The dashboard uses this so the chain reads as
+ *     sidebar (deepest) → workspace → card → inner well (recessed).
+ *   • `well`    — `#07080C` / border 0.10. Use for *recessed* inner
+ *     regions (chart container, status interior) inside a `lifted`
+ *     card.
  */
 export type SectionSurfaceTone = "default" | "lifted" | "well";
 
@@ -40,15 +45,15 @@ const TONE_STYLES: Record<
   { background: string; borderColor: string }
 > = {
   default: {
-    background: "#080F1E",
+    background: "#0B0E14",
     borderColor: "rgba(147,147,147,0.13)",
   },
   lifted: {
-    background: "#0B1325",
+    background: "#0E1119",
     borderColor: "rgba(147,147,147,0.16)",
   },
   well: {
-    background: "#070D1A",
+    background: "#07080C",
     borderColor: "rgba(147,147,147,0.10)",
   },
 };

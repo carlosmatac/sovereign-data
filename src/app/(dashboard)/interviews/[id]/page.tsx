@@ -413,8 +413,30 @@ export default async function InterviewDetailPage({
             )}
           </div>
 
-          {/* Right Column: Sidebar Intelligence */}
-          <div className="space-y-6">
+          {/*
+           * Right Column: Intelligence sidebar.
+           *
+           * Bounded so it can't dictate the entire page height when an
+           * interview has many entities (the previous layout grew
+           * indefinitely, leaving a long sidebar dwarfing a short
+           * transcript). Two layered constraints:
+           *
+           *   1. Column is sticky to the top of the scroll region on
+           *      `lg+` and bounded to the viewport (`max-h-[calc(100vh-2rem)]`)
+           *      with its own internal scroll. So when the user scrolls
+           *      the long left column (transcript), the sidebar stays
+           *      in view; if the sidebar's own content exceeds the
+           *      viewport, it scrolls inside itself.
+           *   2. The entities and relationships cards are *additionally*
+           *      capped (max-h on `CardContent`) with internal scroll,
+           *      so a single huge entity list never pushes the smaller
+           *      cards (sentiment, speaker map) below the fold.
+           *
+           * On `<lg` the column flows normally underneath the main
+           * content; sticky/bounded behaviour only kicks in at the
+           * 2-column breakpoint.
+           */}
+          <div className="space-y-6 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto sv-scroll-soft">
             {/* Sentiment */}
             {sentiment && (
               <Card>
@@ -470,7 +492,16 @@ export default async function InterviewDetailPage({
               </Card>
             )}
 
-            {/* Entities */}
+            {/*
+             * Entities — bounded card with internal scroll.
+             *
+             * `max-h-[40vh]` keeps the card from dominating the
+             * sidebar even when there are 50+ entities; the inner
+             * list scrolls with the same restrained scrollbar
+             * vocabulary used elsewhere (`sv-scroll-soft`). The
+             * `pr-1` reserves room for the scrollbar so rows don't
+             * jitter on overflow appearance.
+             */}
             {entityMentions.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
@@ -481,7 +512,7 @@ export default async function InterviewDetailPage({
                     {entityMentions.length} unique entit{entityMentions.length === 1 ? "y" : "ies"}{totalMentionCount > entityMentions.length ? ` · ${totalMentionCount} mentions` : ""}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="sv-scroll-soft max-h-[40vh] overflow-y-auto pr-1">
                   <EntityMentionsList
                     mentions={entityMentions}
                     projectId={interview.project_id}
@@ -491,7 +522,9 @@ export default async function InterviewDetailPage({
               </Card>
             )}
 
-            {/* Entity Relationships */}
+            {/* Entity Relationships — also bounded (smaller cap; the
+              * relationship list tends to be 1-2 lines per row and
+              * benefits from a tighter ceiling). */}
             {relationshipItems.length > 0 && (
               <Card id="relationships" className="scroll-mt-20">
                 <CardHeader className="pb-3">
@@ -506,7 +539,7 @@ export default async function InterviewDetailPage({
                     {canEdit ? " · editor controls available" : ""}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="sv-scroll-soft max-h-[32vh] overflow-y-auto pr-1">
                   <RelationshipsList
                     relationships={relationshipItems}
                     entityNameMap={entityNameMap}

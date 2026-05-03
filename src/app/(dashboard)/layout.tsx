@@ -43,11 +43,11 @@ export default async function DashboardLayout({
    * working surface", mirroring the landing's `AppSurface` composition:
    *
    *   ┌────────────────────────────────────────────────────────────────────┐
-   *   │ Outer shell: #070A14 (--sidebar, deeper matte ink-navy)            │
+   *   │ Outer shell: #08090E (sidebar, near-black graphite)                │
    *   │  ┌────────┐   ┌──────────────────────────────────────────────────┐ │
    *   │  │        │   │  Central working panel (SidebarInset)            │ │
-   *   │  │ Sidebar│   │  bg #080F1E · 6px radius · whisper border        │ │
-   *   │  │(deeper)│   │  ┌── top bar ──┐                                 │ │
+   *   │  │ Sidebar│   │  bg #0B0E14 · 6px radius · whisper border        │ │
+   *   │  │(deepest)│  │  ┌── top bar ──┐                                 │ │
    *   │  │        │   │  │             │                                 │ │
    *   │  │        │   │  │  page       │                                 │ │
    *   │  │        │   │  │  content    │                                 │ │
@@ -60,12 +60,12 @@ export default async function DashboardLayout({
    *     sidebar-wrapper the outer shell and floats the sidebar column inside
    *     it with an 8px gutter, so the sidebar stops reading as a detached card.
    *   - `SidebarInset` is restyled below as the *lifted* workspace surface:
-   *     `#080F1E` (~1 tonal step above the new darker shell), a 6px radius to
-   *     match the landing `AppSurface` rectangle, a hairline border dropped to
-   *     `rgba(147,147,147,0.08)` — the separation now comes from tone, not a
-   *     hard rule — and a very restrained ambient shadow (barely perceptible)
-   *     so the panel reads as slightly elevated above the recessed sidebar
-   *     layer without becoming a floating card.
+   *     `#0B0E14` (~1 tonal step above the darker graphite shell), a 6px
+   *     radius to match the landing `AppSurface` rectangle, a hairline border
+   *     dropped to `rgba(147,147,147,0.07)` — the separation now comes from
+   *     tone, not a hard rule — and a very restrained ambient shadow (barely
+   *     perceptible) so the panel reads as slightly elevated above the
+   *     recessed sidebar layer without becoming a floating card.
    *
    * Functionality preserved: `SidebarProvider` collapsible="icon", mobile Sheet
    * behaviour, rail toggle, routing, active states — all unchanged.
@@ -114,7 +114,7 @@ export default async function DashboardLayout({
         showPlatformAdministration={showPlatformAdministration}
       />
       <SidebarInset
-        className="flex min-w-0 flex-col overflow-hidden bg-[#080F1E] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.08)] md:shadow-[0_0_0_1px_rgba(255,255,255,0.012),0_24px_48px_-32px_rgba(0,0,0,0.75)]"
+        className="flex min-w-0 flex-col overflow-hidden bg-[#0B0E14] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.07)] md:shadow-[0_0_0_1px_rgba(255,255,255,0.010),0_24px_48px_-32px_rgba(0,0,0,0.65)]"
       >
         <DashboardInsetHeader />
         <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto">

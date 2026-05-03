@@ -17,19 +17,33 @@
  * ========================================================================== */
 
 :root {
-  /* ── Surfaces ──────────────────────────────────────────────────────────── */
-  --sv-panel-bg:          #070E1F;      /* outer panel shell */
-  --sv-surface-bg:        #080F1E;      /* nested cards, detail wells */
-  --sv-canvas-bg:         #050C1A;      /* SVG data canvases */
-  --sv-chrome-top:        #0D1B32;
-  --sv-chrome-bottom:     #0B1729;
-  --sv-chrome-gradient:   linear-gradient(to bottom, #0D1B32, #0B1729);
+  /* ── Surfaces ──────────────────────────────────────────────────────────── *
+   *
+   * April 2026 polish pass — surfaces shifted from saturated SaaS-blue
+   * to graphite/near-black with a *subtle* cool undertone. The aim is
+   * "dark premium enterprise tool with controlled blue accents", not
+   * "blue dashboard". Accent tokens (chart, entity, status) below are
+   * intentionally untouched.
+   *
+   *   surface             before        after        delta
+   *   --sv-panel-bg       #070E1F       #08090F      → graphite shell
+   *   --sv-surface-bg     #080F1E       #0B0E14      → graphite, lifted
+   *   --sv-canvas-bg      #050C1A       #07080C      → recessed near-black
+   *   --sv-chrome-top     #0D1B32       #0E1118      → desaturated chrome
+   *   --sv-chrome-bottom  #0B1729       #0B0D12      → desaturated chrome
+   */
+  --sv-panel-bg:          #08090F;      /* outer panel shell — graphite */
+  --sv-surface-bg:        #0B0E14;      /* nested cards / lifted workspace */
+  --sv-canvas-bg:         #07080C;      /* SVG / chart inner wells */
+  --sv-chrome-top:        #0E1118;
+  --sv-chrome-bottom:     #0B0D12;
+  --sv-chrome-gradient:   linear-gradient(to bottom, #0E1118, #0B0D12);
 
   /* Diagonal sheen used on the central panel inside AppSurface layouts. */
   --sv-panel-sheen:       linear-gradient(
                             135deg,
                             rgba(255,255,255,0.012) 0%,
-                            #070E1F 28%
+                            #08090F 28%
                           );
 
   /* ── Borders & dividers (single hue, multiple alphas) ──────────────────── */

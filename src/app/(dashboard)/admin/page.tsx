@@ -135,7 +135,7 @@ function AdminTile({
   return (
     <Link
       href={href}
-      className="sv-hover-card group block rounded-[6px] border border-[rgba(147,147,147,0.14)] bg-[#080F1E] p-5"
+      className="sv-hover-card group block rounded-[6px] border border-[rgba(147,147,147,0.14)] bg-[#0B0E14] p-5"
     >
       <IconWell accent={accent} size={38}>
         {icon}

@@ -49,25 +49,37 @@
 }
 
 /*
- * Sovereign Data — dark theme, aligned with the landing panel system.
+ * Aksum — dark theme, aligned with the landing panel system.
  *
- * The shadcn tokens below are repointed at the Sovereign palette
+ * The shadcn tokens below are repointed at the Aksum palette
  * (src/styles/design-tokens.css, --sv-*). That way every shadcn primitive
  * (Sidebar, Button, Card, Input, Dropdown, Dialog, …) inherits the panel
  * language without touching component code.
+ *
+ * Tonal direction (April 2026 polish pass): the surface family was
+ * pulled away from saturated SaaS-blue toward graphite/near-black with
+ * a *subtle* cool undertone, so the app reads as "dark premium
+ * enterprise tool with controlled blue accents", not "blue dashboard".
+ * Concretely:
+ *   workspace surface:  #080F1E  →  #0B0E14   (~30% less blue)
+ *   page / shell bg:    #070E1F  →  #08090F   (graphite near-black)
+ *   sidebar:            #070A14  →  #08090E   (near-black, neutral)
+ *   chrome strip:       #0D1B32→#0B1729  →  #0E1118→#0B0D12
+ *
+ * Accent colors (chart/entity/status) intentionally untouched.
  *
  * Palette source: docs/ui-panel-system.md §4.
  */
 :root {
   --radius: 0.375rem; /* 6px — closer to the panel system's 5–6px card radius */
 
-  --background: #070E1F;                       /* --sv-panel-bg */
+  --background: #08090F;                       /* --sv-panel-bg (graphite shell) */
   --foreground: rgba(255, 255, 255, 0.88);     /* --sv-text-primary */
 
-  --card: #080F1E;                             /* --sv-surface-bg */
+  --card: #0B0E14;                             /* --sv-surface-bg (lifted graphite) */
   --card-foreground: rgba(255, 255, 255, 0.88);
 
-  --popover: #080F1E;
+  --popover: #0B0E14;
   --popover-foreground: rgba(255, 255, 255, 0.88);
 
   /* Primary CTA = soft white fill, panel-bg navy as foreground */
@@ -97,17 +109,20 @@
   --chart-5: #7DD3FC;   /* cyan */
 
   /*
-   * Sidebar = deeper, matte, desaturated ink-navy so it reads as a recessed
-   * structural layer *behind* the lifted workspace panel (`--card` / `#080F1E`).
-   * Cool-toned but noticeably less saturated than the workspace surface:
-   *   workspace:  #080F1E  rgb(  8, 15, 30)
-   *   sidebar:    #070A14  rgb(  7, 10, 20)  ← ~33% less blue, darker overall
-   * Not pure black, not glossy, not a different theme — same family, recessed.
+   * Sidebar = deeper, matte, near-black graphite — recessed *behind* the
+   * lifted workspace panel (`--card` / `#0B0E14`). Sits on the same
+   * graphite family as the rest of the shell so the seam between
+   * sidebar and main surface no longer reads as "black block next to
+   * blue block":
+   *   workspace:  #0B0E14  rgb( 11, 14, 20)
+   *   sidebar:    #08090E  rgb(  8,  9, 14)   ← ~one tonal step darker
+   * Not pure black, not glossy, not a different theme — same family,
+   * recessed. The transition reads as depth, not as a hard color cut.
    */
-  --sidebar: #070A14;
+  --sidebar: #08090E;
   --sidebar-foreground: rgba(255, 255, 255, 0.72);
   --sidebar-primary: rgba(255, 255, 255, 0.92);
-  --sidebar-primary-foreground: #070A14;
+  --sidebar-primary-foreground: #08090E;
   --sidebar-accent: rgba(255, 255, 255, 0.07);
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgba(147, 147, 147, 0.09);
@@ -116,11 +131,11 @@
 
 /* html.dark (next-themes forces `dark`): mirror for override predictability. */
 .dark {
-  --background: #070E1F;
+  --background: #08090F;
   --foreground: rgba(255, 255, 255, 0.88);
-  --card: #080F1E;
+  --card: #0B0E14;
   --card-foreground: rgba(255, 255, 255, 0.88);
-  --popover: #080F1E;
+  --popover: #0B0E14;
   --popover-foreground: rgba(255, 255, 255, 0.88);
   --primary: rgba(255, 255, 255, 0.92);
   --primary-foreground: #070E1F;
@@ -139,10 +154,10 @@
   --chart-3: #A78BFA;
   --chart-4: #FBBF24;
   --chart-5: #7DD3FC;
-  --sidebar: #070A14;
+  --sidebar: #08090E;
   --sidebar-foreground: rgba(255, 255, 255, 0.72);
   --sidebar-primary: rgba(255, 255, 255, 0.92);
-  --sidebar-primary-foreground: #070A14;
+  --sidebar-primary-foreground: #08090E;
   --sidebar-accent: rgba(255, 255, 255, 0.07);
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgba(147, 147, 147, 0.09);
@@ -195,12 +210,12 @@
     transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
   .sv-hover-card:hover {
-    background-color: #0A1223;
+    background-color: #0E1119;
     border-color: rgba(147, 147, 147, 0.30);
   }
 
   /*
-   * Variant for cards painted on the *lifted* tone (`#0B1325`, used by
+   * Variant for cards painted on the *lifted* tone (`#0E1119`, used by
    * dashboard KPI cards and right-rail panels sitting on the workspace
    * canvas). Hover lifts one more tonal step toward the same border alpha
    * range as `sv-hover-card`, so the depth chain stays consistent rather
@@ -212,7 +227,7 @@
     transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
   .sv-hover-card-lifted:hover {
-    background-color: #0E1830;
+    background-color: #11141C;
     border-color: rgba(147, 147, 147, 0.30);
   }
 
