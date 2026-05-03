@@ -280,12 +280,12 @@ export default function UploadInterviewPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create interview");
+        throw new Error(errorData.error || "Failed to create source");
       }
 
       const interview = await response.json();
 
-      toast.success("Interview submitted for processing", {
+      toast.success("Audio source submitted for processing", {
         description:
           "Transcription has started. You'll be notified when it's ready.",
       });
@@ -332,12 +332,12 @@ export default function UploadInterviewPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create interview");
+        throw new Error(errorData.error || "Failed to create source");
       }
 
       const interview = await response.json();
 
-      toast.success("PDF interview submitted for processing", {
+      toast.success("PDF source submitted for processing", {
         description:
           "Text has been extracted and intelligence extraction has started.",
       });
@@ -382,12 +382,12 @@ export default function UploadInterviewPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create interview");
+        throw new Error(errorData.error || "Failed to create source");
       }
 
       const interview = await response.json();
 
-      toast.success("Text interview submitted for processing", {
+      toast.success("Text source submitted for processing", {
         description: "Intelligence extraction has started.",
       });
 
@@ -442,16 +442,16 @@ export default function UploadInterviewPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Interviews
+          Back to Intelligence
         </Link>
       </div>
 
       <Card className="mx-auto max-w-2xl">
         <CardHeader>
-          <CardTitle>Upload Interview</CardTitle>
+          <CardTitle>Add Source</CardTitle>
           <CardDescription>
-            Upload an audio recording or a PDF transcript to start the
-            intelligence extraction pipeline.
+            Add audio, PDF, or text material to start the intelligence
+            extraction pipeline.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -488,7 +488,7 @@ export default function UploadInterviewPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Source type toggle */}
               <div className="space-y-2">
-                <Label>Interview Source</Label>
+                <Label>Source type</Label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -532,13 +532,14 @@ export default function UploadInterviewPage() {
                 </div>
                 {sourceType === "document" && (
                   <p className="text-xs text-muted-foreground">
-                    For archived interviews where only a transcript PDF exists.
-                    Audio features will not be available.
+                    For document-based sources such as transcript PDFs, reports,
+                    or analysis notes. Audio features will not be available.
                   </p>
                 )}
                 {sourceType === "text" && (
                   <p className="text-xs text-muted-foreground">
-                    Paste a transcript or upload a .txt file. Minimum 100 characters.
+                    Paste notes, a transcript, or upload a .txt file. Minimum
+                    100 characters.
                   </p>
                 )}
               </div>
@@ -608,7 +609,7 @@ export default function UploadInterviewPage() {
               {/* PDF File Drop Zone */}
               {sourceType === "document" && (
                 <div className="space-y-2">
-                  <Label>PDF Transcript *</Label>
+                    <Label>PDF Source *</Label>
                   {pdfFile ? (
                     <div className="flex items-center gap-3 rounded-lg border p-3">
                       <FileText className="h-8 w-8 shrink-0 text-primary" />
@@ -694,9 +695,9 @@ export default function UploadInterviewPage() {
               {sourceType === "text" && (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label>Interview Text *</Label>
+                    <Label>Text Source *</Label>
                     <Textarea
-                      placeholder="Paste transcript here…"
+                      placeholder="Paste transcript, notes, or source text here…"
                       value={textContent}
                       onChange={(e) => setTextContent(e.target.value)}
                       rows={10}
@@ -746,9 +747,9 @@ export default function UploadInterviewPage() {
                 </div>
               )}
 
-              {/* Interview Title */}
+              {/* Source Title */}
               <div className="space-y-2">
-                <Label htmlFor="title">Interview Title *</Label>
+                <Label htmlFor="title">Source Title *</Label>
                 <Input
                   id="title"
                   placeholder="e.g. Minister of Energy — Abuja, Feb 2026"
@@ -788,7 +789,7 @@ export default function UploadInterviewPage() {
               {/* Primary Entities (optional anchor hints) */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="interviewee-name">Interviewee name</Label>
+                  <Label htmlFor="interviewee-name">Primary person</Label>
                   <InterviewAnchorEntityInput
                     id="interviewee-name"
                     projectId={projectId}
@@ -798,7 +799,7 @@ export default function UploadInterviewPage() {
                     onChange={setIntervieweeName}
                     onSelectedEntityIdChange={setIntervieweeEntityId}
                     disabled={loading}
-                    aria-label="Interviewee name"
+                    aria-label="Primary person"
                   />
                 </div>
                 <div className="space-y-2">
@@ -819,7 +820,7 @@ export default function UploadInterviewPage() {
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="interviewee-title">
-                    Interviewee role / title{" "}
+                    Primary person role / title{" "}
                     <span className="font-normal text-muted-foreground">
                       (optional)
                     </span>
@@ -840,7 +841,7 @@ export default function UploadInterviewPage() {
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  placeholder="Who was interviewed, key topics discussed..."
+                  placeholder="Context, key topics, or why this source matters..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
@@ -869,7 +870,7 @@ export default function UploadInterviewPage() {
               {sourceType === "audio" && (
                 <div className="space-y-2">
                   <Label htmlFor="expected-speakers">
-                    How many people participated in the interview?
+                    How many speakers are expected?
                   </Label>
                   <Select
                     value={expectedSpeakers}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUS_LABELS } from "@/lib/constants";
 import type { InterviewStatus } from "@/types/database";
-import { Clock, Mic, Upload } from "lucide-react";
+import { BookOpen, Clock, Upload } from "lucide-react";
 import { IconWrapper } from "@/components/ui/icon-wrapper";
 
 const PAGE_SIZE = 30;
@@ -71,10 +71,10 @@ export function ProjectInterviewsSection({
   return (
     <Card>
       <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-        <CardTitle>Interviews</CardTitle>
+        <CardTitle>Intelligence Sources</CardTitle>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
-            aria-label="Filter interviews by status"
+            aria-label="Filter sources by status"
             value={statusFilter}
             onChange={(event) => handleFilterChange(event.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -92,7 +92,7 @@ export function ProjectInterviewsSection({
             <Button size="sm" asChild>
               <Link href={`/interviews/upload?project=${projectId}`}>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Interview
+                Add Source
               </Link>
             </Button>
           )}
@@ -102,7 +102,7 @@ export function ProjectInterviewsSection({
         {filteredInterviews.length === 0 ? (
           <div className="rounded-lg border border-dashed py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              No interviews yet for this project.
+              No intelligence sources yet for this project.
             </p>
           </div>
         ) : (
@@ -124,7 +124,7 @@ export function ProjectInterviewsSection({
                       className="flex min-w-0 flex-1 items-center gap-4"
                     >
                       <IconWrapper color="indigo" size="md">
-                        <Mic className="h-5 w-5" />
+                        <BookOpen className="h-5 w-5" />
                       </IconWrapper>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{interview.title}</p>

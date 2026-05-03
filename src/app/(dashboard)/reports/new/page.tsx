@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -139,7 +138,7 @@ export default function NewReportPage() {
 
   const handleGenerate = async () => {
     if (!projectId || !template || !title.trim() || selectedInterviews.size === 0) {
-      toast.error("Please fill all fields and select at least one interview");
+      toast.error("Please fill all fields and select at least one source");
       return;
     }
 
@@ -264,7 +263,7 @@ export default function NewReportPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Generate Report</h1>
         <p className="mt-1 text-muted-foreground">
-          Select interviews and a template to generate an investor-grade
+          Select source material and a template to generate an investor-grade
           intelligence report using GPT-4o.
         </p>
       </div>
@@ -331,12 +330,12 @@ export default function NewReportPage() {
           </Card>
         )}
 
-        {/* Step 3: Interviews */}
+        {/* Step 3: Sources */}
         {template && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">3. Select Interviews</CardTitle>
+                <CardTitle className="text-lg">3. Select Sources</CardTitle>
                 {interviews.length > 0 && (
                   <Button variant="ghost" size="sm" onClick={selectAllInterviews}>
                     {selectedInterviews.size === interviews.length
@@ -346,7 +345,7 @@ export default function NewReportPage() {
                 )}
               </div>
               <CardDescription>
-                {interviews.length} completed interview
+                {interviews.length} completed source
                 {interviews.length !== 1 ? "s" : ""} available
                 {selectedInterviews.size > 0 &&
                   ` • ${selectedInterviews.size} selected`}
@@ -355,7 +354,7 @@ export default function NewReportPage() {
             <CardContent>
               {interviews.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                  No completed interviews in this project yet.
+                  No completed sources in this project yet.
                 </p>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto">

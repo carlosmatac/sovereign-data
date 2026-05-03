@@ -26,9 +26,9 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Image from "next/image";
 import {
+  BookOpen,
   LayoutDashboard,
   FolderKanban,
-  Mic,
   MessageSquare,
   Network,
   Settings,
@@ -54,9 +54,9 @@ const platformNavItems = [
     icon: FolderKanban,
   },
   {
-    title: "All Interviews (Search)",
+    title: "Intelligence",
     href: "/interviews",
-    icon: Mic,
+    icon: BookOpen,
   },
   {
     title: "Copilot",

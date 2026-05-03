@@ -7,7 +7,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
   Calendar,
-  FileText,
   Loader2,
   AlertTriangle,
   Download,
@@ -115,11 +114,11 @@ export default async function ReportDetailPage({ params }: Props) {
         )}
       </div>
 
-      {/* Source Interviews */}
+      {/* Source Material */}
       {sourceInterviews && sourceInterviews.length > 0 && (
         <div className="mb-6">
           <p className="mb-2 text-xs font-medium text-muted-foreground">
-            Source interviews ({sourceInterviews.length}):
+            Source material ({sourceInterviews.length}):
           </p>
           <div className="flex flex-wrap gap-1.5">
             {sourceInterviews.map((interview) => (
@@ -142,7 +141,7 @@ export default async function ReportDetailPage({ params }: Props) {
             <Loader2 className="mb-4 h-8 w-8 animate-spin text-muted-foreground" />
             <h3 className="font-semibold">Generating Report</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              GPT-4o is analyzing {report.interview_ids.length} interview
+              GPT-4o is analyzing {report.interview_ids.length} source
               {report.interview_ids.length > 1 ? "s" : ""} and writing your
               report. This may take 30–60 seconds.
             </p>

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  Mic,
+  BookOpen,
   FolderKanban,
   Users,
   CheckCircle2,
@@ -136,7 +136,7 @@ export default async function DashboardPage() {
   const snapshotScope = `${projectCount.toLocaleString()} ${
     projectCount === 1 ? "project" : "projects"
   } · ${interviewCount.toLocaleString()} ${
-    interviewCount === 1 ? "interview" : "interviews"
+    interviewCount === 1 ? "source" : "sources"
   }`;
 
   return (
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
           href="/interviews/upload"
           icon={<Upload className="h-[12px] w-[12px]" strokeWidth={1.8} />}
         >
-          Upload Interview
+          Add Source
         </TonalActionButton>
       </div>
 
@@ -184,10 +184,10 @@ export default async function DashboardPage() {
         />
         <StatLink
           href="/interviews"
-          label="Interviews"
+          label="Intelligence"
           value={interviewCount}
           sub={`${completedCount} completed · ${processingCount} processing`}
-          icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.6} />}
+          icon={<BookOpen className="h-[12px] w-[12px]" strokeWidth={1.6} />}
           accent="#818CF8"
         />
         <StatLink
@@ -208,8 +208,8 @@ export default async function DashboardPage() {
        * natural height (`items-start`):
        *
        *   left col (col-span-8):
-       *     · Recent Interviews
-       *     · Charts row (Interviews-by-Project + Topic Distribution
+       *     · Recent Intelligence
+       *     · Charts row (Intelligence-by-Project + Topic Distribution
        *       side-by-side via an inner 2-col grid)
        *   right rail (col-span-4):
        *     · Pipeline Status
@@ -230,19 +230,19 @@ export default async function DashboardPage() {
        * everything stacks into a single column unchanged.
        */}
       <div className="grid items-start gap-4 lg:grid-cols-12">
-        {/* Left column — Recent Interviews + charts */}
+        {/* Left column — Recent Intelligence + charts */}
         <div className="flex flex-col gap-4 lg:col-span-8">
           <SectionSurface
             tone="lifted"
             header={{
-              title: "Recent Interviews",
-              subtitle: "Latest uploaded recordings",
+              title: "Recent Intelligence",
+              subtitle: "Latest uploaded sources",
               right: (
                 <Link
                   href="/interviews"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55 transition-colors duration-150 hover:text-white"
                 >
-                  View all
+                  View all intelligence
                   <ArrowUpRight className="h-[11px] w-[11px]" />
                 </Link>
               ),
@@ -251,17 +251,17 @@ export default async function DashboardPage() {
           >
             {recentInterviews.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-                <Mic
+                <BookOpen
                   className="mb-3 h-7 w-7 text-white/22"
                   strokeWidth={1.5}
                 />
                 <p className="text-[12.5px] text-white/55">
-                  No interviews yet.{" "}
+                  No sources yet.{" "}
                   <Link
                     href="/interviews/upload"
                     className="text-white/85 underline decoration-white/30 underline-offset-2 transition-colors duration-150 hover:text-white"
                   >
-                    Upload your first one.
+                    Add your first source.
                   </Link>
                 </p>
               </div>
@@ -307,8 +307,8 @@ export default async function DashboardPage() {
                 <SectionSurface
                   tone="lifted"
                   header={{
-                    title: "Interviews by Project",
-                    subtitle: "Completed interviews per project",
+                    title: "Intelligence by Project",
+                    subtitle: "Completed sources per project",
                     right: (
                       <TrendingUp
                         className="h-[13px] w-[13px] text-white/45"
@@ -335,7 +335,7 @@ export default async function DashboardPage() {
                   tone="lifted"
                   header={{
                     title: "Topic Distribution",
-                    subtitle: `Top ${topTopics.length} themes across all interviews`,
+                    subtitle: `Top ${topTopics.length} themes across all sources`,
                     right: (
                       <Hash
                         className="h-[13px] w-[13px] text-white/45"
@@ -367,7 +367,7 @@ export default async function DashboardPage() {
             tone="lifted"
             header={{
               title: "Pipeline Status",
-              subtitle: "Interview processing",
+              subtitle: "Source processing",
             }}
             bodyClassName="px-4 py-3.5"
           >
@@ -403,7 +403,12 @@ export default async function DashboardPage() {
                   label="Total"
                   count={interviewCount}
                   accent="#94A3B8"
-                  icon={<Mic className="h-[12px] w-[12px]" strokeWidth={1.8} />}
+                  icon={
+                    <BookOpen
+                      className="h-[12px] w-[12px]"
+                      strokeWidth={1.8}
+                    />
+                  }
                   bold
                 />
               </div>
@@ -416,7 +421,7 @@ export default async function DashboardPage() {
             * every action feel equally important and template-y) with
             * a vertical list that establishes a clear hierarchy:
             *
-            *   [ Upload Interview ]   ← primary, slightly lifted
+            *   [ Add Source ]   ← primary, slightly lifted
             *   ─────────────────────
             *   • Copilot            ↗
             *   • Network Explorer   ↗
@@ -434,8 +439,8 @@ export default async function DashboardPage() {
             <PrimaryQuickAction
               href="/interviews/upload"
               icon={Upload}
-              label="Upload Interview"
-              caption="Add a new recording"
+              label="Add Source"
+              caption="Add a new source"
             />
             <div
               aria-hidden

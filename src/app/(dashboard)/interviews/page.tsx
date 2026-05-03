@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthUser } from "@/lib/auth/project-role";
-import { Plus, Mic, Clock, FolderKanban } from "lucide-react";
+import { Plus, BookOpen, Clock, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/constants";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
@@ -83,11 +83,12 @@ export default async function InterviewsPage({
             className="text-[28px] font-semibold text-white"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
-            All Interviews
+            Intelligence Library
           </h1>
           <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-white/62">
-            Cross-project interview index. For day-to-day workflow, start in
-            Projects and manage interviews in project context.
+            Cross-project source library for uploaded audio, documents, and
+            text-based intelligence. For day-to-day workflow, start in Projects
+            and manage sources in project context.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -107,33 +108,33 @@ export default async function InterviewsPage({
               href="/interviews/upload"
               icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
             >
-              Upload Interview
+              Add Source
             </TonalActionButton>
           )}
         </div>
       </div>
 
-      {/* Interview List */}
+      {/* Source List */}
       {error ? (
         <SectionSurface>
           <p className="py-10 text-center text-[13px] text-white/60">
-            Failed to load interviews. Please try again.
+            Failed to load intelligence sources. Please try again.
           </p>
         </SectionSurface>
       ) : !interviews || interviews.length === 0 ? (
         <SectionSurface bodyClassName="flex flex-col items-center py-16 text-center">
           <IconWell accent="#818CF8" size={44}>
-            <Mic
+            <BookOpen
               className="h-[18px] w-[18px]"
               style={{ color: "#818CF8" }}
               strokeWidth={1.5}
             />
           </IconWell>
           <h3 className="mt-3 text-[14px] font-semibold text-white/92">
-            No interviews yet
+            No sources yet
           </h3>
           <p className="mt-1.5 text-[12.5px] text-white/60">
-            Upload your first audio interview to start extracting intelligence.
+            Add your first source to start extracting intelligence.
           </p>
           {canUpload && (
             <div className="mt-4">
@@ -141,7 +142,7 @@ export default async function InterviewsPage({
                 href="/interviews/upload"
                 icon={<Plus className="h-[12px] w-[12px]" strokeWidth={2} />}
               >
-                Upload Interview
+                Add Source
               </TonalActionButton>
             </div>
           )}
@@ -149,8 +150,8 @@ export default async function InterviewsPage({
       ) : (
         <SectionSurface
           header={{
-            title: "Interviews",
-            subtitle: `${interviews.length} recording${interviews.length === 1 ? "" : "s"}`,
+            title: "Sources",
+            subtitle: `${interviews.length} source${interviews.length === 1 ? "" : "s"}`,
           }}
           bodyClassName="p-2"
         >
