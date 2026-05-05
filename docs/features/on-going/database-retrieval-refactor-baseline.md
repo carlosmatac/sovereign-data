@@ -1,9 +1,9 @@
 ---
 title: "Database refactor — baseline diagnostics (Phase 0)"
-status: to-do
+status: on-going
 owner: team
 priority: high
-last_updated: 2026-05-04
+last_updated: 2026-05-05
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
   - docs/architecture/agentic-rag.md
@@ -180,7 +180,7 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
 | Phase | Date | §12.1 | §12.2 | §12.3 | §12.4 | §12.5 | §12.6 | §12.7 | §12.8 | §12.9 | §12.10 | §12.11 | §12.12 | §12.13 | §12.14 | §12.15 | §12.16 |
 | ----- | ---- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: |
 | 0 (baseline) | 2026-05-05 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| 1 (chat retrieval RPC) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 1 (chat retrieval RPC) | 2026-05-05 | 0 | 0 | **22** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **2** | 0 | 0 | 0 |
 | 2 (source-first foundation) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -200,3 +200,12 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   orphan entities** (§12.3), which Phase 2.3 targets directly. Phase 2.5
   pre-flight (§12.10, §12.12) is **clean** — no remediation migration
   required ahead of the unique-constraint swap.
+- 2026-05-05 — Re-ran post-Phase-1 (`00026_entity_intel_rpc.sql`
+  applied). Two deltas vs. baseline: §12.3 18 → **22** orphan entities
+  (+4), §12.13 1 → **2** reviewed interviews (+1). Cause traced to a
+  reviewed reprocess of "Reunion Clara" at 18:58:14Z (between the two
+  audit runs), which created 4 anchor entities the persistence gate
+  later dropped — exactly the P5 / §5.3 pattern. Confirmed Phase 1 is
+  retrieval-only: it adds no entities, no mentions, no relationships,
+  and the +4 orphans are independent of the Phase 1 change set. Phase
+  2.3 will continue to target this metric.
