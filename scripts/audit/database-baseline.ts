@@ -110,11 +110,13 @@ async function runQuery(client: Client, sql: string): Promise<QueryResult> {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  const candidates: { name: string; url: string | undefined }[] = [
-    { name: "DATABASE_URL_DIRECT", url: process.env.DATABASE_URL_DIRECT },
-    { name: "DATABASE_URL_POOLER", url: process.env.DATABASE_URL_POOLER },
-    { name: "DATABASE_URL", url: process.env.DATABASE_URL },
-  ].filter((c): c is { name: string; url: string } => Boolean(c.url));
+  const candidates: { name: string; url: string }[] = (
+    [
+      { name: "DATABASE_URL_DIRECT", url: process.env.DATABASE_URL_DIRECT },
+      { name: "DATABASE_URL_POOLER", url: process.env.DATABASE_URL_POOLER },
+      { name: "DATABASE_URL", url: process.env.DATABASE_URL },
+    ] as const
+  ).flatMap((c) => (c.url ? [{ name: c.name, url: c.url }] : []));
 
   if (candidates.length === 0) {
     console.error(

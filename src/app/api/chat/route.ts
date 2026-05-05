@@ -506,7 +506,7 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
 
       lookupMentions: tool({
         description:
-          "Get interview mentions for an entity (by entity_id). Returns the interview titles, sentiment, and chunk content where the entity was discussed. Use to gather context about how an entity is portrayed across interviews.",
+          "Get interviews where this entity (by entity_id) is associated. Returns interviews where the entity is the upload-anchor INTERVIEWEE, the INTERVIEWEE'S ORG, mentioned in a transcript chunk, or party to a non-rejected relationship. Each row carries a `role` field naming which kind of association it is. Use to gather every source where the entity matters, not just textual mentions.",
         inputSchema: z.object({
           entityId: z.string().describe("The entity UUID returned by lookupEntity"),
         }),
@@ -521,7 +521,8 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
           if (mentions.length === 0) {
             return {
               found: false,
-              message: "No interview mentions found for this entity.",
+              message:
+                "No interviews found where this entity is mentioned, an interviewee anchor, or a relationship party.",
             };
           }
           return {
@@ -530,10 +531,17 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
             mentions: mentions.map((m) => ({
               interview_title: m.interview_title,
               interview_id: m.interview_id,
+              role: m.role,
               sentiment: m.sentiment ?? "neutral",
               context: m.chunk_content
                 ? m.chunk_content.slice(0, 500)
-                : "No chunk content available",
+                : m.role === "interviewee"
+                  ? "Anchor interviewee on this source — no transcript excerpt for this row."
+                  : m.role === "interviewee_org"
+                    ? "Anchor interviewee org on this source — no transcript excerpt for this row."
+                    : m.role === "related_via_relationship"
+                      ? "Linked via an entity relationship on this source — no transcript excerpt for this row."
+                      : "No chunk content available",
             })),
           };
         },

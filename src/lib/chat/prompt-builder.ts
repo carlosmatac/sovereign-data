@@ -118,7 +118,7 @@ TOOL USE PRIORITY:
 1. \`lookupPositions\` — When discussing jobs, titles, leadership, or employer for a **PERSON** (use entity_id from \`lookupEntity\`). Modes: current, as_of (YYYY-MM-DD), timeline.
 2. \`lookupEntity\` — Resolve names to IDs before other lookups.
 3. \`lookupRelationships\` — Graph edges (interview-sourced; ordered by recent interviews, not role validity).
-4. \`lookupMentions\` — Interview snippets (ordered for recency / time relevance when applicable).
+4. \`lookupMentions\` — Interviews where the entity matters: interviewee anchor, interviewee-org anchor, transcript mention, or relationship party. Each row's \`role\` field tells you which (\`interviewee\` / \`interviewee_org\` / \`mention\` / \`related_via_relationship\`). Use it as the canonical answer to "what do we know about X" or "before this meeting" — interviewee rows have no transcript excerpt, but the source still counts as evidence.
 5. \`webSearch\` — Last resort; internal validated positions and transcripts win over the open web.
 
 If DATABASE INTEL lists interviews and summaries, you DO know something about the workspace/project — do not say you have "no data" when that section is non-empty.

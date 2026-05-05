@@ -1170,6 +1170,27 @@ export interface Database {
         Args: { p_conversation_id: string };
         Returns: number;
       };
+      entity_intel: {
+        Args: {
+          p_entity_id: string;
+          p_project_id?: string | null;
+        };
+        Returns: Array<{
+          source_id: string;
+          source_title: string;
+          role:
+            | "mention"
+            | "interviewee"
+            | "interviewee_org"
+            | "related_via_relationship";
+          kind: "mention" | "anchor" | "relationship";
+          evidence: string | null;
+          chunk_id: string | null;
+          sentiment: string | null;
+          conducted_at: string | null;
+          created_at: string;
+        }>;
+      };
     };
     Enums: {
       interview_status: InterviewStatus;

@@ -21,12 +21,55 @@ export interface RelationshipEdge {
   other_entity_type: string;
 }
 
+/**
+ * Mention/association role surfaced by the entity_intel RPC.
+ *
+ * - `mention`: an entity_mentions row with chunk content (today's behaviour)
+ * - `interviewee`: the entity is the upload anchor interviewee on this
+ *   interview, regardless of whether a chunk-level mention survived the
+ *   persistence gate (audit §13)
+ * - `interviewee_org`: same as above for the interviewee's org anchor
+ * - `related_via_relationship`: an active (non-rejected) entity_relationships
+ *   row touches this entity on this interview
+ *
+ * See migration 00026_entity_intel_rpc.sql and
+ * docs/features/on-going/chat-entity-retrieval-rpc.md.
+ */
+export type MentionRole =
+  | "mention"
+  | "interviewee"
+  | "interviewee_org"
+  | "related_via_relationship";
+
+export type MentionKind = "mention" | "anchor" | "relationship";
+
 export interface MentionRecord {
   interview_id: string;
   interview_title: string;
   sentiment: string | null;
   chunk_content: string | null;
   interview_time_ms: number | null;
+  role: MentionRole;
+  kind: MentionKind;
+}
+
+/**
+ * Precedence used when an entity has multiple rows for the same interview
+ * (e.g. interviewee anchor + textual mention + relationship). Lower index =
+ * higher precedence in the deduped output. The Copilot benefits more from
+ * "this person was the interviewee" than from "this person was mentioned" or
+ * "this person is in a relationship in this interview."
+ */
+const MENTION_ROLE_PRECEDENCE: MentionRole[] = [
+  "interviewee",
+  "interviewee_org",
+  "mention",
+  "related_via_relationship",
+];
+
+function rolePrecedence(role: MentionRole): number {
+  const idx = MENTION_ROLE_PRECEDENCE.indexOf(role);
+  return idx === -1 ? MENTION_ROLE_PRECEDENCE.length : idx;
 }
 
 /**
@@ -188,7 +231,18 @@ export async function getRelationships(
 }
 
 /**
- * Get all mentions of an entity across interviews, with chunk content for context.
+ * Get all interviews where an entity is associated as a textual mention,
+ * upload-anchor interviewee/interviewee_org, or via a non-rejected
+ * relationship. Backed by the `entity_intel` SECURITY DEFINER RPC
+ * (migration 00026).
+ *
+ * Closes the audit §13 retrieval gap: an entity that is the interviewee
+ * of an interview but has no surviving chunk-level mention is no longer
+ * invisible to the chat tool.
+ *
+ * Dedup: when the same interview has multiple rows (e.g. interviewee
+ * anchor + textual mention), only the highest-precedence row survives
+ * (see {@link MENTION_ROLE_PRECEDENCE}).
  */
 export async function getMentions(
   admin: AdminClient,
@@ -199,32 +253,44 @@ export async function getMentions(
     prioritizeTemporalProximity?: boolean;
   }
 ): Promise<MentionRecord[]> {
-  const { data: mentions } = await admin
-    .from("entity_mentions")
-    .select(
-      "interview_id, sentiment, chunk_id, interviews!entity_mentions_interview_id_fkey(title, project_id, conducted_at, created_at)"
-    )
-    .eq("entity_id", entityId)
-    .order("created_at", { ascending: false })
-    .limit(60);
-  if (!mentions || mentions.length === 0) return [];
+  const { data, error } = await admin.rpc("entity_intel", {
+    p_entity_id: entityId,
+    p_project_id: projectId ?? null,
+  });
+  if (error) {
+    console.error("[entity-lookup] entity_intel RPC failed", error);
+    return [];
+  }
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
 
-  const results: MentionRecord[] = [];
-  const chunkIds = mentions
-    .filter((m) => m.chunk_id)
-    .map((m) => m.chunk_id as string);
-
-  // Batch-fetch chunk content for context
-  const chunkMap = new Map<string, string>();
-  if (chunkIds.length > 0) {
-    const { data: chunks } = await admin
-      .from("interview_chunks")
-      .select("id, content")
-      .in("id", chunkIds);
-    for (const c of chunks ?? []) {
-      chunkMap.set(c.id, c.content);
+  // Map raw RPC rows → MentionRecord[]; dedup by source_id keeping the
+  // highest-precedence role (interviewee > interviewee_org > mention >
+  // related_via_relationship).
+  const byInterview = new Map<string, MentionRecord>();
+  for (const row of rows) {
+    const role = row.role as MentionRole;
+    const kind = row.kind as MentionKind;
+    const timeRaw = row.conducted_at ?? row.created_at ?? null;
+    const interviewTimeMs = timeRaw ? Date.parse(timeRaw) : null;
+    const candidate: MentionRecord = {
+      interview_id: row.source_id,
+      interview_title: row.source_title ?? "Unknown Interview",
+      sentiment: row.sentiment,
+      chunk_content: row.evidence,
+      interview_time_ms:
+        interviewTimeMs !== null && !Number.isNaN(interviewTimeMs)
+          ? interviewTimeMs
+          : null,
+      role,
+      kind,
+    };
+    const existing = byInterview.get(row.source_id);
+    if (!existing || rolePrecedence(role) < rolePrecedence(existing.role)) {
+      byInterview.set(row.source_id, candidate);
     }
   }
+  const results = Array.from(byInterview.values());
 
   const targetMs =
     options?.targetDateIso &&
@@ -232,24 +298,6 @@ export async function getMentions(
     /^\d{4}-\d{2}-\d{2}$/.test(options.targetDateIso)
       ? Date.parse(`${options.targetDateIso}T12:00:00.000Z`)
       : null;
-
-  for (const m of mentions) {
-    const interview = unwrapInterviewWithDates(m.interviews);
-    if (projectId && interview?.project_id && interview.project_id !== projectId) {
-      continue;
-    }
-    const timeRaw = interview?.conducted_at ?? interview?.created_at ?? null;
-    const interviewTimeMs = timeRaw ? Date.parse(timeRaw) : null;
-    results.push({
-      interview_id: m.interview_id,
-      interview_title: interview?.title ?? "Unknown Interview",
-      sentiment: m.sentiment,
-      chunk_content: m.chunk_id ? (chunkMap.get(m.chunk_id) ?? null) : null,
-      interview_time_ms: interviewTimeMs !== null && !Number.isNaN(interviewTimeMs)
-        ? interviewTimeMs
-        : null,
-    });
-  }
 
   if (targetMs !== null && !Number.isNaN(targetMs)) {
     results.sort((a, b) => {
@@ -336,20 +384,3 @@ function unwrapBasicEntity(value: unknown): BasicEntity | null {
   return value as BasicEntity;
 }
 
-function unwrapInterviewWithDates(
-  value: unknown
-): {
-  title: string;
-  project_id?: string | null;
-  conducted_at?: string | null;
-  created_at?: string | null;
-} | null {
-  if (!value) return null;
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value as {
-    title: string;
-    project_id?: string | null;
-    conducted_at?: string | null;
-    created_at?: string | null;
-  };
-}
