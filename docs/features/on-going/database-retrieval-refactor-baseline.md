@@ -209,3 +209,30 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   retrieval-only: it adds no entities, no mentions, no relationships,
   and the +4 orphans are independent of the Phase 1 change set. Phase
   2.3 will continue to target this metric.
+- 2026-05-06 — Phase 1 manual chat tests run by the human reviewer.
+  Verbatim outputs and per-finding attribution recorded in
+  [`chat-entity-retrieval-rpc.md` §Live verification report](./chat-entity-retrieval-rpc.md).
+  Two new audit-shaped facts were uncovered that this baseline did
+  not capture and that warrant follow-up probes in later cadence
+  rows:
+  1. **§12.10 has a blind spot.** The probe groups by
+     `(normalized_name, type)`; same-name / different-type canonical
+     duplicates (e.g. `One World Media` × COMPANY+ORGANIZATION,
+     `Banco Angolano de Investimentos` × COMPANY+ORGANIZATION+PUBLIC_INSTITUTION
+     in the Angola project) escape it. A §12.10b probe (group by
+     `normalized_name` only, count distinct types) is tracked under
+     the to-do spec [`entity-cross-type-deduplication.md`](../to-do/entity-cross-type-deduplication.md)
+     and should be added to `scripts/audit/queries/` before the
+     Phase 2.5 pre-flight re-run.
+  2. **`entities.metadata` coverage is 0/56.** Not currently in §12;
+     adding a §12.17 probe (`with_meta`, `avg_desc_len`,
+     `with_desc_50`) would let us track the description / metadata
+     enrichment work proposed under
+     [`entity-metadata-and-descriptions.md`](../to-do/entity-metadata-and-descriptions.md).
+  3. **Anchor FKs are still 0/5.** Already noted in the Phase 1 spec
+     (`with_interviewee_fk = 0`, `with_org_fk = 0`); §12.1 / §12.2
+     remain `0` only because the FK columns the probes read are
+     uniformly NULL. A small companion migration
+     `00027_backfill_interviewee_fks.sql` would activate Phase 1's
+     anchor branch on existing rows; pending sign-off in the Phase 1
+     spec.
