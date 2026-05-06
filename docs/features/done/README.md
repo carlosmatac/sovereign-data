@@ -16,5 +16,6 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [edit-interview-title.md](./edit-interview-title.md) | Inline rename of interview title from detail page |
 
 | [ingestion-refactor.md](./ingestion-refactor.md) | Unified ingestion pipeline, text source type, semantic classification, candidate entities |
+| [chat-entity-retrieval-rpc.md](./chat-entity-retrieval-rpc.md) | Phase 1 of database refactor — `entity_intel` SECURITY DEFINER RPC + `lookupMentions` rewrite (interviewee / interviewee-org / mention / relationship branches) |
 
 New completed features: add a row here when you move a spec into this folder.

@@ -19,13 +19,50 @@ This file stays **short**. Per-feature detail lives under [`docs/features/`](../
 
 ## Right now
 
-Right now, only focus on (./database-refactor-plan.md)
+Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.md).
+
+**Refactor progress:**
+
+- **Phase 0 (baseline)** — done. Audit baseline captured + cadence
+  table opened in
+  [`docs/features/on-going/database-retrieval-refactor-baseline.md`](../features/on-going/database-retrieval-refactor-baseline.md).
+- **Phase 1 (entity-centered retrieval RPC)** — done (2026-05-06).
+  Spec at
+  [`docs/features/done/chat-entity-retrieval-rpc.md`](../features/done/chat-entity-retrieval-rpc.md);
+  migration `supabase/migrations/00026_entity_intel_rpc.sql`.
+- **Phase 2.1** — next on deck per the plan.
+
+---
+
+## Tracked product fixes (queued, do not auto-start)
+
+These came out of Phase 1 manual chat testing (2026-05-06). They are
+**not refactor phases**; they are scoped product/data-quality fixes
+that should not get lost behind the phased work:
+
+- [`docs/features/to-do/entity-cross-type-deduplication.md`](../features/to-do/entity-cross-type-deduplication.md)
+  — same-name / different-type canonical duplicates
+  (`One World Media`, `Banco Angolano de Investimentos`, …) +
+  audit-probe gap (§12.10b).
+- [`docs/features/to-do/entity-correction-governance.md`](../features/to-do/entity-correction-governance.md)
+  — reviewer corrections must repoint mentions / relationships /
+  aliases instead of leaving stale canonical rows behind.
+- [`docs/features/to-do/entity-metadata-and-descriptions.md`](../features/to-do/entity-metadata-and-descriptions.md)
+  — `entities.metadata` is empty for all 56 canonical entities;
+  descriptions are 100-char-capped and underperform as standalone
+  evidence.
+- [`docs/features/to-do/chat-citation-routing.md`](../features/to-do/chat-citation-routing.md)
+  — server-side sanitizer for citation links; the LLM occasionally
+  fabricates `https://example.com/...` despite the prompt rule.
 
 ---
 
 ## Immediate next
 
-- **Derive from** product discussion and whatever sits in `to-do/` / `on-going/` — not from legacy phase tables.
+- **Refactor:** Phase 2.1 of
+  [`database-refactor-plan.md`](./database-refactor-plan.md).
+- **Backlog:** the four queued specs above, in priority order set
+  by the human reviewer.
 
 ---
 
