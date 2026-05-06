@@ -182,6 +182,7 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
 | 0 (baseline) | 2026-05-05 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | 1 (chat retrieval RPC) | 2026-05-05 | 0 | 0 | **22** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **2** | 0 | 0 | 0 |
 | 2.1 (source rename + back-compat views) | 2026-05-06 | 0 | 0 | **24** | 0 | 0 | **1** | 0 | 0 | 0 | 0 | 0 | 0 | **3** | 0 | 0 | 0 |
+| 2.2 (`source_entities` table + anchor backfill) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
 | 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 4a (chat evidence) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -254,3 +255,29 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   recreates helpers/policies/functions, and creates read-only views;
   it does not insert entities, mentions, relationships, chunks, or
   review data. Phase 2.3 remains the target for orphan growth.
+
+- 2026-05-06 — Re-ran post-Phase-2.2 (`00028_source_entities_table.sql`
+  applied). All §12.* counts unchanged from Phase 2.1, as expected:
+  the migration adds two enums (`source_entity_link_type`,
+  `source_entity_origin`), one new table (`source_entities`) with
+  4 RLS policies and 5 indexes (PK + quad UNIQUE + 3 secondary), one
+  trigger, and a one-shot anchor backfill from `sources.interviewee_*_entity_id`.
+  The audit predates this table and does not yet probe it.
+
+  Backfill row count is **0** on this dataset because every
+  `sources` row currently has both anchor FKs NULL — consistent with
+  §12.1 / §12.2 = 0 and with the 2026-05-06 finding "Anchor FKs are
+  still 0/5". The migration's own `RAISE EXCEPTION` invariant
+  (`count(source_entities WHERE …upload_anchor) ==
+   count(sources WHERE …entity_id IS NOT NULL)`) ran clean for both
+  link types. The invariant is structural: it will continue to hold
+  when PR 2.3 starts writing real anchor rows.
+
+  Two follow-up audit probes are queued (not blocking 2.2) so future
+  cadence rows can track the new table:
+
+  1. `§12.17` — `source_entities` row count grouped by
+     `(link_type, origin)`, to make growth visible per provenance.
+  2. `§12.18` — anchors that exist on `sources` but have no
+     matching `source_entities` row (will become non-trivially
+     populated once PR 2.3 hooks the pipeline; today vacuously 0).

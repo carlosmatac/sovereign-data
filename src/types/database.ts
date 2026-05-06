@@ -118,6 +118,39 @@ export type RelationshipReviewStatus = "pending" | "approved" | "rejected";
 export type RelationshipOrigin = "llm" | "human_created" | "human_edited";
 
 /**
+ * Source-level (source, entity) association layer (added in migration 00028).
+ *
+ * `link_type` describes WHAT the link is; `origin` describes HOW it was
+ * learned. The `source_entities` table allows multiple provenance rows
+ * for the same logical association via `UNIQUE(source_id, entity_id,
+ * link_type, origin)`.
+ */
+export type SourceEntityLinkType =
+  | "interviewee"
+  | "interviewee_org"
+  | "interviewer"
+  | "translator"
+  | "participant"
+  | "author"
+  | "primary_subject"
+  | "subject_organization"
+  | "account"
+  | "source_owner"
+  | "mentioned_at_source_level"
+  | "related_entity";
+
+export type SourceEntityOrigin =
+  | "upload_anchor"
+  | "metadata_import"
+  | "extraction"
+  | "crm_import"
+  | "manual_tag"
+  | "ai_inference"
+  | "human_review"
+  | "alias_propagation"
+  | "prior_context";
+
+/**
  * Review statuses that count as **active** in the operational graph
  * (Network Explorer edges + connections panel, chat-tool relationship
  * lookups, report intelligence, dashboard counts).
@@ -569,6 +602,69 @@ export interface Database {
             columns: ["interview_id"];
             isOneToOne: false;
             referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      source_entities: {
+        Row: {
+          id: string;
+          source_id: string;
+          entity_id: string;
+          link_type: SourceEntityLinkType;
+          origin: SourceEntityOrigin;
+          is_primary: boolean;
+          speaker_label: string | null;
+          source_metadata: Record<string, unknown> | null;
+          evidence: Record<string, unknown> | null;
+          confidence: number | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_id: string;
+          entity_id: string;
+          link_type: SourceEntityLinkType;
+          origin: SourceEntityOrigin;
+          is_primary?: boolean;
+          speaker_label?: string | null;
+          source_metadata?: Record<string, unknown> | null;
+          evidence?: Record<string, unknown> | null;
+          confidence?: number | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_id?: string;
+          entity_id?: string;
+          link_type?: SourceEntityLinkType;
+          origin?: SourceEntityOrigin;
+          is_primary?: boolean;
+          speaker_label?: string | null;
+          source_metadata?: Record<string, unknown> | null;
+          evidence?: Record<string, unknown> | null;
+          confidence?: number | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "source_entities_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "sources";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "source_entities_entity_id_fkey";
+            columns: ["entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
             referencedColumns: ["id"];
           },
         ];
@@ -1255,6 +1351,8 @@ export interface Database {
       relation_type: RelationType;
       relationship_review_status: RelationshipReviewStatus;
       relationship_origin: RelationshipOrigin;
+      source_entity_link_type: SourceEntityLinkType;
+      source_entity_origin: SourceEntityOrigin;
       source_type: SourceType;
       snippet_platform: SnippetPlatform;
       snippet_tone: SnippetTone;
@@ -1285,6 +1383,7 @@ export type Project = Tables<"projects">;
 export type ProjectMember = Tables<"project_members">;
 export type Source = Tables<"sources">;
 export type SourceChunk = Tables<"source_chunks">;
+export type SourceEntity = Tables<"source_entities">;
 export type Interview = Tables<"interviews">;
 export type InterviewChunk = Tables<"interview_chunks">;
 export type Entity = Tables<"entities">;
