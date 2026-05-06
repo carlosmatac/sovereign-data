@@ -58,7 +58,7 @@ export async function buildProjectIntelBrief(
   for (const inv of completed) {
     lines.push(`— "${inv.title}" (interview_id: ${inv.id})`);
     if (inv.last_intel_source === "human_review") {
-      lines.push("  (Intel from human-reviewed transcript pass)");
+      lines.push("  (Knowledge from human-reviewed transcript pass)");
     }
     if (inv.summary) {
       lines.push(`  Executive summary: ${clip(inv.summary, MAX_SUMMARY_LEN)}`);
@@ -115,7 +115,7 @@ export async function buildWorkspaceIntelBriefForUser(
   const lines: string[] = [
     "WORKSPACE PROJECTS (database — you are not scoped to a single project URL):",
     "When the user names a project (e.g. Nigeria 2026), match it to a PROJECT name below and use that project's interviews.",
-    "Summaries are authoritative high-level intel; pair with transcript RAG + tools for quotes and relationships.",
+    "Summaries are authoritative high-level knowledge; pair with transcript RAG + tools for quotes and relationships.",
     "",
   ];
 

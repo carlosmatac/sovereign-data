@@ -11,7 +11,7 @@
 
 ## 1. BUSINESS CONTEXT
 
-**Sovereign Data** is a Frontier Markets Intelligence Platform for a media/consulting firm operating in the Global South. It transforms 60–90 minute exclusive interviews with Ministers, CEOs, and Diplomats into a searchable, AI-powered business intelligence database.
+**Sovereign Data** is a Frontier Markets Knowledge Platform for a media/consulting firm operating in the Global South. It transforms 60–90 minute exclusive interviews with Ministers, CEOs, and Diplomats into a searchable, AI-powered company knowledge database.
 
 ### Three Pillars
 

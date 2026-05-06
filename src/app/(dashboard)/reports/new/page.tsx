@@ -264,7 +264,7 @@ export default function NewReportPage() {
         <h1 className="text-3xl font-bold tracking-tight">Generate Report</h1>
         <p className="mt-1 text-muted-foreground">
           Select source material and a template to generate an investor-grade
-          intelligence report using GPT-4o.
+          knowledge report using GPT-4o.
         </p>
       </div>
 

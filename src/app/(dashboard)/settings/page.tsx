@@ -80,7 +80,7 @@ export default function SettingsPage() {
           icon={<Brain className="h-[15px] w-[15px]" style={{ color: "#A78BFA" }} strokeWidth={1.6} />}
           accent="#A78BFA"
           title="AI Pipeline"
-          subtitle="Model configuration for the intelligence engine"
+          subtitle="Model configuration for the knowledge engine"
           rows={aiRows}
         />
         <SettingsPanel

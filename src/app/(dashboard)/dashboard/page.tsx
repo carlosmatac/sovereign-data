@@ -176,7 +176,7 @@ export default async function DashboardPage() {
           href="/projects"
           label="Projects"
           value={projectCount}
-          sub="Active intelligence projects"
+          sub="Active knowledge projects"
           icon={
             <FolderKanban className="h-[12px] w-[12px]" strokeWidth={1.6} />
           }
@@ -184,7 +184,7 @@ export default async function DashboardPage() {
         />
         <StatLink
           href="/interviews"
-          label="Intelligence"
+          label="Knowledge"
           value={interviewCount}
           sub={`${completedCount} completed · ${processingCount} processing`}
           icon={<BookOpen className="h-[12px] w-[12px]" strokeWidth={1.6} />}
@@ -208,8 +208,8 @@ export default async function DashboardPage() {
        * natural height (`items-start`):
        *
        *   left col (col-span-8):
-       *     · Recent Intelligence
-       *     · Charts row (Intelligence-by-Project + Topic Distribution
+       *     · Recent Knowledge
+       *     · Charts row (Knowledge-by-Project + Topic Distribution
        *       side-by-side via an inner 2-col grid)
        *   right rail (col-span-4):
        *     · Pipeline Status
@@ -230,19 +230,19 @@ export default async function DashboardPage() {
        * everything stacks into a single column unchanged.
        */}
       <div className="grid items-start gap-4 lg:grid-cols-12">
-        {/* Left column — Recent Intelligence + charts */}
+        {/* Left column — Recent Knowledge + charts */}
         <div className="flex flex-col gap-4 lg:col-span-8">
           <SectionSurface
             tone="lifted"
             header={{
-              title: "Recent Intelligence",
+              title: "Recent Knowledge",
               subtitle: "Latest uploaded sources",
               right: (
                 <Link
                   href="/interviews"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55 transition-colors duration-150 hover:text-white"
                 >
-                  View all intelligence
+                  View all knowledge
                   <ArrowUpRight className="h-[11px] w-[11px]" />
                 </Link>
               ),
@@ -307,7 +307,7 @@ export default async function DashboardPage() {
                 <SectionSurface
                   tone="lifted"
                   header={{
-                    title: "Intelligence by Project",
+                    title: "Knowledge by Project",
                     subtitle: "Completed sources per project",
                     right: (
                       <TrendingUp
@@ -452,7 +452,7 @@ export default async function DashboardPage() {
                 href: "/chat",
                 icon: MessageSquare,
                 label: "Copilot",
-                caption: "Ask the intelligence layer",
+                caption: "Ask the knowledge layer",
                 accent: "#A78BFA",
               },
               {

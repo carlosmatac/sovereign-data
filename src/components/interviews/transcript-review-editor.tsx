@@ -772,7 +772,7 @@ export function TranscriptReviewEditor({
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           {lastIntelSource && (
             <span>
-              Last intel: <span className="text-foreground">{lastIntelSource}</span>
+              Last knowledge pass: <span className="text-foreground">{lastIntelSource}</span>
             </span>
           )}
           <span>
@@ -788,7 +788,7 @@ export function TranscriptReviewEditor({
           {reprocessing && (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
-              Intel pipeline running — editing is paused.
+              Knowledge pipeline running — editing is paused.
             </span>
           )}
         </div>

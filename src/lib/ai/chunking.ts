@@ -148,7 +148,7 @@ function splitOversizedChunk(chunk: TextChunk): TextChunk[] {
 function enforceChunkBounds(chunks: TextChunk[]): TextChunk[] {
   if (chunks.length === 0) return [];
 
-  let expanded: TextChunk[] = [];
+  const expanded: TextChunk[] = [];
   for (const chunk of chunks) {
     if (estimateTokens(chunk.content) > CHUNK_MAX_TOKENS) {
       expanded.push(...splitOversizedChunk(chunk));

@@ -11,7 +11,7 @@
  * Example:
  *   <WindowPanel
  *     chrome={{ label: "Sovereign · Copilot", status: { tone: "live", text: "Live" } }}
- *     header={{ title: "Intelligence Report", subtitle: "April 2026 · Q1" }}
+ *     header={{ title: "Knowledge Report", subtitle: "April 2026 · Q1" }}
  *   >
  *     {children}
  *   </WindowPanel>

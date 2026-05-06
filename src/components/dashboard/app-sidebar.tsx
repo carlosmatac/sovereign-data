@@ -54,7 +54,7 @@ const platformNavItems = [
     icon: FolderKanban,
   },
   {
-    title: "Intelligence",
+    title: "Knowledge",
     href: "/interviews",
     icon: BookOpen,
   },
@@ -155,7 +155,7 @@ export function AppSidebar({
                 >
                   <Image
                     src="/aksum_white_long.svg"
-                    alt="Aksum — Intelligence Platform"
+                    alt="Aksum — Knowledge Platform"
                     width={2186}
                     height={885}
                     className="h-8 w-auto object-contain opacity-90"

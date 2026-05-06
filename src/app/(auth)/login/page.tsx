@@ -57,7 +57,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Aksum</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Frontier Markets Intelligence Platform
+            Frontier Markets Knowledge Platform
           </p>
         </div>
 

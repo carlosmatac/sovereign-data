@@ -179,14 +179,14 @@ export default async function ProjectDetailPage({ params }: Props) {
               <Card className="sv-hover-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Intelligence
+                    Knowledge
                   </CardTitle>
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{interviewCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    View all intelligence
+                    View all knowledge
                   </p>
                 </CardContent>
               </Card>
@@ -259,7 +259,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 <Button variant="outline" size="sm" asChild className="justify-start">
                   <Link href={`/interviews?project=${projectId}`}>
                     <BookOpen className="mr-2 h-4 w-4" />
-                    View Intelligence
+                    View Knowledge
                   </Link>
                 </Button>
                 {canEdit && (

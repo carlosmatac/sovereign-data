@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to build report intelligence layer";
+      error instanceof Error ? error.message : "Failed to build report knowledge layer";
     await admin
       .from("reports")
       .update({ status: "failed", error_message: message })

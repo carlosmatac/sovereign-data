@@ -339,7 +339,7 @@ export default function UploadInterviewPage() {
 
       toast.success("PDF source submitted for processing", {
         description:
-          "Text has been extracted and intelligence extraction has started.",
+          "Text has been extracted and knowledge extraction has started.",
       });
 
       router.push(`/interviews/${interview.id}`);
@@ -388,7 +388,7 @@ export default function UploadInterviewPage() {
       const interview = await response.json();
 
       toast.success("Text source submitted for processing", {
-        description: "Intelligence extraction has started.",
+        description: "Knowledge extraction has started.",
       });
 
       router.push(`/interviews/${interview.id}`);
@@ -442,7 +442,7 @@ export default function UploadInterviewPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Intelligence
+          Back to Knowledge
         </Link>
       </div>
 
@@ -450,7 +450,7 @@ export default function UploadInterviewPage() {
         <CardHeader>
           <CardTitle>Add Source</CardTitle>
           <CardDescription>
-            Add audio, PDF, or text material to start the intelligence
+            Add audio, PDF, or text material to start the knowledge
             extraction pipeline.
           </CardDescription>
         </CardHeader>
@@ -475,7 +475,7 @@ export default function UploadInterviewPage() {
                     {step === "uploading"
                       ? "Securely transferring to encrypted storage"
                       : sourceType === "document" || sourceType === "text"
-                        ? "Starting AI intelligence pipeline"
+                        ? "Starting AI knowledge pipeline"
                         : "Starting AI transcription pipeline"}
                   </p>
                 </div>

@@ -72,8 +72,7 @@ export default async function ReportsPage() {
             Reports
           </h1>
           <p className="mt-2 max-w-xl text-[13px] leading-[1.6] text-white/62">
-            AI-generated business intelligence reports from your interview
-            data.
+            AI-generated knowledge reports from your source data.
           </p>
         </div>
         {canCreate && (
@@ -105,7 +104,7 @@ export default async function ReportsPage() {
             No reports yet
           </h3>
           <p className="mt-1.5 text-[12.5px] text-white/60">
-            Generate your first intelligence report from interview data.
+            Generate your first knowledge report from source data.
           </p>
           {canCreate && (
             <Button className="mt-4" asChild>
