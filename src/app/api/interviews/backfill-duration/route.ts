@@ -53,7 +53,7 @@ export async function POST() {
         const correctDuration = Math.round(transcription.audio_duration);
 
         await admin
-          .from("interviews")
+          .from("sources")
           .update({ audio_duration: correctDuration })
           .eq("id", interview.id);
 

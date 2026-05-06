@@ -30,7 +30,13 @@ Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.
   Spec at
   [`docs/features/done/chat-entity-retrieval-rpc.md`](../features/done/chat-entity-retrieval-rpc.md);
   migration `supabase/migrations/00026_entity_intel_rpc.sql`.
-- **Phase 2.1** — next on deck per the plan.
+- **Phase 2.1 (source-first rename + back-compat views)** — in
+  progress (2026-05-06). Spec at
+  [`docs/features/on-going/source-rename-and-backcompat-views.md`](../features/on-going/source-rename-and-backcompat-views.md);
+  migration `supabase/migrations/00027_rename_interviews_to_sources.sql`
+  has been applied to remote and app write paths have been moved to
+  `sources` / `source_chunks`. Pending before sign-off: final browser
+  smoke / dev-server cleanup and commit.
 
 ---
 
@@ -59,7 +65,7 @@ that should not get lost behind the phased work:
 
 ## Immediate next
 
-- **Refactor:** Phase 2.1 of
+- **Refactor:** finish Phase 2.1 sign-off, then queue Phase 2.2 of
   [`database-refactor-plan.md`](./database-refactor-plan.md).
 - **Backlog:** the four queued specs above, in priority order set
   by the human reviewer.

@@ -57,7 +57,7 @@ export async function processTextInterview(
     });
 
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "EXTRACTING",
         transcript_full: plainText,
@@ -94,7 +94,7 @@ export async function processTextInterview(
   } catch (error) {
     console.error(`Text pipeline failed for interview ${interviewId}:`, error);
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "FAILED",
         error_message: toErrorMessage(error),
@@ -134,7 +134,7 @@ export async function processDocument(
     });
 
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "EXTRACTING",
         transcript_full: plainText,
@@ -175,7 +175,7 @@ export async function processDocument(
   } catch (error) {
     console.error(`Document pipeline failed for interview ${interviewId}:`, error);
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "FAILED",
         error_message: toErrorMessage(error),

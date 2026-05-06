@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: interview, error: insertError } = await admin
-    .from("interviews")
+    .from("sources")
     .insert({
       title: rawTitle.trim(),
       project_id: projectIdTrim,

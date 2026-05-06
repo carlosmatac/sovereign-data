@@ -36,26 +36,45 @@ loadEnv({ path: ".env.local", override: false });
 interface Args {
   migration: string;
   probe: string | null;
+  lockTimeout: string;
+  statementTimeout: string;
+  lockCheckTables: string[];
 }
 
 function parseArgs(argv: string[]): Args {
   let migration: string | null = null;
   let probe: string | null = null;
+  let lockTimeout = "5s";
+  let statementTimeout = "60s";
+  let lockCheckTables: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--migration" || a === "-m") {
       migration = argv[++i] ?? null;
     } else if (a === "--probe" || a === "-p") {
       probe = argv[++i] ?? null;
+    } else if (a === "--lock-timeout") {
+      lockTimeout = argv[++i] ?? lockTimeout;
+    } else if (a === "--statement-timeout") {
+      statementTimeout = argv[++i] ?? statementTimeout;
+    } else if (a === "--lock-check") {
+      lockCheckTables = (argv[++i] ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
   }
   if (!migration) {
     console.error(
-      "Usage: npx tsx scripts/db/migration-dry-run.ts --migration <path.sql> [--probe <sql>]",
+      "Usage: npx tsx scripts/db/migration-dry-run.ts --migration <path.sql>\n" +
+        "        [--probe <sql>]\n" +
+        "        [--lock-timeout <interval>     default 5s]\n" +
+        "        [--statement-timeout <interval> default 60s]\n" +
+        "        [--lock-check <comma,separated,tables>]",
     );
     process.exit(1);
   }
-  return { migration, probe };
+  return { migration, probe, lockTimeout, statementTimeout, lockCheckTables };
 }
 
 async function pickConnection(): Promise<{ name: string; url: string }> {
@@ -115,7 +134,7 @@ async function main() {
   const client = new Client({
     connectionString: url,
     ssl: { rejectUnauthorized: false },
-    statement_timeout: 30_000,
+    statement_timeout: 90_000,
   });
   await client.connect();
 
@@ -123,6 +142,52 @@ async function main() {
   try {
     process.stderr.write(`▶ BEGIN\n`);
     await client.query("BEGIN");
+
+    process.stderr.write(
+      `▶ SET LOCAL lock_timeout=${args.lockTimeout} statement_timeout=${args.statementTimeout}\n`,
+    );
+    await client.query(`SET LOCAL lock_timeout = '${args.lockTimeout}'`);
+    await client.query(
+      `SET LOCAL statement_timeout = '${args.statementTimeout}'`,
+    );
+    await client.query(`SET LOCAL application_name = 'migration-dry-run'`);
+
+    if (args.lockCheckTables.length > 0) {
+      process.stderr.write(
+        `▶ pre-flight lock check on: ${args.lockCheckTables.join(", ")}\n`,
+      );
+      const lockSql = `
+        SELECT
+          c.relname                AS relation,
+          l.mode                   AS lock_mode,
+          l.granted                AS granted,
+          a.pid                    AS pid,
+          a.application_name       AS app,
+          a.usename                AS usr,
+          a.state                  AS state,
+          left(a.query, 120)       AS query_excerpt,
+          (now() - a.query_start)  AS query_age
+        FROM pg_locks l
+        JOIN pg_class c       ON c.oid = l.relation
+        JOIN pg_namespace n   ON n.oid = c.relnamespace
+        LEFT JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE n.nspname = 'public'
+          AND c.relname = ANY($1::text[])
+          AND a.pid <> pg_backend_pid()
+        ORDER BY c.relname, l.granted DESC, l.mode
+      `;
+      const locks = await client.query(lockSql, [args.lockCheckTables]);
+      if (locks.rowCount === 0) {
+        process.stderr.write(`  (no other sessions hold locks on these)\n`);
+      } else {
+        for (const r of locks.rows) {
+          process.stderr.write(
+            `  ⚠ ${r.relation} ${r.lock_mode} granted=${r.granted} pid=${r.pid} app=${r.app ?? "?"} state=${r.state ?? "?"} age=${r.query_age ?? "?"}\n` +
+              `    query: ${r.query_excerpt ?? "?"}\n`,
+          );
+        }
+      }
+    }
 
     process.stderr.write(`▶ applying ${args.migration}\n`);
     await client.query(sql);
@@ -150,16 +215,40 @@ async function main() {
     process.stderr.write(`✓ rolled back — no changes persisted\n`);
     process.exit(0);
   } catch (err) {
-    if (applied) {
-      try {
-        await client.query("ROLLBACK");
-        process.stderr.write(`▼ rolled back after error\n`);
-      } catch {
-        /* ignore secondary error */
-      }
+    // Always attempt a ROLLBACK so the connection doesn't linger in a failed
+    // transaction state, regardless of whether the failure happened before
+    // the migration was fully applied.
+    try {
+      await client.query("ROLLBACK");
+      process.stderr.write(
+        applied
+          ? `▼ rolled back after error (post-apply)\n`
+          : `▼ rolled back after error (pre-apply)\n`,
+      );
+    } catch (rollbackErr) {
+      process.stderr.write(
+        `! ROLLBACK itself failed: ${rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr)}\n`,
+      );
     }
+    const e = err as {
+      code?: string;
+      message?: string;
+      severity?: string;
+      detail?: string;
+      hint?: string;
+      where?: string;
+      position?: string;
+      internalQuery?: string;
+    };
     console.error("\n✗ dry-run failed:");
-    console.error(err);
+    console.error(`  code:     ${e.code ?? "?"}`);
+    console.error(`  severity: ${e.severity ?? "?"}`);
+    console.error(`  message:  ${e.message ?? String(err)}`);
+    if (e.detail) console.error(`  detail:   ${e.detail}`);
+    if (e.hint) console.error(`  hint:     ${e.hint}`);
+    if (e.where) console.error(`  where:    ${e.where}`);
+    if (e.position) console.error(`  position: ${e.position}`);
+    if (e.internalQuery) console.error(`  internalQuery: ${e.internalQuery}`);
     process.exit(2);
   } finally {
     try {

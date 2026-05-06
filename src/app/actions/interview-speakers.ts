@@ -91,7 +91,7 @@ export async function updateInterviewSpeakerMap(
     }
 
     const { error: updateError } = await admin
-      .from("interviews")
+      .from("sources")
       .update({ speaker_map: sanitized })
       .eq("id", interviewId);
 

@@ -57,7 +57,7 @@ async function updateInterviewStatus(
 ) {
   const supabase = createAdminClient();
   const { error } = await supabase
-    .from("interviews")
+    .from("sources")
     .update({ status, ...extra })
     .eq("id", interviewId);
 
@@ -447,11 +447,11 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   const embeddings = await generateEmbeddings(embeddingTexts);
 
   if (clearDerivedBeforeInsert) {
-    const { error: rpcError } = await supabase.rpc("clear_interview_derived_data", {
-      p_interview_id: interviewId,
+    const { error: rpcError } = await supabase.rpc("clear_source_derived_data", {
+      p_source_id: interviewId,
     });
     if (rpcError) {
-      throw new Error(`clear_interview_derived_data failed: ${rpcError.message}`);
+      throw new Error(`clear_source_derived_data failed: ${rpcError.message}`);
     }
   }
 
@@ -477,7 +477,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   );
 
   const chunkRows = enrichedChunks.map((ec, i) => ({
-    interview_id: interviewId,
+    source_id: interviewId,
     chunk_index: ec.chunk.chunkIndex,
     content: ec.chunk.content,
     speaker: ec.chunk.speaker,
@@ -489,7 +489,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
 
   for (let i = 0; i < chunkRows.length; i += 50) {
     const batch = chunkRows.slice(i, i + 50);
-    const { error: chunkError } = await supabase.from("interview_chunks").insert(batch);
+    const { error: chunkError } = await supabase.from("source_chunks").insert(batch);
     if (chunkError) {
       console.error("Failed to insert chunks batch:", chunkError);
       throw chunkError;
@@ -614,9 +614,9 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     }
     for (const row of chunkRows) {
       const { error: metaError } = await supabase
-        .from("interview_chunks")
+        .from("source_chunks")
         .update({ metadata: row.metadata })
-        .eq("interview_id", interviewId)
+        .eq("source_id", interviewId)
         .eq("chunk_index", row.chunk_index);
       if (metaError) {
         console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
@@ -808,7 +808,7 @@ export async function processTranscription(
  * Rebuild chunks, mentions, relationships, and snippets from `reviewed_utterances` only.
  * Triggered when an editor POSTs `/api/interviews/[id]/reprocess-review` (after `transcript_review_status = ready`).
  *
- * Failure safety: LLM + embeddings run **before** `clear_interview_derived_data`.
+ * Failure safety: LLM + embeddings run **before** `clear_source_derived_data`.
  * If the RPC or inserts fail after clear, the interview can be left without derived rows — surface FAILED + `transcript_review_status: ready` for retry.
  * Full delete+insert in one DB transaction is deferred (see docs).
  */
@@ -866,7 +866,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
     }));
 
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "EXTRACTING",
         transcript_review_status: "reprocessing",
@@ -905,7 +905,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
   } catch (error) {
     console.error(`Review reprocess failed for interview ${interviewId}:`, error);
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "FAILED",
         transcript_review_status: "ready",

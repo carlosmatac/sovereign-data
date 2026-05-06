@@ -61,7 +61,7 @@ export async function updateInterviewTitle(
     }
 
     const { error: updateError } = await admin
-      .from("interviews")
+      .from("sources")
       .update({ title })
       .eq("id", interviewId);
 
