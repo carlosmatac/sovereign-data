@@ -30,13 +30,22 @@ Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.
   Spec at
   [`docs/features/done/chat-entity-retrieval-rpc.md`](../features/done/chat-entity-retrieval-rpc.md);
   migration `supabase/migrations/00026_entity_intel_rpc.sql`.
-- **Phase 2.1 (source-first rename + back-compat views)** — in
-  progress (2026-05-06). Spec at
+- **Phase 2.1 (source-first rename + back-compat views)** — shipped
+  (2026-05-06). Spec at
   [`docs/features/on-going/source-rename-and-backcompat-views.md`](../features/on-going/source-rename-and-backcompat-views.md);
   migration `supabase/migrations/00027_rename_interviews_to_sources.sql`
-  has been applied to remote and app write paths have been moved to
-  `sources` / `source_chunks`. Pending before sign-off: final browser
-  smoke / dev-server cleanup and commit.
+  applied to remote, app write paths moved to `sources` /
+  `source_chunks`, browser smoke clean, committed.
+- **Phase 2.2 (`source_entities` table + anchor backfill)** — in
+  progress (2026-05-06). Spec at
+  [`docs/features/on-going/source-entities-table-and-backfill.md`](../features/on-going/source-entities-table-and-backfill.md);
+  migration `supabase/migrations/00028_source_entities_table.sql`
+  applied to remote (table + 2 enums + 4 RLS policies + 5 indexes,
+  anchor backfill 0/0 because `sources.interviewee_*_entity_id` are
+  uniformly NULL today; structural invariant `RAISE EXCEPTION` block
+  passed). Types added to `src/types/database.ts`. No app code
+  reads/writes the new table yet — pipeline writes ship in PR 2.3,
+  RPC reads in PR 2.4. Pending: sign-off + commit.
 
 ---
 
@@ -65,7 +74,9 @@ that should not get lost behind the phased work:
 
 ## Immediate next
 
-- **Refactor:** finish Phase 2.1 sign-off, then queue Phase 2.2 of
+- **Refactor:** finish Phase 2.2 sign-off (browser smoke is a no-op
+  for this PR — schema-only — so really just commit), then queue
+  Phase 2.3 (`source_entities` writes from the ingestion pipeline) of
   [`database-refactor-plan.md`](./database-refactor-plan.md).
 - **Backlog:** the four queued specs above, in priority order set
   by the human reviewer.
