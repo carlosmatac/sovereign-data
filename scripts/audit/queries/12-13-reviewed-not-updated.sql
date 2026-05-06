@@ -5,4 +5,4 @@ SELECT i.id, i.title, i.last_intel_source,
 FROM interviews i
 LEFT JOIN interview_chunks c ON c.interview_id = i.id
 WHERE i.last_intel_source = 'human_review'
-GROUP BY i.id;
+GROUP BY i.id, i.title, i.last_intel_source, i.reviewed_utterances;

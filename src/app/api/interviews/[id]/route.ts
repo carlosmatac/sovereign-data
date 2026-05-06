@@ -61,7 +61,7 @@ export async function DELETE(
 
   // Delete interview record (CASCADE handles all related tables)
   const { error: deleteError } = await admin
-    .from("interviews")
+    .from("sources")
     .delete()
     .eq("id", id);
 

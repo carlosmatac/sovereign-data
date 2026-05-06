@@ -82,7 +82,7 @@ export async function saveTranscriptReviewDraft(
     }
 
     const { error } = await admin
-      .from("interviews")
+      .from("sources")
       .update({
         reviewed_utterances: reviewedUtterances,
         transcript_review_status: "draft",
@@ -118,7 +118,7 @@ export async function markInterviewReviewReady(interviewId: string): Promise<Act
     }
 
     const { error } = await admin
-      .from("interviews")
+      .from("sources")
       .update({ transcript_review_status: "ready" })
       .eq("id", interviewId);
 

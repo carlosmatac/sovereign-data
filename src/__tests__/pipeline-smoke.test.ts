@@ -4,7 +4,7 @@
  * Tests three paths through the shared runIntelPipelineFromCanonicalSource runner:
  * 1. Audio path  (processTranscription → COMPLETED, lastIntelSource = assemblyai_auto)
  * 2. PDF path    (processDocument     → COMPLETED, lastIntelSource = direct_ingest)
- * 3. Reprocess   (reprocessInterviewFromReview → clear_interview_derived_data called, lastIntelSource = human_review)
+ * 3. Reprocess   (reprocessInterviewFromReview → clear_source_derived_data called, lastIntelSource = human_review)
  *
  * All external I/O is mocked (OpenAI, Supabase, AssemblyAI).
  */
@@ -253,7 +253,7 @@ describe("pipeline smoke tests", () => {
     await reprocessInterviewFromReview("interview-reprocess-1");
 
     const clearedRpc = mockSupabase._rpcCalls.find(
-      (c) => c.fn === "clear_interview_derived_data"
+      (c) => c.fn === "clear_source_derived_data"
     );
     expect(clearedRpc).toBeDefined();
 

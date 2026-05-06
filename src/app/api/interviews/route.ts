@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
 
   // ── Create interview record ────────────────────────────────────
   const { data: interview, error: insertError } = await admin
-    .from("interviews")
+    .from("sources")
     .insert({
       title,
       description: description ?? null,
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
 
     // Update with AssemblyAI ID
     await admin
-      .from("interviews")
+      .from("sources")
       .update({
         assemblyai_id: transcriptId,
         status: "TRANSCRIBING",
@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
 
     // Mark as failed but still return the interview ID
     await admin
-      .from("interviews")
+      .from("sources")
       .update({
         status: "FAILED",
         error_message:

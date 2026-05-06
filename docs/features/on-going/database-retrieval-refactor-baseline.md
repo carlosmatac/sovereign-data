@@ -181,7 +181,7 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
 | ----- | ---- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: |
 | 0 (baseline) | 2026-05-05 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | 1 (chat retrieval RPC) | 2026-05-05 | 0 | 0 | **22** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **2** | 0 | 0 | 0 |
-| 2 (source-first foundation) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 2.1 (source rename + back-compat views) | 2026-05-06 | 0 | 0 | **24** | 0 | 0 | **1** | 0 | 0 | 0 | 0 | 0 | 0 | **3** | 0 | 0 | 0 |
 | 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 4a (chat evidence) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -211,7 +211,7 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   2.3 will continue to target this metric.
 - 2026-05-06 — Phase 1 manual chat tests run by the human reviewer.
   Verbatim outputs and per-finding attribution recorded in
-  [`chat-entity-retrieval-rpc.md` §Live verification report](./chat-entity-retrieval-rpc.md).
+  [`chat-entity-retrieval-rpc.md` §Live verification report](../done/chat-entity-retrieval-rpc.md).
   Two new audit-shaped facts were uncovered that this baseline did
   not capture and that warrant follow-up probes in later cadence
   rows:
@@ -236,3 +236,21 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
      `00027_backfill_interviewee_fks.sql` would activate Phase 1's
      anchor branch on existing rows; pending sign-off in the Phase 1
      spec.
+- 2026-05-06 — Re-ran post-Phase-2.1 (`00027_rename_interviews_to_sources.sql`
+  applied). The audit still runs against the legacy read names
+  (`interviews`, `interview_chunks`), now back-compat views over
+  `sources` / `source_chunks`, so this is a direct validation that
+  the views preserve baseline semantics. One query needed a view-safe
+  SQL fix: §12.13 previously grouped only by `i.id`, which worked on
+  the base table because Postgres could infer functional dependency
+  from the primary key; after `interviews` became a view, the query
+  had to explicitly group by every selected non-aggregate column. The
+  fixed query now returns rows instead of `ERROR`.
+
+  Deltas vs. Phase 1: §12.3 22 → **24** orphan entities (+2), §12.6
+  0 → **1** relationship without evidence quote, §12.13 2 → **3**
+  reviewed/human-review rows. These are data/content deltas, not
+  caused by Phase 2.1: the migration only renames tables/columns,
+  recreates helpers/policies/functions, and creates read-only views;
+  it does not insert entities, mentions, relationships, chunks, or
+  review data. Phase 2.3 remains the target for orphan growth.

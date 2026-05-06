@@ -57,7 +57,7 @@ export async function GET(
         // Atomically claim this transcription to prevent double-triggering.
         // Only proceed if the row is still in TRANSCRIBING status.
         const { data: claimed } = await admin
-          .from("interviews")
+          .from("sources")
           .update({ status: "EXTRACTING" as const })
           .eq("id", id)
           .eq("status", "TRANSCRIBING")
@@ -85,7 +85,7 @@ export async function GET(
       if (transcription.status === "error") {
         // AssemblyAI failed — update our record
         await admin
-          .from("interviews")
+          .from("sources")
           .update({
             status: "FAILED",
             error_message:

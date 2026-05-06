@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   // ── Handle error status ────────────────────────────────────────
   if (status === "error") {
     await supabase
-      .from("interviews")
+      .from("sources")
       .update({
         status: "FAILED",
         error_message: "AssemblyAI transcription failed",

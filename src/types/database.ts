@@ -466,6 +466,11 @@ export interface Database {
           },
         ];
       };
+      /**
+       * Canonical source table after Phase 2.1 (`interviews` is kept as a
+       * read-only back-compat view for one release).
+       */
+      sources: Database["public"]["Tables"]["interviews"];
       interview_review_entities: {
         Row: {
           id: string;
@@ -564,6 +569,53 @@ export interface Database {
             columns: ["interview_id"];
             isOneToOne: false;
             referencedRelation: "interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      source_chunks: {
+        Row: {
+          id: string;
+          source_id: string;
+          chunk_index: number;
+          content: string;
+          speaker: string | null;
+          start_time: number | null;
+          end_time: number | null;
+          embedding: string | null;
+          metadata: ChunkMetadata;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_id: string;
+          chunk_index: number;
+          content: string;
+          speaker?: string | null;
+          start_time?: number | null;
+          end_time?: number | null;
+          embedding?: string | null;
+          metadata?: ChunkMetadata;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_id?: string;
+          chunk_index?: number;
+          content?: string;
+          speaker?: string | null;
+          start_time?: number | null;
+          end_time?: number | null;
+          embedding?: string | null;
+          metadata?: ChunkMetadata;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "source_chunks_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "sources";
             referencedColumns: ["id"];
           },
         ];
@@ -1158,9 +1210,13 @@ export interface Database {
           similarity: number;
         }>;
       };
-      clear_interview_derived_data: {
-        Args: { p_interview_id: string };
+      clear_source_derived_data: {
+        Args: { p_source_id: string };
         Returns: undefined;
+      };
+      get_source_project: {
+        Args: { p_source_id: string };
+        Returns: string | null;
       };
       list_distinct_position_titles: {
         Args: { p_limit?: number | null };
@@ -1227,6 +1283,8 @@ export type InsertTables<T extends keyof Database["public"]["Tables"]> =
 export type Profile = Tables<"profiles">;
 export type Project = Tables<"projects">;
 export type ProjectMember = Tables<"project_members">;
+export type Source = Tables<"sources">;
+export type SourceChunk = Tables<"source_chunks">;
 export type Interview = Tables<"interviews">;
 export type InterviewChunk = Tables<"interview_chunks">;
 export type Entity = Tables<"entities">;
