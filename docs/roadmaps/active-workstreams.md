@@ -36,16 +36,22 @@ Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.
   migration `supabase/migrations/00027_rename_interviews_to_sources.sql`
   applied to remote, app write paths moved to `sources` /
   `source_chunks`, browser smoke clean, committed.
-- **Phase 2.2 (`source_entities` table + anchor backfill)** — in
-  progress (2026-05-06). Spec at
+- **Phase 2.2 (`source_entities` table + anchor backfill)** — shipped
+  (2026-05-06). Spec at
   [`docs/features/on-going/source-entities-table-and-backfill.md`](../features/on-going/source-entities-table-and-backfill.md);
   migration `supabase/migrations/00028_source_entities_table.sql`
-  applied to remote (table + 2 enums + 4 RLS policies + 5 indexes,
-  anchor backfill 0/0 because `sources.interviewee_*_entity_id` are
-  uniformly NULL today; structural invariant `RAISE EXCEPTION` block
-  passed). Types added to `src/types/database.ts`. No app code
-  reads/writes the new table yet — pipeline writes ship in PR 2.3,
-  RPC reads in PR 2.4. Pending: sign-off + commit.
+  applied to remote.
+- **Phase 2.3 (pipeline writes `source_entities` + orphan-anchor
+  reduction)** — in progress (2026-05-07). Spec at
+  [`docs/features/on-going/source-entities-pipeline-writes.md`](../features/on-going/source-entities-pipeline-writes.md);
+  migration `supabase/migrations/00029_clear_source_derived_extraction.sql`
+  applied to remote. PR 2.3 also closes a regression in the upload
+  flow: explicit `Primary person` / `Organization` form fields now
+  deterministically match-or-create their entity at the route layer
+  via `ensureUploadAnchorEntity`, populating
+  `sources.interviewee_*_entity_id` and the matching
+  `source_entities` upload-anchor row on every upload. Awaiting user
+  manual smoke before commit.
 
 ---
 
@@ -69,16 +75,24 @@ that should not get lost behind the phased work:
 - [`docs/features/to-do/chat-citation-routing.md`](../features/to-do/chat-citation-routing.md)
   — server-side sanitizer for citation links; the LLM occasionally
   fabricates `https://example.com/...` despite the prompt rule.
+- [`docs/features/to-do/entity-anchor-autocomplete-ux.md`](../features/to-do/entity-anchor-autocomplete-ux.md)
+  — `Primary person` / `Organization` autocomplete already exists
+  but is not discoverable; needs loading state, project-vs-global
+  badges, and a "no match — will create" hint. Pure UX follow-up
+  to the PR 2.3 regression fix (functional behaviour is correct).
+- [`docs/features/to-do/source-detail-entity-cards.md`](../features/to-do/source-detail-entity-cards.md)
+  — surface the source-level primary entities (`interviewee`,
+  `interviewee_org` rows in `source_entities`) at the top of the
+  source detail page. Backend is in place (PR 2.3); pure frontend.
 
 ---
 
 ## Immediate next
 
-- **Refactor:** finish Phase 2.2 sign-off (browser smoke is a no-op
-  for this PR — schema-only — so really just commit), then queue
-  Phase 2.3 (`source_entities` writes from the ingestion pipeline) of
-  [`database-refactor-plan.md`](./database-refactor-plan.md).
-- **Backlog:** the four queued specs above, in priority order set
+- **Refactor:** finish Phase 2.3 sign-off — user runs a fresh
+  upload with the `ensureUploadAnchorEntity` fix, then we commit and
+  queue Phase 2.4 (chat reads `source_entities` via `entity_intel`).
+- **Backlog:** the queued specs above, in priority order set
   by the human reviewer.
 
 ---

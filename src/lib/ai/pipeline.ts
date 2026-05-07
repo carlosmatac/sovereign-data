@@ -28,6 +28,10 @@ import {
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
 import { applyPersistenceGate, relationshipKey } from "@/lib/ai/persistence-gate";
+import {
+  writeAnchorSourceEntities,
+  writeExtractionSourceEntities,
+} from "@/lib/entities/source-entities-writer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -643,6 +647,27 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     }
   }
 
+  // ── source_entities (PR 2.3) ──────────────────────────────────────────
+  // Anchor rows persist who the source is "about" structurally (uploader-
+  // confirmed FKs). Idempotent across reprocesses; preserved by the clear
+  // RPC since they have origin='upload_anchor'.
+  const anchorWritten = await writeAnchorSourceEntities({
+    supabase,
+    sourceId: interviewId,
+    intervieweeEntityId: interview.interviewee_entity_id ?? null,
+    intervieweeOrgEntityId: interview.interviewee_org_entity_id ?? null,
+  });
+
+  // Extraction rows describe source-level facts the LLM was confident
+  // about (≥ 0.9). On reprocess the clear RPC has already removed
+  // origin='extraction' rows, so these inserts are clean.
+  const extractionWriteStats = await writeExtractionSourceEntities({
+    supabase,
+    sourceId: interviewId,
+    associations: extraction.source_associations ?? [],
+    entityIdMap,
+  });
+
   const completedPatch: Record<string, unknown> = {
     last_intel_source: lastIntelSource,
     ...completedInterviewExtra,
@@ -666,7 +691,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     `Pipeline completed for interview ${interviewId}: ${chunks.length} chunks, ${resolvedEntities.length} resolved entities (from ${rawEntities.length} raw), ` +
       `persistence gate kept ${gated.stats.persistedEntities}/${gated.stats.totalEntities} entities ` +
       `(ungrounded=${gated.stats.ungrounded}, dropped_by_policy=${gated.stats.droppedByPolicy}), ` +
-      `relationships kept=${gated.stats.relationshipsKept} dropped=${gated.stats.relationshipsDropped}`
+      `relationships kept=${gated.stats.relationshipsKept} dropped=${gated.stats.relationshipsDropped}, ` +
+      `source_entities anchor=${anchorWritten} ` +
+      `extraction(written=${extractionWriteStats.written}/${extractionWriteStats.attempted}, ` +
+      `dropped_low_conf=${extractionWriteStats.droppedLowConfidence}, dropped_unresolved=${extractionWriteStats.droppedUnresolved})`
   );
 
   try {

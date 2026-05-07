@@ -84,6 +84,7 @@ export async function resolveExtractedEntities(params: {
 
   const resolved: ResolvedEntity[] = [];
   const seenEntityIds = new Map<string, ResolvedEntity>();
+  let droppedAnchorOnly = 0;
 
   for (const raw of rawEntities) {
     const result = await resolveSingleEntity({
@@ -92,6 +93,14 @@ export async function resolveExtractedEntities(params: {
       projectId,
       supabaseClient,
     });
+
+    // PR 2.3 / Q1: `match_only` mode in matchOrCreateEntity can return a
+    // null entityId when an anchor-inferred candidate has no exact match.
+    // Drop the resolution rather than mint a new (often stale/wrong) entity.
+    if (result === null) {
+      droppedAnchorOnly += 1;
+      continue;
+    }
 
     // Deduplicate: keep the first (usually best) resolution per entityId.
     // Accumulate descriptions from duplicates if the first was empty.
@@ -107,6 +116,12 @@ export async function resolveExtractedEntities(params: {
     resolved.push(result);
   }
 
+  if (droppedAnchorOnly > 0) {
+    console.log(
+      `[resolve] dropped ${droppedAnchorOnly} anchor-inferred mention(s) — no exact match in match_only mode (PR 2.3 / Q1)`
+    );
+  }
+
   // Enrich entity descriptions in DB for all resolved entities
   await enrichEntityDescriptions(supabaseClient, resolved);
 
@@ -120,7 +135,7 @@ async function resolveSingleEntity(params: {
   anchors: ResolutionAnchors;
   projectId: string;
   supabaseClient: SupabaseClient<Database>;
-}): Promise<ResolvedEntity> {
+}): Promise<ResolvedEntity | null> {
   const { raw, anchors, projectId, supabaseClient } = params;
 
   if (raw.forcedEntityId) {
@@ -155,12 +170,25 @@ async function resolveSingleEntity(params: {
     ? anchorMatch.anchorName
     : raw.canonical_name || raw.raw_name;
 
+  // PR 2.3 / Q1: anchor-inferred resolutions without a forced entity ID
+  // run in `match_only` mode — exact-match-or-drop.
+  const useMatchOnly =
+    anchorMatch !== null && raw.forcedEntityId == null;
+
   const { entityId, needsReview } = await matchOrCreateEntity({
     projectId,
     nameRaw: nameForResolution,
     type: raw.type,
     supabaseClient,
+    mode: useMatchOnly ? "match_only" : "create_or_match",
   });
+
+  if (entityId === null) {
+    console.log(
+      `[resolve] match_only drop: raw="${raw.raw_name}" canonical="${raw.canonical_name}" anchor="${nameForResolution}" — no exact match`
+    );
+    return null;
+  }
 
   // Also register the raw_name as an alias if it differs
   if (
