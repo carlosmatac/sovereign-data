@@ -3,7 +3,7 @@ title: "Database refactor — baseline diagnostics (Phase 0)"
 status: on-going
 owner: team
 priority: high
-last_updated: 2026-05-05
+last_updated: 2026-05-06
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
   - docs/architecture/agentic-rag.md
@@ -177,16 +177,17 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
 
 ### Re-run cadence (append after each phase)
 
-| Phase | Date | §12.1 | §12.2 | §12.3 | §12.4 | §12.5 | §12.6 | §12.7 | §12.8 | §12.9 | §12.10 | §12.11 | §12.12 | §12.13 | §12.14 | §12.15 | §12.16 |
-| ----- | ---- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: |
-| 0 (baseline) | 2026-05-05 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| 1 (chat retrieval RPC) | 2026-05-05 | 0 | 0 | **22** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **2** | 0 | 0 | 0 |
-| 2.1 (source rename + back-compat views) | 2026-05-06 | 0 | 0 | **24** | 0 | 0 | **1** | 0 | 0 | 0 | 0 | 0 | 0 | **3** | 0 | 0 | 0 |
-| 2.2 (`source_entities` table + anchor backfill) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
-| 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| 4a (chat evidence) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| 4b (topics as entities) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| Phase | Date | §12.1 | §12.2 | §12.3 | §12.4 | §12.5 | §12.6 | §12.7 | §12.8 | §12.9 | §12.10 | §12.11 | §12.12 | §12.13 | §12.14 | §12.15 | §12.16 | §12.17 | §12.18 |
+| ----- | ---- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: | -----: |
+| 0 (baseline) | 2026-05-05 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | n/a | n/a |
+| 1 (chat retrieval RPC) | 2026-05-05 | 0 | 0 | **22** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **2** | 0 | 0 | 0 | n/a | n/a |
+| 2.1 (source rename + back-compat views) | 2026-05-06 | 0 | 0 | **24** | 0 | 0 | **1** | 0 | 0 | 0 | 0 | 0 | 0 | **3** | 0 | 0 | 0 | n/a | n/a |
+| 2.2 (`source_entities` table + anchor backfill) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | n/a | n/a |
+| 2.3 (pipeline writes + match_only) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | **0** | **0** |
+| 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 4a (chat evidence) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 4b (topics as entities) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 ## Implementation log
 
@@ -281,3 +282,29 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   2. `§12.18` — anchors that exist on `sources` but have no
      matching `source_entities` row (will become non-trivially
      populated once PR 2.3 hooks the pipeline; today vacuously 0).
+
+- 2026-05-06 — Re-ran post-Phase-2.3 (`00029_clear_source_derived_extraction.sql`
+  applied; pipeline writes + `match_only` resolver mode now live in
+  `main`). All §12.1–§12.16 counts are unchanged — Phase 2.3 modifies
+  app behaviour and a single function body, not data. The two new
+  probes (§12.17 / §12.18) ship alongside this row:
+
+  - **§12.17 — source_entities by origin = 0.** Expected: no ingest
+    has run since the migration applied. The next upload (audio,
+    PDF, or text) will produce at least one anchor row when its
+    `interviewee_*_entity_id` is set, and zero or more extraction
+    rows depending on whether the LLM emits high-confidence
+    `source_associations`. The plan stays as: PR 2.4 builds reads
+    on top of this column; orphan-rate (§12.3) starts moving down
+    only as new ingests bypass the orphan-creation path the
+    `match_only` resolver now closes.
+  - **§12.18 — anchors without source_entities row = 0.** Vacuously
+    zero today: every `sources` row in the DB has `interviewee_*_entity_id
+    IS NULL` (also why §12.1 / §12.2 = 0). Once any source has the
+    FK populated and the pipeline runs (or is reprocessed), this
+    probe must remain 0 — non-zero would mean the anchor write
+    silently failed.
+
+  No data changed. The audit script preamble was updated to reference
+  §12.17 / §12.18 alongside §12.1–§12.16. Manual upload smoke pending
+  before Phase 2.3 commit (run by the user; the agent has stopped).

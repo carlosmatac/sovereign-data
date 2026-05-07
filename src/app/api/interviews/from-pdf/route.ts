@@ -9,7 +9,7 @@ const pdfParse = require("pdf-parse/lib/pdf-parse") as (
 ) => Promise<{ text: string; numpages: number }>;
 import { processDocument } from "@/lib/ai/document-pipeline";
 import { MAX_PDF_SIZE_BYTES, MIN_PDF_TEXT_LENGTH } from "@/lib/constants";
-import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
+import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 // Force Node.js runtime — pdf-parse requires Node APIs (not Edge compatible)
@@ -115,8 +115,10 @@ export async function POST(request: NextRequest) {
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
   const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
-  const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
-  const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
+  const rawIntervieweeEntityIdParsed = parseOptionalUuid(rawIntervieweeEntityId);
+  const rawIntervieweeOrgEntityIdParsed = parseOptionalUuid(
+    rawIntervieweeOrgEntityId
+  );
   const language =
     typeof rawLanguage === "string" && rawLanguage.trim()
       ? rawLanguage.trim()
@@ -155,35 +157,38 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const projectIdTrim = rawProjectId.trim();
 
-  if (intervieweeEntityId) {
-    const v = await validateInterviewAnchorEntityId(admin, {
-      entityId: intervieweeEntityId,
-      projectId: projectIdTrim,
-      role: "person",
-    });
-    if (!v.ok) {
-      return NextResponse.json(
-        { error: "Invalid interviewee entity selection" },
-        { status: 400 }
-      );
-    }
-    intervieweeName = v.name;
+  // Resolve user-provided anchors into deterministic entity IDs.
+  // See ensureUploadAnchorEntity for the FK-or-text branching contract.
+  const personAnchor = await ensureUploadAnchorEntity(admin, {
+    entityId: rawIntervieweeEntityIdParsed,
+    name: intervieweeName,
+    projectId: projectIdTrim,
+    role: "person",
+  });
+  if (!personAnchor.ok) {
+    return NextResponse.json(
+      { error: "Invalid interviewee entity selection" },
+      { status: 400 }
+    );
   }
 
-  if (intervieweeOrgEntityId) {
-    const v = await validateInterviewAnchorEntityId(admin, {
-      entityId: intervieweeOrgEntityId,
-      projectId: projectIdTrim,
-      role: "organization",
-    });
-    if (!v.ok) {
-      return NextResponse.json(
-        { error: "Invalid organization entity selection" },
-        { status: 400 }
-      );
-    }
-    intervieweeOrg = v.name;
+  const orgAnchor = await ensureUploadAnchorEntity(admin, {
+    entityId: rawIntervieweeOrgEntityIdParsed,
+    name: intervieweeOrg,
+    projectId: projectIdTrim,
+    role: "organization",
+  });
+  if (!orgAnchor.ok) {
+    return NextResponse.json(
+      { error: "Invalid organization entity selection" },
+      { status: 400 }
+    );
   }
+
+  intervieweeName = personAnchor.name;
+  intervieweeOrg = orgAnchor.name;
+  const intervieweeEntityId = personAnchor.entityId;
+  const intervieweeOrgEntityId = orgAnchor.entityId;
 
   const { data: interview, error: insertError } = await admin
     .from("sources")

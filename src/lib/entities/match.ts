@@ -2,15 +2,36 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, EntityType } from "@/types/database";
 import { normalizeEntityName } from "@/lib/entities/normalize";
 
+/**
+ * `create_or_match` (default): full behaviour — exact match → fuzzy auto-merge
+ * (≥0.9) → fuzzy review-create (≥0.8 and <0.9) → create new project entity.
+ *
+ * `match_only`: precision-only mode used by the resolver when the candidate
+ * came from anchor-inferred matching without a `forcedEntityId`. Only the
+ * four exact paths (project entity, project alias, global entity, global
+ * alias) run. Fuzzy auto-merge AND new-entity creation are skipped. If none
+ * of the exact paths hit, the function returns `{ entityId: null,
+ * needsReview: false }` so the caller can drop the resolution. This keeps
+ * stale/incorrect anchor entities from being re-minted on every reprocess.
+ * See docs/features/on-going/source-entities-pipeline-writes.md (Q1).
+ */
+export type MatchOrCreateEntityMode = "create_or_match" | "match_only";
+
 type MatchOrCreateEntityParams = {
   projectId: string;
   nameRaw: string;
   type: EntityType;
   supabaseClient: SupabaseClient<Database>;
+  mode?: MatchOrCreateEntityMode;
 };
 
+/**
+ * `entityId` is `null` only in `match_only` mode when no exact match was
+ * found. In `create_or_match` mode the function always returns a non-null
+ * `entityId`.
+ */
 type MatchOrCreateEntityResult = {
-  entityId: string;
+  entityId: string | null;
   needsReview: boolean;
 };
 
@@ -51,11 +72,24 @@ const EPSILON = 1e-9;
 /**
  * Matches an extracted entity name to an existing canonical entity (project-first, then global),
  * or creates a new project-scoped canonical entity when no safe match exists.
+ *
+ * Overloads narrow the return type by mode so callers using the default
+ * `create_or_match` mode keep a non-null `entityId` guarantee.
  */
+export function matchOrCreateEntity(
+  params: MatchOrCreateEntityParams & { mode: "match_only" }
+): Promise<{ entityId: string | null; needsReview: boolean }>;
+export function matchOrCreateEntity(
+  params: MatchOrCreateEntityParams & { mode?: "create_or_match" }
+): Promise<{ entityId: string; needsReview: boolean }>;
+export function matchOrCreateEntity(
+  params: MatchOrCreateEntityParams
+): Promise<MatchOrCreateEntityResult>;
 export async function matchOrCreateEntity(
   params: MatchOrCreateEntityParams
 ): Promise<MatchOrCreateEntityResult> {
   const { projectId, nameRaw, type, supabaseClient } = params;
+  const mode: MatchOrCreateEntityMode = params.mode ?? "create_or_match";
 
   const normalized = normalizeEntityName(nameRaw);
   if (!normalized) {
@@ -136,6 +170,14 @@ export async function matchOrCreateEntity(
       aliasNormalized: normalized,
     });
     return { entityId: canonicalId, needsReview: false };
+  }
+
+  // ── match_only short-circuit (PR 2.3 / Q1) ─────────────────────────
+  // Precision-first: anchor-inferred resolutions without a forced entity ID
+  // never auto-merge fuzzily and never mint new entities. If none of the
+  // four exact paths hit, return null so the resolver can drop the row.
+  if (mode === "match_only") {
+    return { entityId: null, needsReview: false };
   }
 
   // Fuzzy search: project-scoped first, then global

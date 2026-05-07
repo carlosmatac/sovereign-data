@@ -140,6 +140,52 @@ const ExtractionSchema = z.object({
   opportunities: z
     .array(z.string())
     .describe("Key opportunities or positive signals mentioned"),
+  // PR 2.3: source-level associations.
+  // These describe the SOURCE-as-a-whole (this document / interview / report),
+  // not chunk-level mentions. The pipeline only persists rows with
+  // confidence ≥ 0.9 to keep precision high.
+  //
+  // NOTE: This MUST be a required array (not `.optional()` / not
+  // `.default([])`) because OpenAI's structured-output strict mode
+  // requires every property to appear in JSON Schema `required`.
+  // The model is instructed to emit `[]` when no source-level
+  // association applies — same convention as `entities`,
+  // `relationships`, `risks`, `opportunities` above.
+  source_associations: z
+    .array(
+      z.object({
+        name: z
+          .string()
+          .describe(
+            "canonical_name of the entity (must match a canonical_name in the entities array)"
+          ),
+        link_type: z
+          .enum(["author", "primary_subject", "subject_organization"])
+          .describe(
+            "How this entity relates to the SOURCE itself, not to other entities. " +
+              "author: explicitly authored, signed, or by-lined this source. " +
+              "primary_subject: the source-as-a-whole is centrally about this person/entity (interviewee in an interview, profile subject in a profile piece). " +
+              "subject_organization: the source-as-a-whole is centrally about this organization."
+          ),
+        confidence: z
+          .number()
+          .min(0)
+          .max(1)
+          .describe(
+            "0–1 confidence that the source-as-a-whole is by/about this entity. " +
+              "Only emit when ≥ 0.9; lower-confidence guesses should NOT be in this list."
+          ),
+        evidence_text: z
+          .string()
+          .nullable()
+          .describe(
+            "Short quote or paraphrase that justifies the link (byline line, opening framing, etc.), null if structurally implicit"
+          ),
+      })
+    )
+    .describe(
+      "Source-level associations. Use sparingly: at most one author and one primary_subject (and optionally one subject_organization) per source. Emit an empty array ([]) when the source is a generic article or panel that isn't 'about' a single person/org."
+    ),
 });
 
 export type ExtractionResult = z.infer<typeof ExtractionSchema>;
@@ -293,7 +339,17 @@ INSTRUCTIONS:
   * For GOVERNMENT / PUBLIC_INSTITUTION / regulator ↔ COMPANY / ORGANIZATION / STATE_OWNED_ENTERPRISE / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
   * For commercial sales: pair "supplier" (seller → buyer) and "customer_of" (buyer → seller).
   * Only use "business_partner" or "ally" when no other type fits AND the transcript explicitly frames the link as a partnership or alliance.
-- If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.`,
+- If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.
+- SOURCE-LEVEL ASSOCIATIONS (source_associations):
+  * Distinct from entities/relationships: these describe the SOURCE itself, not links between entities.
+  * Use ONLY when the source-as-a-whole is clearly about / by an entity. Examples:
+    - An interview transcript whose interviewee is "Raji Bashir" → source_associations: [{ name: "Raji Bashir", link_type: "primary_subject", confidence: 0.95, evidence_text: "(speaker labels, opening intro)" }].
+    - An article whose byline is "By Carlos Ruiz" → source_associations: [{ name: "Carlos Ruiz", link_type: "author", confidence: 0.97, evidence_text: "By Carlos Ruiz" }].
+    - A company profile of "ANPG" → source_associations: [{ name: "ANPG", link_type: "subject_organization", confidence: 0.95, evidence_text: "ANPG, the National Oil, Gas and Biofuels Agency, ..." }].
+  * Use VERY sparingly. At most: one author + one primary_subject (and optionally one subject_organization).
+  * Confidence must be ≥ 0.9 — lower-confidence guesses should be omitted entirely. The pipeline drops anything below the threshold.
+  * "name" must equal a canonical_name in your entities array (so downstream resolution can map it to an entity ID).
+  * If the source is a generic article, a panel discussion, or a multi-speaker piece with no clear "subject", **return an empty array [] for source_associations** — do not omit the field.`,
       }),
     "extractIntelligence"
   );

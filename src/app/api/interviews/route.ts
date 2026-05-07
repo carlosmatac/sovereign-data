@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
 import { parseExpectedSpeakers } from "@/lib/constants";
-import { validateInterviewAnchorEntityId } from "@/lib/entities/validate-interview-anchor";
+import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 const MAX_ANCHOR_LENGTH = 120;
@@ -173,41 +173,46 @@ export async function POST(request: NextRequest) {
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
   const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
-  const intervieweeEntityId = parseOptionalUuid(rawIntervieweeEntityId);
-  const intervieweeOrgEntityId = parseOptionalUuid(rawIntervieweeOrgEntityId);
+  const rawIntervieweeEntityIdParsed = parseOptionalUuid(rawIntervieweeEntityId);
+  const rawIntervieweeOrgEntityIdParsed = parseOptionalUuid(
+    rawIntervieweeOrgEntityId
+  );
 
   // 2. Use admin client for DB operations (bypasses RLS, safe after auth check)
   const admin = createAdminClient();
 
-  if (intervieweeEntityId) {
-    const v = await validateInterviewAnchorEntityId(admin, {
-      entityId: intervieweeEntityId,
-      projectId: project_id,
-      role: "person",
-    });
-    if (!v.ok) {
-      return NextResponse.json(
-        { error: "Invalid interviewee entity selection" },
-        { status: 400 }
-      );
-    }
-    intervieweeName = v.name;
+  // 3. Resolve user-provided anchors into deterministic entity IDs.
+  // See ensureUploadAnchorEntity for the FK-or-text branching contract.
+  const personAnchor = await ensureUploadAnchorEntity(admin, {
+    entityId: rawIntervieweeEntityIdParsed,
+    name: intervieweeName,
+    projectId: project_id,
+    role: "person",
+  });
+  if (!personAnchor.ok) {
+    return NextResponse.json(
+      { error: "Invalid interviewee entity selection" },
+      { status: 400 }
+    );
   }
 
-  if (intervieweeOrgEntityId) {
-    const v = await validateInterviewAnchorEntityId(admin, {
-      entityId: intervieweeOrgEntityId,
-      projectId: project_id,
-      role: "organization",
-    });
-    if (!v.ok) {
-      return NextResponse.json(
-        { error: "Invalid organization entity selection" },
-        { status: 400 }
-      );
-    }
-    intervieweeOrg = v.name;
+  const orgAnchor = await ensureUploadAnchorEntity(admin, {
+    entityId: rawIntervieweeOrgEntityIdParsed,
+    name: intervieweeOrg,
+    projectId: project_id,
+    role: "organization",
+  });
+  if (!orgAnchor.ok) {
+    return NextResponse.json(
+      { error: "Invalid organization entity selection" },
+      { status: 400 }
+    );
   }
+
+  intervieweeName = personAnchor.name;
+  intervieweeOrg = orgAnchor.name;
+  const intervieweeEntityId = personAnchor.entityId;
+  const intervieweeOrgEntityId = orgAnchor.entityId;
 
   // ── Create interview record ────────────────────────────────────
   const { data: interview, error: insertError } = await admin
