@@ -17,5 +17,10 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 
 | [ingestion-refactor.md](./ingestion-refactor.md) | Unified ingestion pipeline, text source type, semantic classification, candidate entities |
 | [chat-entity-retrieval-rpc.md](./chat-entity-retrieval-rpc.md) | Phase 1 of database refactor — `entity_intel` SECURITY DEFINER RPC + `lookupMentions` rewrite (interviewee / interviewee-org / mention / relationship branches) |
+| [source-rename-and-backcompat-views.md](./source-rename-and-backcompat-views.md) | Phase 2.1 — `interviews` → `sources`, `interview_chunks` → `source_chunks` (in-place rename + back-compat views) |
+| [source-entities-table-and-backfill.md](./source-entities-table-and-backfill.md) | Phase 2.2 — `source_entities` table + `link_type`/`origin` enums + anchor backfill (migration 00028) |
+| [source-entities-pipeline-writes.md](./source-entities-pipeline-writes.md) | Phase 2.3 — pipeline writes `source_entities` for anchors + extracted associations; `match_only` resolver mode stops orphan entity creation |
+| [entity-intel-rpc-source-entities.md](./entity-intel-rpc-source-entities.md) | Phase 2.4 — `entity_intel` RPC reads `source_entities` instead of legacy FK columns; all `link_type` roles surfaced |
+| [entities-unique-constraint-swap.md](./entities-unique-constraint-swap.md) | Phase 2.5 — drop global `UNIQUE(name,type)` on `entities`; add project-scoped unique index; remove 23505 silent-recovery hack |
 
 New completed features: add a row here when you move a spec into this folder.

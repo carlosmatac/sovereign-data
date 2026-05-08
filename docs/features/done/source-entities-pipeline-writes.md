@@ -1,9 +1,9 @@
 ---
 title: "Pipeline writes source_entities + orphan-anchor reduction (Phase 2.3 / PR 2.3)"
-status: on-going
+status: done
 owner: team
 priority: high
-last_updated: 2026-05-07
+last_updated: 2026-05-08
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_infrastructure:

@@ -1275,7 +1275,28 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    /**
+     * Back-compat views created in migration 00027 (Phase 2.1).
+     * Both are read-only SELECT views — INSERT/UPDATE/DELETE go through the
+     * canonical `sources` / `source_chunks` tables. These views will be
+     * dropped in a future "Soon" PR once no live reader uses the old names.
+     */
+    Views: {
+      /** Read-only view over `sources`. All columns pass-through. */
+      interviews: {
+        Row: Database["public"]["Tables"]["interviews"]["Row"];
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** Read-only view over `source_chunks` with `source_id` aliased back to `interview_id`. */
+      interview_chunks: {
+        Row: Database["public"]["Tables"]["interview_chunks"]["Row"];
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+    };
     Functions: {
       is_superuser: {
         Args: Record<string, never>;
@@ -1322,6 +1343,16 @@ export interface Database {
         Args: { p_conversation_id: string };
         Returns: number;
       };
+      /**
+       * Phase 1 + Phase 2.4 — UNION of:
+       *   1. entity_mentions rows (role="mention", kind="mention")
+       *   2. source_entities rows (role=link_type, kind="anchor"|"source_entity")
+       *   3. entity_relationships rows (role="related_via_relationship", kind="relationship")
+       *
+       * `kind` mapping by origin:
+       *   upload_anchor | metadata_import | manual_tag | human_review → "anchor"
+       *   extraction | ai_inference | alias_propagation | prior_context → "source_entity"
+       */
       entity_intel: {
         Args: {
           p_entity_id: string;
@@ -1330,12 +1361,9 @@ export interface Database {
         Returns: Array<{
           source_id: string;
           source_title: string;
-          role:
-            | "mention"
-            | "interviewee"
-            | "interviewee_org"
-            | "related_via_relationship";
-          kind: "mention" | "anchor" | "relationship";
+          /** All SourceEntityLinkType values for source_entities rows; "mention" for chunk rows; "related_via_relationship" for relationship rows. */
+          role: SourceEntityLinkType | "mention" | "related_via_relationship";
+          kind: "mention" | "anchor" | "source_entity" | "relationship";
           evidence: string | null;
           chunk_id: string | null;
           sentiment: string | null;

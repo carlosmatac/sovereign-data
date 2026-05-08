@@ -1,6 +1,6 @@
 ---
 title: "Phase 2.5 — Drop global entities UNIQUE(name, type); add project-scoped unique index"
-status: on-going
+status: done
 owner: agent
 priority: high
 last_updated: 2026-05-08
