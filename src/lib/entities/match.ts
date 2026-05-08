@@ -19,6 +19,13 @@ export type MatchOrCreateEntityMode = "create_or_match" | "match_only";
 
 type MatchOrCreateEntityParams = {
   projectId: string;
+  /**
+   * Tenant the new entity should belong to when one is minted. NULL is
+   * legal — it makes the new row a platform-global entity. Callers that
+   * know the project's tenant should always pass it through; only seed
+   * scripts and tests should rely on the NULL default.
+   */
+  tenantId?: string | null;
   nameRaw: string;
   type: EntityType;
   supabaseClient: SupabaseClient<Database>;
@@ -89,6 +96,7 @@ export async function matchOrCreateEntity(
   params: MatchOrCreateEntityParams
 ): Promise<MatchOrCreateEntityResult> {
   const { projectId, nameRaw, type, supabaseClient } = params;
+  const tenantId = params.tenantId ?? null;
   const mode: MatchOrCreateEntityMode = params.mode ?? "create_or_match";
 
   const normalized = normalizeEntityName(nameRaw);
@@ -109,6 +117,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: canonicalId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -128,6 +137,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: canonicalId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -147,6 +157,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: canonicalId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -166,6 +177,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: canonicalId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -204,6 +216,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: canonicalId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -219,6 +232,7 @@ export async function matchOrCreateEntity(
     const newEntityId = await createProjectCanonicalEntity({
       supabaseClient,
       projectId,
+      tenantId,
       nameRaw,
       normalized,
       type,
@@ -227,6 +241,7 @@ export async function matchOrCreateEntity(
       supabaseClient,
       entityId: newEntityId,
       projectId,
+      tenantId,
       aliasRaw: nameRaw,
       aliasNormalized: normalized,
     });
@@ -237,6 +252,7 @@ export async function matchOrCreateEntity(
   const newEntityId = await createProjectCanonicalEntity({
     supabaseClient,
     projectId,
+    tenantId,
     nameRaw,
     normalized,
     type,
@@ -245,6 +261,7 @@ export async function matchOrCreateEntity(
     supabaseClient,
     entityId: newEntityId,
     projectId,
+    tenantId,
     aliasRaw: nameRaw,
     aliasNormalized: normalized,
   });
@@ -370,17 +387,19 @@ async function findBestFuzzyCandidate(args: {
 async function createProjectCanonicalEntity(args: {
   supabaseClient: SupabaseClient<Database>;
   projectId: string;
+  tenantId: string | null;
   nameRaw: string;
   normalized: string;
   type: EntityType;
 }): Promise<string> {
-  const { supabaseClient, projectId, nameRaw, normalized, type } = args;
+  const { supabaseClient, projectId, tenantId, nameRaw, normalized, type } = args;
 
   const insertPayload: EntityInsert = {
     name: nameRaw.trim(),
     normalized_name: normalized,
     type,
     project_id: projectId,
+    tenant_id: tenantId,
     canonical_entity_id: null,
     metadata: {},
   };
@@ -435,10 +454,11 @@ async function ensureAlias(args: {
   supabaseClient: SupabaseClient<Database>;
   entityId: string;
   projectId: string;
+  tenantId: string | null;
   aliasRaw: string;
   aliasNormalized: string;
 }): Promise<void> {
-  const { supabaseClient, entityId, projectId, aliasRaw, aliasNormalized } = args;
+  const { supabaseClient, entityId, projectId, tenantId, aliasRaw, aliasNormalized } = args;
 
   const payload: EntityAliasInsert = {
     entity_id: entityId,
@@ -447,6 +467,7 @@ async function ensureAlias(args: {
     source: "system",
     confidence: 1,
     project_id: projectId,
+    tenant_id: tenantId,
   };
 
   const { error } = await supabaseClient.from("entity_aliases").insert(payload);

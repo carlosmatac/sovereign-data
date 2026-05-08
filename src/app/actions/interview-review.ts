@@ -36,7 +36,7 @@ async function requireInterviewEditor(interviewId: string) {
   const admin = createAdminClient();
   const { data: interview, error } = await admin
     .from("interviews")
-    .select("id, project_id, status, transcript_review_status")
+    .select("id, tenant_id, project_id, status, transcript_review_status")
     .eq("id", interviewId)
     .single();
 
@@ -168,6 +168,7 @@ export async function addReviewSeedFromEntity(
     if (existing) return { error: "This entity is already in the review list." };
 
     const { error } = await admin.from("interview_review_entities").insert({
+      tenant_id: interview.tenant_id,
       interview_id: interviewId,
       entity_id: entity.id,
       display_name: entity.name,
@@ -206,6 +207,7 @@ export async function createReviewSeedEntity(
 
     const { entityId } = await matchOrCreateEntity({
       projectId,
+      tenantId: interview.tenant_id,
       nameRaw: trimmed,
       type,
       supabaseClient: admin,
@@ -223,6 +225,7 @@ export async function createReviewSeedEntity(
     }
 
     const { error } = await admin.from("interview_review_entities").insert({
+      tenant_id: interview.tenant_id,
       interview_id: interviewId,
       entity_id: entityId,
       display_name: trimmed,

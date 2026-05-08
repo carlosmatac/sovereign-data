@@ -35,6 +35,7 @@ type EditorContext = {
   userId: string;
   relationship: {
     id: string;
+    tenant_id: string;
     source_entity_id: string;
     target_entity_id: string;
     relation_type: RelationType;
@@ -56,7 +57,7 @@ async function requireRelationshipEditor(
 
   const { data: rel, error: relError } = await admin
     .from("entity_relationships")
-    .select("id, source_entity_id, target_entity_id, relation_type, interview_id")
+    .select("id, tenant_id, source_entity_id, target_entity_id, relation_type, interview_id")
     .eq("id", relationshipId)
     .maybeSingle();
 
@@ -96,6 +97,7 @@ async function requireRelationshipEditor(
       userId: user.id,
       relationship: {
         id: rel.id,
+        tenant_id: rel.tenant_id,
         source_entity_id: rel.source_entity_id,
         target_entity_id: rel.target_entity_id,
         relation_type: rel.relation_type as RelationType,
@@ -284,6 +286,7 @@ export async function updateRelationshipType(
     const { error: insertError } = await admin
       .from("entity_relationships")
       .insert({
+        tenant_id: relationship.tenant_id,
         source_entity_id: relationship.source_entity_id,
         target_entity_id: relationship.target_entity_id,
         relation_type: newRelationType,

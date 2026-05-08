@@ -100,10 +100,26 @@ that should not get lost behind the phased work:
 
 ## Immediate next
 
-- **Refactor:** Phase 2.5 — pre-flight audit §12.10 / §12.12 (both
-  currently 0), then drop `entities.UNIQUE(name, type)` global constraint
-  and replace with project-scoped unique index; remove the `23505`
-  recovery hack in `match.ts`.
+- **Refactor:** Phase 2.5 — done (2026-05-08). `entities.UNIQUE(name, type)`
+  global constraint dropped; project-scoped unique index in place; `23505`
+  recovery hack removed from `match.ts`. Spec at
+  [`docs/features/on-going/schema-doc-and-types-refresh.md`](../features/on-going/schema-doc-and-types-refresh.md).
+
+- **Phase 3a — on-going (2026-05-08).** Approved and implementation
+  started. Three migrations + TypeScript changes:
+  - `00032_tenants_core.sql` — `tenants`, `tenant_members`,
+    `tenant_settings`, `tenant_integrations`, `is_tenant_member()`,
+    bootstrap row.
+  - `00033_tenant_id_everywhere.sql` — `tenant_id` on every Tier A/B
+    table; backfill; NOT NULL; compound UNIQUE + compound FKs; Tier B
+    trigger; hot-path indexes.
+  - `00034_tenant_rls.sql` — direct `is_tenant_member(tenant_id)` RLS
+    on all customer-owned tables.
+  - Pipeline and TypeScript: `tenant_id` propagated through all batch
+    writes; `src/lib/tenant/scope.ts`; `src/lib/tenant/settings.ts`.
+  Feature spec: [`docs/features/on-going/tenants-rls-and-customization.md`](../features/on-going/tenants-rls-and-customization.md).
+  ADR: [`docs/architecture/tenant-model-adr.md`](../architecture/tenant-model-adr.md).
+
 - **Backlog:** the queued specs above, in priority order set
   by the human reviewer.
 

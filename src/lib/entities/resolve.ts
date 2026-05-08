@@ -78,9 +78,10 @@ export async function resolveExtractedEntities(params: {
   rawEntities: RawExtractedEntity[];
   anchors: ResolutionAnchors;
   projectId: string;
+  tenantId: string;
   supabaseClient: SupabaseClient<Database>;
 }): Promise<ResolvedEntity[]> {
-  const { rawEntities, anchors, projectId, supabaseClient } = params;
+  const { rawEntities, anchors, projectId, tenantId, supabaseClient } = params;
 
   const resolved: ResolvedEntity[] = [];
   const seenEntityIds = new Map<string, ResolvedEntity>();
@@ -91,6 +92,7 @@ export async function resolveExtractedEntities(params: {
       raw,
       anchors,
       projectId,
+      tenantId,
       supabaseClient,
     });
 
@@ -134,9 +136,10 @@ async function resolveSingleEntity(params: {
   raw: RawExtractedEntity;
   anchors: ResolutionAnchors;
   projectId: string;
+  tenantId: string;
   supabaseClient: SupabaseClient<Database>;
 }): Promise<ResolvedEntity | null> {
-  const { raw, anchors, projectId, supabaseClient } = params;
+  const { raw, anchors, projectId, tenantId, supabaseClient } = params;
 
   if (raw.forcedEntityId) {
     const { data: forced, error } = await supabaseClient
@@ -177,6 +180,7 @@ async function resolveSingleEntity(params: {
 
   const { entityId, needsReview } = await matchOrCreateEntity({
     projectId,
+    tenantId,
     nameRaw: nameForResolution,
     type: raw.type,
     supabaseClient,
@@ -195,7 +199,7 @@ async function resolveSingleEntity(params: {
     raw.raw_name &&
     normalizeEntityName(raw.raw_name) !== normalizeEntityName(nameForResolution)
   ) {
-    await ensureAliasQuiet(supabaseClient, entityId, projectId, raw.raw_name);
+    await ensureAliasQuiet(supabaseClient, entityId, projectId, tenantId, raw.raw_name);
   }
 
   // Register canonical_name as alias if it differs from both
@@ -209,6 +213,7 @@ async function resolveSingleEntity(params: {
       supabaseClient,
       entityId,
       projectId,
+      tenantId,
       raw.canonical_name
     );
   }
@@ -492,6 +497,7 @@ async function ensureAliasQuiet(
   supabase: SupabaseClient<Database>,
   entityId: string,
   projectId: string,
+  tenantId: string,
   aliasRaw: string
 ): Promise<void> {
   const aliasNormalized = normalizeEntityName(aliasRaw);
@@ -504,6 +510,7 @@ async function ensureAliasQuiet(
     source: "extraction",
     confidence: 0.8,
     project_id: projectId,
+    tenant_id: tenantId,
   });
 
   // Ignore unique constraint violations

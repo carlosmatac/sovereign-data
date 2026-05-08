@@ -84,6 +84,7 @@ function buildSupabaseMock() {
   const INTERVIEW_ROW = {
     title: "Test Interview",
     project_id: "proj-1",
+    tenant_id: "tenant-1",
     interviewee_name: "Jane Doe",
     interviewee_org: "Acme Corp",
     interviewee_entity_id: null,

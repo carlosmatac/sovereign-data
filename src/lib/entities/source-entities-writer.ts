@@ -46,10 +46,11 @@ export const EXTRACTION_CONFIDENCE_FLOOR = 0.9;
 export async function writeAnchorSourceEntities(args: {
   supabase: SupabaseClient<Database>;
   sourceId: string;
+  tenantId: string;
   intervieweeEntityId: string | null | undefined;
   intervieweeOrgEntityId: string | null | undefined;
 }): Promise<number> {
-  const { supabase, sourceId, intervieweeEntityId, intervieweeOrgEntityId } =
+  const { supabase, sourceId, tenantId, intervieweeEntityId, intervieweeOrgEntityId } =
     args;
 
   const rows: SourceEntityInsert[] = [];
@@ -61,6 +62,7 @@ export async function writeAnchorSourceEntities(args: {
   if (intervieweeEntityId) {
     rows.push({
       source_id: sourceId,
+      tenant_id: tenantId,
       entity_id: intervieweeEntityId,
       link_type: "interviewee",
       origin: "upload_anchor",
@@ -72,6 +74,7 @@ export async function writeAnchorSourceEntities(args: {
   if (intervieweeOrgEntityId) {
     rows.push({
       source_id: sourceId,
+      tenant_id: tenantId,
       entity_id: intervieweeOrgEntityId,
       link_type: "interviewee_org",
       origin: "upload_anchor",
@@ -146,6 +149,7 @@ function lookupEntityIdByName(
 export async function writeExtractionSourceEntities(args: {
   supabase: SupabaseClient<Database>;
   sourceId: string;
+  tenantId: string;
   associations: ExtractionSourceAssociation[];
   entityIdMap: Map<string, string>;
   threshold?: number;
@@ -158,6 +162,7 @@ export async function writeExtractionSourceEntities(args: {
   const {
     supabase,
     sourceId,
+    tenantId,
     associations,
     entityIdMap,
     threshold = EXTRACTION_CONFIDENCE_FLOOR,
@@ -196,6 +201,7 @@ export async function writeExtractionSourceEntities(args: {
 
     rows.push({
       source_id: sourceId,
+      tenant_id: tenantId,
       entity_id: entityId,
       link_type: linkType,
       origin,

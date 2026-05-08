@@ -51,10 +51,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
+  // Resolve tenant_id from project — required on every Tier A insert.
+  const { data: projectRow, error: projectError } = await admin
+    .from("projects")
+    .select("tenant_id")
+    .eq("id", project_id)
+    .single();
+  if (projectError || !projectRow) {
+    return NextResponse.json({ error: "Project not found" }, { status: 400 });
+  }
+  const tenantId = projectRow.tenant_id as string;
+
   // Create the report row with 'generating' status
   const { data: report, error: createError } = await admin
     .from("reports")
     .insert({
+      tenant_id: tenantId,
       project_id,
       title: title.trim(),
       template,

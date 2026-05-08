@@ -137,12 +137,27 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const projectIdTrim = (project_id as string).trim();
 
+  // Resolve tenant_id from project — required on every Tier A insert.
+  const { data: projectRow, error: projectError } = await admin
+    .from("projects")
+    .select("tenant_id")
+    .eq("id", projectIdTrim)
+    .single();
+  if (projectError || !projectRow) {
+    return NextResponse.json(
+      { error: "Project not found" },
+      { status: 400 }
+    );
+  }
+  const tenantId = projectRow.tenant_id as string;
+
   // 7. Resolve user-provided anchors into deterministic entity IDs.
   // See ensureUploadAnchorEntity for the FK-or-text branching contract.
   const personAnchor = await ensureUploadAnchorEntity(admin, {
     entityId: rawIntervieweeEntityIdParsed,
     name: intervieweeName,
     projectId: projectIdTrim,
+    tenantId,
     role: "person",
   });
   if (!personAnchor.ok) {
@@ -156,6 +171,7 @@ export async function POST(request: NextRequest) {
     entityId: rawIntervieweeOrgEntityIdParsed,
     name: intervieweeOrg,
     projectId: projectIdTrim,
+    tenantId,
     role: "organization",
   });
   if (!orgAnchor.ok) {
@@ -174,6 +190,7 @@ export async function POST(request: NextRequest) {
   const { data: interview, error: insertError } = await admin
     .from("sources")
     .insert({
+      tenant_id: tenantId,
       title: (title as string).trim(),
       project_id: projectIdTrim,
       language: lang,

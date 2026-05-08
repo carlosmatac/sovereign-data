@@ -28,7 +28,7 @@ ALTER TABLE entities
 -- 2. Project-scoped unique index.
 --    Global entities (project_id IS NULL) share a single virtual scope via the
 --    COALESCE sentinel UUID; project entities each have their own scope.
-CREATE UNIQUE INDEX entities_name_type_scope_unique
+CREATE UNIQUE INDEX IF NOT EXISTS entities_name_type_scope_unique
   ON entities (
     normalized_name,
     type,

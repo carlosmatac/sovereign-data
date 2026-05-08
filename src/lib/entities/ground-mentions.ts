@@ -162,13 +162,14 @@ export async function backfillInterviewMentions(
 ): Promise<{ grounded: number; skipped: number }> {
   const { data: interview } = await supabaseClient
     .from("interviews")
-    .select("interviewee_name, interviewee_org, project_id")
+    .select("interviewee_name, interviewee_org, project_id, tenant_id")
     .eq("id", interviewId)
     .single();
 
   if (!interview?.project_id) {
     return { grounded: 0, skipped: 0 };
   }
+  const tenantId = interview.tenant_id as string;
 
   const { data: ungroundedMentions } = await supabaseClient
     .from("entity_mentions")
@@ -247,6 +248,7 @@ export async function backfillInterviewMentions(
     for (const gm of newMentions) {
       const { error } = await supabaseClient.from("entity_mentions").upsert(
         {
+          tenant_id: tenantId,
           entity_id: gm.entityId,
           interview_id: interviewId,
           chunk_id: gm.chunkId,

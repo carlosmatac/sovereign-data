@@ -43,7 +43,7 @@ export async function processTextInterview(
     const { data: interview } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -70,6 +70,9 @@ export async function processTextInterview(
     if (!interview?.project_id) {
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
+    if (!interview.tenant_id) {
+      throw new Error(`Missing tenant_id for interview ${interviewId} — run migration 00033`);
+    }
 
     await runIntelPipelineFromCanonicalSource({
       supabase,
@@ -77,6 +80,7 @@ export async function processTextInterview(
       interview: {
         title: interview.title,
         project_id: interview.project_id,
+        tenant_id: interview.tenant_id as string,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
@@ -120,7 +124,7 @@ export async function processDocument(
     const { data: interview } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -153,6 +157,9 @@ export async function processDocument(
     if (!interview?.project_id) {
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
+    if (!interview.tenant_id) {
+      throw new Error(`Missing tenant_id for interview ${interviewId} — run migration 00033`);
+    }
 
     await runIntelPipelineFromCanonicalSource({
       supabase,
@@ -160,6 +167,7 @@ export async function processDocument(
       interview: {
         title: interview.title,
         project_id: interview.project_id,
+        tenant_id: interview.tenant_id as string,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
