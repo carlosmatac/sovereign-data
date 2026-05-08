@@ -1544,6 +1544,15 @@ export interface Database {
         Args: { p_source_id: string };
         Returns: undefined;
       };
+      replace_source_derived_data: {
+        Args: {
+          p_source_id: string;
+          p_chunks: string;
+          p_mentions: string;
+          p_relationships: string;
+        };
+        Returns: undefined;
+      };
       get_source_project: {
         Args: { p_source_id: string };
         Returns: string | null;

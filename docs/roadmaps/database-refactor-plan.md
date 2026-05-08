@@ -40,7 +40,7 @@ todos:
     status: pending
   - id: phase-3b-reprocess-txn
     content: "Phase 3b / PR 3b.1 — Migration 00035: replace_source_derived_data SECURITY DEFINER function (transactional swap); pipeline calls single function for reviewed reprocess"
-    status: pending
+    status: on-going
   - id: phase-4a-1-evidence-table
     content: "Phase 4a / PR 4a.1 — Migration 00036: chat_message_evidence table (with tenant_id NOT NULL + compound FK from day one per Phase 3a forward-compat) + RLS"
     status: pending

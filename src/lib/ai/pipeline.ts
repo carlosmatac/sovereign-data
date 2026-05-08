@@ -4,6 +4,7 @@
 // Runs after AssemblyAI webhook: Extract -> Chunk -> Embed -> Persist
 // Reviewed reprocessing: same intel path from reviewed_utterances only.
 
+import { randomUUID } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTranscription } from "./assemblyai";
 import { extractIntelligence, type ExtractionResult } from "./extraction";
@@ -451,15 +452,6 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   );
   const embeddings = await generateEmbeddings(embeddingTexts);
 
-  if (clearDerivedBeforeInsert) {
-    const { error: rpcError } = await supabase.rpc("clear_source_derived_data", {
-      p_source_id: interviewId,
-    });
-    if (rpcError) {
-      throw new Error(`clear_source_derived_data failed: ${rpcError.message}`);
-    }
-  }
-
   // Editorial suppression: any (source, target, relation_type) the user has
   // previously rejected on this interview must NOT be re-inserted by the LLM.
   // The clear-RPC keeps these rows alive on reprocess; we read them so the
@@ -483,7 +475,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
 
   const tenantId = interview.tenant_id;
 
+  // Pre-assign UUIDs so grounding can reference chunk IDs before any DB write,
+  // and so the atomic replace function receives a fully self-consistent payload.
   const chunkRows = enrichedChunks.map((ec, i) => ({
+    id: randomUUID(),
     source_id: interviewId,
     tenant_id: tenantId,
     chunk_index: ec.chunk.chunkIndex,
@@ -495,12 +490,16 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     metadata: ec.metadata,
   }));
 
-  for (let i = 0; i < chunkRows.length; i += 50) {
-    const batch = chunkRows.slice(i, i + 50);
-    const { error: chunkError } = await supabase.from("source_chunks").insert(batch);
-    if (chunkError) {
-      console.error("Failed to insert chunks batch:", chunkError);
-      throw chunkError;
+  // First-ingest (non-reprocess): insert chunks now.
+  // Reprocess: defer — the atomic RPC handles delete + insert together.
+  if (!clearDerivedBeforeInsert) {
+    for (let i = 0; i < chunkRows.length; i += 50) {
+      const batch = chunkRows.slice(i, i + 50);
+      const { error: chunkError } = await supabase.from("source_chunks").insert(batch);
+      if (chunkError) {
+        console.error("Failed to insert chunks batch:", chunkError);
+        throw chunkError;
+      }
     }
   }
 
@@ -552,17 +551,12 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     entityIdMap.set(normalizeEntityName(n), interview.interviewee_org_entity_id);
   }
 
-  const { data: persistedChunks } = await supabase
-    .from("interview_chunks")
-    .select("id, chunk_index, content, speaker")
-    .eq("interview_id", interviewId)
-    .order("chunk_index");
-
-  const chunksForGrounding: ChunkForGrounding[] = (persistedChunks ?? []).map((c) => ({
-    id: c.id,
-    chunkIndex: c.chunk_index,
-    content: c.content,
-    speaker: c.speaker,
+  // Use the pre-assigned IDs directly — no DB round-trip needed.
+  const chunksForGrounding: ChunkForGrounding[] = chunkRows.map((row) => ({
+    id: row.id,
+    chunkIndex: row.chunk_index,
+    content: row.content,
+    speaker: row.speaker ?? null,
   }));
 
   const groundedMap = await groundEntityMentions({
@@ -588,19 +582,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     rejectedRelationshipKeys,
   });
 
-  for (let i = 0; i < gated.mentionRows.length; i += 50) {
-    const batch = gated.mentionRows.slice(i, i + 50).map((row) => ({
-      ...row,
-      tenant_id: tenantId,
-    }));
-    const { error: mentionError } = await supabase
-      .from("entity_mentions")
-      .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
-    if (mentionError) {
-      console.error("Failed to upsert entity mentions batch:", mentionError);
-    }
-  }
-
+  // ── Anchor entity backfill into chunk metadata ───────────────────────
+  // Compute now (before any DB writes) so the in-memory chunkRows objects
+  // carry final metadata. For the reprocess path this is enough; for the
+  // first-ingest path we also push the updates to the DB below.
   const personName = interview.interviewee_name ?? "";
   const orgName = interview.interviewee_org ?? "";
   const personEntityId =
@@ -624,34 +609,96 @@ export async function runIntelPipelineFromCanonicalSource(params: {
       if (personEntityId) meta.primary_person_entity_id = personEntityId;
       if (orgEntityId) meta.primary_org_entity_id = orgEntityId;
     }
-    for (const row of chunkRows) {
-      const { error: metaError } = await supabase
-        .from("source_chunks")
-        .update({ metadata: row.metadata })
-        .eq("source_id", interviewId)
-        .eq("chunk_index", row.chunk_index);
-      if (metaError) {
-        console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
-      }
-    }
   }
 
-  for (const row of gated.relationshipRows) {
-    // `ignoreDuplicates: true` guarantees that a row already carrying any
-    // editorial state (approved / rejected / human_edited / human_created)
-    // is never overwritten by a fresh LLM pass. Rejected rows are also
-    // pre-filtered upstream by the persistence gate; this is belt + braces
-    // for approved / human_edited triples that the LLM may legitimately
-    // re-extract on reprocess.
-    const { error: relError } = await supabase.from("entity_relationships").upsert(
-      { ...row, origin: "llm", review_status: "pending", tenant_id: tenantId },
-      {
-        onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
-        ignoreDuplicates: true,
+  if (clearDerivedBeforeInsert) {
+    // ── REPROCESS PATH: single atomic DB call ─────────────────────────
+    // All derived data (delete + insert) runs in one PL/pgSQL transaction.
+    // If the function throws, the DELETE rolls back — original data stays intact.
+    const chunksPayload = chunkRows.map((row) => ({
+      id: row.id,
+      chunk_index: row.chunk_index,
+      content: row.content,
+      speaker: row.speaker,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      embedding: row.embedding,   // already JSON.stringify'd float array
+      metadata: row.metadata,
+    }));
+
+    const mentionsPayload = gated.mentionRows.map((row) => ({
+      id: randomUUID(),
+      entity_id: row.entity_id,
+      chunk_id: row.chunk_id ?? null,
+      context: row.context ?? null,
+      sentiment: row.sentiment ?? null,
+    }));
+
+    const relationshipsPayload = gated.relationshipRows.map((row) => ({
+      id: randomUUID(),
+      source_entity_id: row.source_entity_id,
+      target_entity_id: row.target_entity_id,
+      relation_type: row.relation_type,
+      confidence: row.confidence ?? null,
+      evidence_text: row.evidence_text ?? null,
+    }));
+
+    const { error: rpcError } = await supabase.rpc("replace_source_derived_data", {
+      p_source_id: interviewId,
+      p_chunks: JSON.stringify(chunksPayload),
+      p_mentions: JSON.stringify(mentionsPayload),
+      p_relationships: JSON.stringify(relationshipsPayload),
+    });
+    if (rpcError) {
+      throw new Error(`replace_source_derived_data failed: ${rpcError.message}`);
+    }
+  } else {
+    // ── FIRST-INGEST PATH: separate batch inserts ─────────────────────
+    // Chunks were already inserted above; now write mentions, then
+    // relationships, then backfill chunk metadata with anchor entity IDs.
+    for (let i = 0; i < gated.mentionRows.length; i += 50) {
+      const batch = gated.mentionRows.slice(i, i + 50).map((row) => ({
+        ...row,
+        tenant_id: tenantId,
+      }));
+      const { error: mentionError } = await supabase
+        .from("entity_mentions")
+        .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
+      if (mentionError) {
+        console.error("Failed to upsert entity mentions batch:", mentionError);
       }
-    );
-    if (relError) {
-      console.error("Failed to upsert relationship:", relError);
+    }
+
+    if (personEntityId || orgEntityId) {
+      for (const row of chunkRows) {
+        const { error: metaError } = await supabase
+          .from("source_chunks")
+          .update({ metadata: row.metadata })
+          .eq("source_id", interviewId)
+          .eq("chunk_index", row.chunk_index);
+        if (metaError) {
+          console.error("Failed to backfill anchor entity ID in chunk metadata:", metaError);
+        }
+      }
+    }
+
+    for (const row of gated.relationshipRows) {
+      // `ignoreDuplicates: true` guarantees that a row already carrying any
+      // editorial state (approved / rejected / human_edited / human_created)
+      // is never overwritten by a fresh LLM pass. Rejected rows are also
+      // pre-filtered upstream by the persistence gate; this is belt + braces
+      // for approved / human_edited triples that the LLM may legitimately
+      // re-extract on reprocess.
+      const { error: relError } = await supabase.from("entity_relationships").upsert(
+        { ...row, origin: "llm", review_status: "pending", tenant_id: tenantId },
+        {
+          onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
+          ignoreDuplicates: true,
+        }
+      );
+      if (relError) {
+        console.error("Failed to upsert relationship:", relError);
+      }
     }
   }
 
@@ -851,9 +898,9 @@ export async function processTranscription(
  * Rebuild chunks, mentions, relationships, and snippets from `reviewed_utterances` only.
  * Triggered when an editor POSTs `/api/interviews/[id]/reprocess-review` (after `transcript_review_status = ready`).
  *
- * Failure safety: LLM + embeddings run **before** `clear_source_derived_data`.
- * If the RPC or inserts fail after clear, the interview can be left without derived rows — surface FAILED + `transcript_review_status: ready` for retry.
- * Full delete+insert in one DB transaction is deferred (see docs).
+ * Failure safety: LLM + embeddings run before any DB write. The derived layer
+ * is swapped atomically via `replace_source_derived_data` (migration 00035) — if
+ * the function throws, the DELETE rolls back and the original data is intact.
  */
 export async function reprocessInterviewFromReview(interviewId: string): Promise<void> {
   const supabase = createAdminClient();

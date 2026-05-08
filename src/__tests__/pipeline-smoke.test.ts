@@ -235,7 +235,7 @@ describe("pipeline smoke tests", () => {
     expect(completedCall?.patch.last_intel_source).toBe("direct_ingest");
   });
 
-  it("reprocess: clears derived data and uses human_review lastIntelSource", async () => {
+  it("reprocess: uses replace_source_derived_data (atomic swap) and human_review lastIntelSource", async () => {
     const { reprocessInterviewFromReview } = await import("@/lib/ai/pipeline");
 
     // Need interview_review_entities for the seeds query
@@ -253,10 +253,21 @@ describe("pipeline smoke tests", () => {
 
     await reprocessInterviewFromReview("interview-reprocess-1");
 
-    const clearedRpc = mockSupabase._rpcCalls.find(
+    // Phase 3b: atomic function must be called instead of clear_source_derived_data
+    const replaceRpc = mockSupabase._rpcCalls.find(
+      (c) => c.fn === "replace_source_derived_data"
+    );
+    expect(replaceRpc).toBeDefined();
+    expect(replaceRpc?.args).toHaveProperty("p_source_id", "interview-reprocess-1");
+    expect(replaceRpc?.args).toHaveProperty("p_chunks");
+    expect(replaceRpc?.args).toHaveProperty("p_mentions");
+    expect(replaceRpc?.args).toHaveProperty("p_relationships");
+
+    // Legacy clear RPC must NOT be called on reprocess path
+    const clearRpc = mockSupabase._rpcCalls.find(
       (c) => c.fn === "clear_source_derived_data"
     );
-    expect(clearedRpc).toBeDefined();
+    expect(clearRpc).toBeUndefined();
 
     const completedCall = mockSupabase._updateCalls.find(
       (c) => c.patch.status === "COMPLETED"
