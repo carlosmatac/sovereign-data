@@ -51,6 +51,7 @@ function makeAdmin() {
 const SOURCE_ID = "11111111-1111-1111-1111-111111111111";
 const PERSON_ID = "22222222-2222-2222-2222-222222222222";
 const ORG_ID = "33333333-3333-3333-3333-333333333333";
+const TENANT_ID = "44444444-4444-4444-4444-444444444444";
 
 // ── Anchor writer ──────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ describe("writeAnchorSourceEntities", () => {
     const written = await writeAnchorSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       intervieweeEntityId: null,
       intervieweeOrgEntityId: null,
     });
@@ -72,6 +74,7 @@ describe("writeAnchorSourceEntities", () => {
     const written = await writeAnchorSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       intervieweeEntityId: PERSON_ID,
       intervieweeOrgEntityId: null,
     });
@@ -97,6 +100,7 @@ describe("writeAnchorSourceEntities", () => {
     const written = await writeAnchorSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       intervieweeEntityId: PERSON_ID,
       intervieweeOrgEntityId: ORG_ID,
     });
@@ -138,6 +142,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [],
       entityIdMap: new Map(),
     });
@@ -156,6 +161,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [assoc("raji bashir", "primary_subject", 0.85)],
       entityIdMap: map,
     });
@@ -170,6 +176,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [assoc("unknown person", "author", 0.95)],
       entityIdMap: new Map(),
     });
@@ -184,6 +191,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [
         assoc("Raji Bashir", "primary_subject", 0.95, "Today we speak with Raji Bashir."),
       ],
@@ -212,6 +220,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [
         assoc("Raji Bashir", "primary_subject", 0.95, "first quote"),
         assoc("Raji Bashir", "primary_subject", 0.99, "second quote"),
@@ -234,6 +243,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [
         assoc("Raji Bashir", "author", 0.95),
         assoc("Raji Bashir", "primary_subject", 0.95),
@@ -253,6 +263,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [assoc("Raji Bashir", "primary_subject", 0.95)],
       entityIdMap: map,
     });
@@ -266,6 +277,7 @@ describe("writeExtractionSourceEntities", () => {
     const stats = await writeExtractionSourceEntities({
       supabase: admin,
       sourceId: SOURCE_ID,
+      tenantId: TENANT_ID,
       associations: [assoc("Raji Bashir", "primary_subject", 0.85)],
       entityIdMap: map,
       threshold: 0.8,

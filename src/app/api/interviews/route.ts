@@ -181,12 +181,28 @@ export async function POST(request: NextRequest) {
   // 2. Use admin client for DB operations (bypasses RLS, safe after auth check)
   const admin = createAdminClient();
 
+  // Resolve tenant_id from project — every source row carries it explicitly
+  // so RLS policies can enforce tenancy without multi-hop joins.
+  const { data: projectRow, error: projectError } = await admin
+    .from("projects")
+    .select("tenant_id")
+    .eq("id", project_id)
+    .single();
+  if (projectError || !projectRow) {
+    return NextResponse.json(
+      { error: "Project not found" },
+      { status: 400 }
+    );
+  }
+  const tenantId = projectRow.tenant_id as string;
+
   // 3. Resolve user-provided anchors into deterministic entity IDs.
   // See ensureUploadAnchorEntity for the FK-or-text branching contract.
   const personAnchor = await ensureUploadAnchorEntity(admin, {
     entityId: rawIntervieweeEntityIdParsed,
     name: intervieweeName,
     projectId: project_id,
+    tenantId,
     role: "person",
   });
   if (!personAnchor.ok) {
@@ -200,6 +216,7 @@ export async function POST(request: NextRequest) {
     entityId: rawIntervieweeOrgEntityIdParsed,
     name: intervieweeOrg,
     projectId: project_id,
+    tenantId,
     role: "organization",
   });
   if (!orgAnchor.ok) {
@@ -218,6 +235,7 @@ export async function POST(request: NextRequest) {
   const { data: interview, error: insertError } = await admin
     .from("sources")
     .insert({
+      tenant_id: tenantId,
       title,
       description: description ?? null,
       project_id,

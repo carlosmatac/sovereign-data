@@ -27,9 +27,24 @@ export async function createProject(formData: FormData) {
 
   const admin = createAdminClient();
 
+  // Resolve the creator's tenant — every project is owned by exactly one
+  // tenant. New customers are bootstrapped via SQL/admin tools; the UI does
+  // not expose a tenant picker yet, so we use the user's first membership.
+  const { data: membership, error: tenantError } = await admin
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (tenantError || !membership) {
+    return { error: "No tenant membership found for user" };
+  }
+
   const { data, error } = await admin
     .from("projects")
     .insert({
+      tenant_id: membership.tenant_id,
       name: name.trim(),
       description: description?.trim() || null,
       country: country?.trim() || null,

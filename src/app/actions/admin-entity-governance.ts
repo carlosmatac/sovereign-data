@@ -39,6 +39,7 @@ type CanonicalEntityRow = {
   name: string;
   type: EntityType;
   project_id: string | null;
+  tenant_id: string | null;
   canonical_entity_id: string | null;
   normalized_name: string;
   description: string | null;
@@ -96,7 +97,7 @@ export async function updateGovernedEntity(
   const { data: row, error: loadError } = await admin
     .from("entities")
     .select(
-      "id, name, type, project_id, canonical_entity_id, normalized_name, description"
+      "id, name, type, project_id, tenant_id, canonical_entity_id, normalized_name, description"
     )
     .eq("id", entityId)
     .maybeSingle<CanonicalEntityRow>();
@@ -212,6 +213,7 @@ export async function updateGovernedEntity(
         source: "admin_governance",
         confidence: 1,
         project_id: row.project_id,
+        tenant_id: row.tenant_id,
       });
       if (aliasErr && aliasErr.code !== "23505") {
         console.error("updateGovernedEntity alias:", aliasErr);
@@ -235,11 +237,12 @@ export async function addGovernedEntityAlias(
 
   const { data: row, error: loadError } = await admin
     .from("entities")
-    .select("id, project_id, canonical_entity_id")
+    .select("id, project_id, tenant_id, canonical_entity_id")
     .eq("id", entityId)
     .maybeSingle<{
       id: string;
       project_id: string | null;
+      tenant_id: string | null;
       canonical_entity_id: string | null;
     }>();
 
@@ -266,6 +269,7 @@ export async function addGovernedEntityAlias(
     source: "admin_governance",
     confidence: 1,
     project_id: row.project_id,
+    tenant_id: row.tenant_id,
   });
 
   if (error) {

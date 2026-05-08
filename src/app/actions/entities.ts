@@ -22,6 +22,7 @@ type EntityRecord = {
 };
 
 type MentionRecord = {
+  tenant_id: string;
   interview_id: string;
   chunk_id: string | null;
   context: string | null;
@@ -29,6 +30,7 @@ type MentionRecord = {
 };
 
 type RelationshipRecord = {
+  tenant_id: string;
   relation_type: RelationType;
   confidence: number;
   evidence_text: string | null;
@@ -99,8 +101,9 @@ async function insertAliasFromCorrection(args: {
   entityId: string;
   aliasRaw: string;
   projectId: string;
+  tenantId: string;
 }) {
-  const { admin, entityId, aliasRaw, projectId } = args;
+  const { admin, entityId, aliasRaw, projectId, tenantId } = args;
   const alias = aliasRaw.trim();
   const aliasNormalized = normalizeEntityName(alias);
 
@@ -113,6 +116,7 @@ async function insertAliasFromCorrection(args: {
     source: "user_correction",
     confidence: 1,
     project_id: projectId,
+    tenant_id: tenantId,
   });
 
   // Unique violation means this correction is already learned.
@@ -130,7 +134,7 @@ async function remapMentions(args: {
 
   const { data: mentions, error: mentionsError } = await admin
     .from("entity_mentions")
-    .select("interview_id, chunk_id, context, sentiment")
+    .select("tenant_id, interview_id, chunk_id, context, sentiment")
     .eq("entity_id", sourceEntityId);
 
   if (mentionsError) throw mentionsError;
@@ -139,6 +143,7 @@ async function remapMentions(args: {
   for (const row of rows) {
     const { error: upsertError } = await admin.from("entity_mentions").upsert(
       {
+        tenant_id: row.tenant_id,
         entity_id: targetEntityId,
         interview_id: row.interview_id,
         chunk_id: row.chunk_id,
@@ -169,7 +174,7 @@ async function remapRelationships(args: {
   const { data: relationships, error: relFetchError } = await admin
     .from("entity_relationships")
     .select(
-      "source_entity_id, target_entity_id, relation_type, confidence, evidence_text, interview_id"
+      "tenant_id, source_entity_id, target_entity_id, relation_type, confidence, evidence_text, interview_id"
     )
     .or(`source_entity_id.eq.${sourceEntityId},target_entity_id.eq.${sourceEntityId}`);
 
@@ -190,6 +195,7 @@ async function remapRelationships(args: {
       .from("entity_relationships")
       .upsert(
         {
+          tenant_id: rel.tenant_id,
           source_entity_id: newSourceId,
           target_entity_id: newTargetId,
           relation_type: rel.relation_type,
@@ -239,6 +245,17 @@ export async function updateEntityName(
 
     if (!existingEntity) return { error: "Entity not found" };
 
+    // Resolve project's tenant_id once — every alias we mint below carries it.
+    const { data: projectRow } = await admin
+      .from("projects")
+      .select("tenant_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!projectRow?.tenant_id) {
+      return { error: "Project not found" };
+    }
+    const projectTenantId = projectRow.tenant_id as string;
+
     const oldName = existingEntity.name.trim();
     if (oldName === trimmedName) {
       return { success: true, merged: false };
@@ -277,6 +294,7 @@ export async function updateEntityName(
         entityId,
         aliasRaw: oldName,
         projectId,
+        tenantId: projectTenantId,
       });
 
       revalidatePath("/interviews");
@@ -317,6 +335,7 @@ export async function updateEntityName(
       entityId: targetEntityId,
       aliasRaw: oldName,
       projectId,
+      tenantId: projectTenantId,
     });
 
     revalidatePath("/interviews");

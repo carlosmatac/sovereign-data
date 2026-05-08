@@ -343,6 +343,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   interview: {
     title: string;
     project_id: string;
+    tenant_id: string;
     interviewee_name: string | null;
     interviewee_org: string | null;
     interviewee_entity_id?: string | null;
@@ -480,8 +481,11 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     )
   );
 
+  const tenantId = interview.tenant_id;
+
   const chunkRows = enrichedChunks.map((ec, i) => ({
     source_id: interviewId,
+    tenant_id: tenantId,
     chunk_index: ec.chunk.chunkIndex,
     content: ec.chunk.content,
     speaker: ec.chunk.speaker,
@@ -513,6 +517,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
       intervieweeOrg: interview.interviewee_org ?? null,
     },
     projectId,
+    tenantId,
     supabaseClient: supabase,
   });
 
@@ -584,7 +589,10 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   });
 
   for (let i = 0; i < gated.mentionRows.length; i += 50) {
-    const batch = gated.mentionRows.slice(i, i + 50);
+    const batch = gated.mentionRows.slice(i, i + 50).map((row) => ({
+      ...row,
+      tenant_id: tenantId,
+    }));
     const { error: mentionError } = await supabase
       .from("entity_mentions")
       .upsert(batch, { onConflict: "entity_id,interview_id,chunk_id" });
@@ -636,7 +644,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     // for approved / human_edited triples that the LLM may legitimately
     // re-extract on reprocess.
     const { error: relError } = await supabase.from("entity_relationships").upsert(
-      { ...row, origin: "llm", review_status: "pending" },
+      { ...row, origin: "llm", review_status: "pending", tenant_id: tenantId },
       {
         onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
         ignoreDuplicates: true,
@@ -654,6 +662,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   const anchorWritten = await writeAnchorSourceEntities({
     supabase,
     sourceId: interviewId,
+    tenantId,
     intervieweeEntityId: interview.interviewee_entity_id ?? null,
     intervieweeOrgEntityId: interview.interviewee_org_entity_id ?? null,
   });
@@ -664,6 +673,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
   const extractionWriteStats = await writeExtractionSourceEntities({
     supabase,
     sourceId: interviewId,
+    tenantId,
     associations: extraction.source_associations ?? [],
     entityIdMap,
   });
@@ -701,6 +711,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     const keyQuotes = extraction.sentiment.highlights.map((h) => h.text);
     await generateContentSnippets({
       interviewId,
+      tenantId,
       title: interview.title ?? "Unknown Interview",
       summary: extraction.summary,
       topics: extraction.topics,
@@ -754,7 +765,7 @@ export async function processTranscription(
     const { data: interview } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -796,6 +807,9 @@ export async function processTranscription(
     if (!interview?.project_id) {
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
+    if (!interview.tenant_id) {
+      throw new Error(`Missing tenant_id for interview ${interviewId} — run migration 00033`);
+    }
 
     const chunkUtterances: TranscriptUtterance[] = transcription.utterances
       ? transcription.utterances.map((u) => ({
@@ -812,6 +826,7 @@ export async function processTranscription(
       interview: {
         title: interview.title,
         project_id: interview.project_id,
+        tenant_id: interview.tenant_id as string,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
@@ -847,7 +862,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
     const { data: interview, error: fetchError } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -907,6 +922,9 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
     if (!interview.project_id) {
       throw new Error(`Missing project_id for interview ${interviewId}`);
     }
+    if (!interview.tenant_id) {
+      throw new Error(`Missing tenant_id for interview ${interviewId} — run migration 00033`);
+    }
 
     await runIntelPipelineFromCanonicalSource({
       supabase,
@@ -914,6 +932,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
       interview: {
         title: interview.title,
         project_id: interview.project_id,
+        tenant_id: interview.tenant_id as string,
         interviewee_name: interview.interviewee_name,
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,

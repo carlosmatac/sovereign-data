@@ -31,6 +31,7 @@ import { ensureUploadAnchorEntity } from "./validate-interview-anchor";
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const PERSON_ID = "22222222-2222-2222-2222-222222222222";
 const ORG_ID = "33333333-3333-3333-3333-333333333333";
+const TENANT_ID = "44444444-4444-4444-4444-444444444444";
 
 interface MaybeSingleConfig {
   data: unknown;
@@ -79,6 +80,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: null,
       name: null,
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
@@ -94,6 +96,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: null,
       name: "   ",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
@@ -122,6 +125,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: PERSON_ID,
       name: "francisco pinzon",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
@@ -154,6 +158,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: ORG_ID,
       name: "DP World",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "organization",
     });
 
@@ -178,6 +183,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: "00000000-0000-0000-0000-000000000000",
       name: "Some Name",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
@@ -206,6 +212,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: ORG_ID,
       name: null,
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
@@ -232,11 +239,13 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: null,
       name: "Francisco Pinzon",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 
     expect(matchOrCreateMock).toHaveBeenCalledWith({
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       nameRaw: "Francisco Pinzon",
       type: "PERSON",
       supabaseClient: admin,
@@ -268,11 +277,13 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: null,
       name: "CENORED",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "organization",
     });
 
     expect(matchOrCreateMock).toHaveBeenCalledWith({
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       nameRaw: "CENORED",
       type: "ORGANIZATION",
       supabaseClient: admin,
@@ -301,6 +312,7 @@ describe("ensureUploadAnchorEntity", () => {
       entityId: null,
       name: "  Francisco Pinzon  ",
       projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
       role: "person",
     });
 

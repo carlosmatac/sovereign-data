@@ -46,13 +46,14 @@ export async function findUserMessageByClientId(
 export async function persistUserTurn(params: {
   admin: AdminClient;
   conversationId: string;
+  tenantId: string;
   clientMessageId: string;
   content: string;
 }): Promise<
   | { ok: true; userMessageDbId: string }
   | { ok: false; response: Response }
 > {
-  const { admin, conversationId, clientMessageId, content } = params;
+  const { admin, conversationId, tenantId, clientMessageId, content } = params;
 
   const existing = await findUserMessageByClientId(
     admin,
@@ -79,6 +80,7 @@ export async function persistUserTurn(params: {
   const { data: inserted, error } = await admin
     .from("chat_messages")
     .insert({
+      tenant_id: tenantId,
       conversation_id: conversationId,
       role: "user",
       content,
@@ -121,15 +123,17 @@ export async function persistUserTurn(params: {
 export async function persistAssistantTurn(params: {
   admin: AdminClient;
   conversationId: string;
+  tenantId: string;
   userMessageDbId: string;
   text: string;
 }): Promise<void> {
-  const { admin, conversationId, userMessageDbId, text } = params;
+  const { admin, conversationId, tenantId, userMessageDbId, text } = params;
 
   const seq = await nextSequence(admin, conversationId);
   if (seq === null) return;
 
   const { error } = await admin.from("chat_messages").insert({
+    tenant_id: tenantId,
     conversation_id: conversationId,
     role: "assistant",
     content: text,

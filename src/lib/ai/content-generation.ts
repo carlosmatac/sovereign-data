@@ -52,6 +52,7 @@ const ContentSnippetSchema = z.object({
  */
 export async function generateContentSnippets({
   interviewId,
+  tenantId,
   title,
   summary,
   topics,
@@ -59,6 +60,7 @@ export async function generateContentSnippets({
   keyQuotes,
 }: {
   interviewId: string;
+  tenantId: string;
   title: string;
   summary: string;
   topics: string[];
@@ -97,6 +99,7 @@ INSTRUCTIONS:
   const platforms = ["linkedin", "twitter", "newsletter", "summary"] as const;
   const rows = platforms.map((platform) => ({
     interview_id: interviewId,
+    tenant_id: tenantId,
     platform,
     content: object[platform].content,
     tone: object[platform].tone,

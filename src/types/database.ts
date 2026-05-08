@@ -190,6 +190,9 @@ export type DatePrecision = "exact" | "approximate" | "unknown";
 
 export type ChatMessageRole = "user" | "assistant";
 
+/** Role on a tenant (distinct from `project_members.role`). */
+export type TenantRole = "owner" | "admin" | "member";
+
 // ============================================
 // JSON Column Types
 // ============================================
@@ -279,9 +282,170 @@ export interface Database {
         };
         Relationships: [];
       };
+      tenants: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      tenant_members: {
+        Row: {
+          tenant_id: string;
+          user_id: string;
+          role: TenantRole;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          user_id: string;
+          role?: TenantRole;
+          created_at?: string;
+        };
+        Update: {
+          tenant_id?: string;
+          user_id?: string;
+          role?: TenantRole;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_members_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tenant_members_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tenant_settings: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          limits: Record<string, unknown>;
+          branding: Record<string, unknown>;
+          feature_flags: Record<string, unknown>;
+          module_config: Record<string, unknown>;
+          prompt_config: Record<string, unknown>;
+          custom_schemas: Record<string, unknown>;
+          auth_config: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          limits?: Record<string, unknown>;
+          branding?: Record<string, unknown>;
+          feature_flags?: Record<string, unknown>;
+          module_config?: Record<string, unknown>;
+          prompt_config?: Record<string, unknown>;
+          custom_schemas?: Record<string, unknown>;
+          auth_config?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          limits?: Record<string, unknown>;
+          branding?: Record<string, unknown>;
+          feature_flags?: Record<string, unknown>;
+          module_config?: Record<string, unknown>;
+          prompt_config?: Record<string, unknown>;
+          custom_schemas?: Record<string, unknown>;
+          auth_config?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_settings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: true;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tenant_integrations: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          integration_type: string;
+          enabled: boolean;
+          config: Record<string, unknown>;
+          credentials_ref: string | null;
+          sync_status: string | null;
+          last_sync_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          integration_type: string;
+          enabled?: boolean;
+          config?: Record<string, unknown>;
+          credentials_ref?: string | null;
+          sync_status?: string | null;
+          last_sync_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          integration_type?: string;
+          enabled?: boolean;
+          config?: Record<string, unknown>;
+          credentials_ref?: string | null;
+          sync_status?: string | null;
+          last_sync_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_integrations_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       projects: {
         Row: {
           id: string;
+          tenant_id: string;
           name: string;
           description: string | null;
           country: string | null;
@@ -292,6 +456,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           name: string;
           description?: string | null;
           country?: string | null;
@@ -302,6 +467,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           name?: string;
           description?: string | null;
           country?: string | null;
@@ -323,6 +489,7 @@ export interface Database {
       project_members: {
         Row: {
           id: string;
+          tenant_id: string;
           project_id: string;
           user_id: string | null;
           role: UserRole;
@@ -331,6 +498,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           project_id: string;
           user_id?: string | null;
           role?: UserRole;
@@ -339,6 +507,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           project_id?: string;
           user_id?: string | null;
           role?: UserRole;
@@ -365,6 +534,7 @@ export interface Database {
       interviews: {
         Row: {
           id: string;
+          tenant_id: string;
           project_id: string;
           title: string;
           description: string | null;
@@ -400,6 +570,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           project_id: string;
           title: string;
           description?: string | null;
@@ -435,6 +606,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           project_id?: string;
           title?: string;
           description?: string | null;
@@ -507,6 +679,7 @@ export interface Database {
       interview_review_entities: {
         Row: {
           id: string;
+          tenant_id: string;
           interview_id: string;
           entity_id: string | null;
           display_name: string;
@@ -517,6 +690,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           interview_id: string;
           entity_id?: string | null;
           display_name: string;
@@ -527,6 +701,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           interview_id?: string;
           entity_id?: string | null;
           display_name?: string;
@@ -562,6 +737,7 @@ export interface Database {
       interview_chunks: {
         Row: {
           id: string;
+          tenant_id: string;
           interview_id: string;
           chunk_index: number;
           content: string;
@@ -574,6 +750,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           interview_id: string;
           chunk_index: number;
           content: string;
@@ -586,6 +763,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           interview_id?: string;
           chunk_index?: number;
           content?: string;
@@ -609,6 +787,7 @@ export interface Database {
       source_entities: {
         Row: {
           id: string;
+          tenant_id: string;
           source_id: string;
           entity_id: string;
           link_type: SourceEntityLinkType;
@@ -624,6 +803,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           source_id: string;
           entity_id: string;
           link_type: SourceEntityLinkType;
@@ -639,6 +819,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           source_id?: string;
           entity_id?: string;
           link_type?: SourceEntityLinkType;
@@ -672,6 +853,7 @@ export interface Database {
       source_chunks: {
         Row: {
           id: string;
+          tenant_id: string;
           source_id: string;
           chunk_index: number;
           content: string;
@@ -684,6 +866,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           source_id: string;
           chunk_index: number;
           content: string;
@@ -696,6 +879,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           source_id?: string;
           chunk_index?: number;
           content?: string;
@@ -719,6 +903,8 @@ export interface Database {
       entities: {
         Row: {
           id: string;
+          /** NULL = platform-global entity accessible across all tenants. */
+          tenant_id: string | null;
           name: string;
           project_id: string | null;
           canonical_entity_id: string | null;
@@ -731,6 +917,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id?: string | null;
           name: string;
           project_id?: string | null;
           canonical_entity_id?: string | null;
@@ -743,6 +930,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string | null;
           name?: string;
           project_id?: string | null;
           canonical_entity_id?: string | null;
@@ -773,6 +961,8 @@ export interface Database {
       entity_aliases: {
         Row: {
           id: string;
+          /** NULL = alias for a platform-global entity. */
+          tenant_id: string | null;
           entity_id: string;
           alias: string;
           alias_normalized: string;
@@ -784,6 +974,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id?: string | null;
           entity_id: string;
           alias: string;
           alias_normalized: string;
@@ -795,6 +986,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string | null;
           entity_id?: string;
           alias?: string;
           alias_normalized?: string;
@@ -824,6 +1016,7 @@ export interface Database {
       entity_mentions: {
         Row: {
           id: string;
+          tenant_id: string;
           entity_id: string;
           interview_id: string;
           chunk_id: string | null;
@@ -833,6 +1026,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           entity_id: string;
           interview_id: string;
           chunk_id?: string | null;
@@ -842,6 +1036,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           entity_id?: string;
           interview_id?: string;
           chunk_id?: string | null;
@@ -876,6 +1071,7 @@ export interface Database {
       entity_relationships: {
         Row: {
           id: string;
+          tenant_id: string;
           source_entity_id: string;
           target_entity_id: string;
           relation_type: RelationType;
@@ -891,6 +1087,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           source_entity_id: string;
           target_entity_id: string;
           relation_type: RelationType;
@@ -906,6 +1103,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           source_entity_id?: string;
           target_entity_id?: string;
           relation_type?: RelationType;
@@ -946,6 +1144,7 @@ export interface Database {
       content_snippets: {
         Row: {
           id: string;
+          tenant_id: string;
           interview_id: string;
           platform: SnippetPlatform;
           content: string;
@@ -957,6 +1156,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           interview_id: string;
           platform: SnippetPlatform;
           content: string;
@@ -968,6 +1168,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           interview_id?: string;
           platform?: SnippetPlatform;
           content?: string;
@@ -990,6 +1191,7 @@ export interface Database {
       reports: {
         Row: {
           id: string;
+          tenant_id: string;
           project_id: string;
           title: string;
           template: ReportTemplate;
@@ -1007,6 +1209,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           project_id: string;
           title: string;
           template: ReportTemplate;
@@ -1024,6 +1227,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           project_id?: string;
           title?: string;
           template?: ReportTemplate;
@@ -1121,14 +1325,17 @@ export interface Database {
       };
       chat_conversation_seq: {
         Row: {
+          tenant_id: string;
           conversation_id: string;
           next_val: number;
         };
         Insert: {
+          tenant_id: string;
           conversation_id: string;
           next_val?: number;
         };
         Update: {
+          tenant_id?: string;
           conversation_id?: string;
           next_val?: number;
         };
@@ -1145,6 +1352,7 @@ export interface Database {
       chat_conversations: {
         Row: {
           id: string;
+          tenant_id: string;
           user_id: string;
           project_id: string | null;
           interview_id: string | null;
@@ -1155,6 +1363,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           user_id: string;
           project_id?: string | null;
           interview_id?: string | null;
@@ -1165,6 +1374,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           user_id?: string;
           project_id?: string | null;
           interview_id?: string | null;
@@ -1200,6 +1410,7 @@ export interface Database {
       chat_messages: {
         Row: {
           id: string;
+          tenant_id: string;
           conversation_id: string;
           role: ChatMessageRole;
           content: string;
@@ -1210,6 +1421,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          tenant_id: string;
           conversation_id: string;
           role: ChatMessageRole;
           content: string;
@@ -1220,6 +1432,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          tenant_id?: string;
           conversation_id?: string;
           role?: ChatMessageRole;
           content?: string;

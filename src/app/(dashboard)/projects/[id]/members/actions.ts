@@ -38,6 +38,18 @@ export async function inviteTeamMember(
       return { error: "Please enter a valid email address" };
     }
 
+    // project_members carries tenant_id explicitly so RLS can enforce
+    // tenancy on this junction table without joining back to projects.
+    const { data: projectRow } = await admin
+      .from("projects")
+      .select("tenant_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!projectRow?.tenant_id) {
+      return { error: "Project not found" };
+    }
+    const projectTenantId = projectRow.tenant_id as string;
+
     // Check for existing pending invite
     const { data: pendingInvites } = await admin
       .from("project_members")
@@ -71,6 +83,7 @@ export async function inviteTeamMember(
 
       // Existing user — add them directly
       const { error: insertError } = await admin.from("project_members").insert({
+        tenant_id: projectTenantId,
         project_id: projectId,
         user_id: existingUser.id,
         role,
@@ -95,6 +108,7 @@ export async function inviteTeamMember(
     }
 
     const { error: insertError } = await admin.from("project_members").insert({
+      tenant_id: projectTenantId,
       project_id: projectId,
       invited_email: normalizedEmail,
       role,

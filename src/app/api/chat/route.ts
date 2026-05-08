@@ -226,10 +226,12 @@ export async function POST(request: NextRequest) {
   projectId = resolved.projectId;
   explicitInterviewId = resolved.interviewId;
   const activeConversationId = resolved.conversationId;
+  const activeTenantId = resolved.tenantId;
 
   const persistedUser = await persistUserTurn({
     admin,
     conversationId: activeConversationId,
+    tenantId: activeTenantId,
     clientMessageId: lastUserMessage.id,
     content: queryText,
   });
@@ -585,6 +587,7 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
       await persistAssistantTurn({
         admin,
         conversationId: activeConversationId,
+        tenantId: activeTenantId,
         userMessageDbId,
         text,
       });

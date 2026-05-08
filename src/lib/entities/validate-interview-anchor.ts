@@ -90,6 +90,7 @@ export async function ensureUploadAnchorEntity(
     entityId: string | null;
     name: string | null;
     projectId: string;
+    tenantId: string;
     role: "person" | "organization";
   }
 ): Promise<EnsureUploadAnchorResult> {
@@ -113,6 +114,7 @@ export async function ensureUploadAnchorEntity(
 
   const { entityId } = await matchOrCreateEntity({
     projectId: params.projectId,
+    tenantId: params.tenantId,
     nameRaw: trimmedName,
     type,
     supabaseClient: admin,

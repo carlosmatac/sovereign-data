@@ -7,11 +7,41 @@ export type ResolvedConversation =
   | {
       ok: true;
       conversationId: string;
+      tenantId: string;
       projectId: string | null;
       interviewId: string | null;
       isNew: boolean;
     }
   | { ok: false; response: Response };
+
+/**
+ * Resolve the tenant_id a brand-new conversation should belong to.
+ * Order of preference:
+ *   1. The project's tenant (if a project is in scope).
+ *   2. The user's first tenant membership (single-tenant fallback).
+ */
+async function resolveCreateTenantId(
+  admin: AdminClient,
+  userId: string,
+  projectId: string | null
+): Promise<string | null> {
+  if (projectId) {
+    const { data: project } = await admin
+      .from("projects")
+      .select("tenant_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (project?.tenant_id) return project.tenant_id;
+  }
+  const { data: member } = await admin
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return member?.tenant_id ?? null;
+}
 
 async function assertProjectMember(
   admin: AdminClient,
@@ -82,7 +112,7 @@ export async function resolveChatConversation(params: {
   if (conversationId) {
     const { data: conv, error } = await admin
       .from("chat_conversations")
-      .select("id, user_id, project_id, interview_id")
+      .select("id, user_id, tenant_id, project_id, interview_id")
       .eq("id", conversationId)
       .maybeSingle();
 
@@ -110,6 +140,7 @@ export async function resolveChatConversation(params: {
     return {
       ok: true,
       conversationId: conv.id,
+      tenantId: conv.tenant_id as string,
       projectId: conv.project_id,
       interviewId: conv.interview_id,
       isNew: false,
@@ -140,9 +171,20 @@ export async function resolveChatConversation(params: {
     }
   }
 
+  const tenantId = await resolveCreateTenantId(admin, userId, projectId);
+  if (!tenantId) {
+    return {
+      ok: false,
+      response: new Response("No tenant membership found for user", {
+        status: 403,
+      }),
+    };
+  }
+
   const { data: created, error: insertErr } = await admin
     .from("chat_conversations")
     .insert({
+      tenant_id: tenantId,
       user_id: userId,
       project_id: projectId,
       interview_id: interviewId,
@@ -160,6 +202,7 @@ export async function resolveChatConversation(params: {
   }
 
   const { error: seqErr } = await admin.from("chat_conversation_seq").insert({
+    tenant_id: tenantId,
     conversation_id: created.id,
     next_val: 0,
   });
@@ -177,6 +220,7 @@ export async function resolveChatConversation(params: {
   return {
     ok: true,
     conversationId: created.id,
+    tenantId,
     projectId,
     interviewId,
     isNew: true,
