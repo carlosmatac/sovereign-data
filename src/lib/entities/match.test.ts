@@ -225,3 +225,31 @@ describe("matchOrCreateEntity — default mode (create_or_match) still creates",
     expect(inserts.some((i) => i.table === "entities")).toBe(true);
   });
 });
+
+describe("matchOrCreateEntity — Phase 2.5: 23505 now propagates", () => {
+  it("throws on unique-constraint violation instead of silently recovering", async () => {
+    // After migration 00031 the constraint is project-scoped. A 23505 reaching
+    // createProjectCanonicalEntity means the exact-match steps failed to catch
+    // an existing same-scope entity — an unexpected state. The function must
+    // propagate rather than return the colliding entity from another scope.
+    const uniqueViolationError = { code: "23505", message: "duplicate key value" };
+
+    const { client } = buildMock({
+      insertSingle: {
+        entities: {
+          data: null,
+          error: uniqueViolationError,
+        },
+      },
+    });
+
+    await expect(
+      matchOrCreateEntity({
+        projectId: PROJECT_ID,
+        nameRaw: "Colliding Entity",
+        type: "COMPANY",
+        supabaseClient: client,
+      })
+    ).rejects.toMatchObject({ code: "23505" });
+  });
+});

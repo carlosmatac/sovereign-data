@@ -3,7 +3,7 @@ title: "Database refactor — baseline diagnostics (Phase 0)"
 status: on-going
 owner: team
 priority: high
-last_updated: 2026-05-06
+last_updated: 2026-05-08
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
   - docs/architecture/agentic-rag.md
@@ -184,6 +184,8 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
 | 2.1 (source rename + back-compat views) | 2026-05-06 | 0 | 0 | **24** | 0 | 0 | **1** | 0 | 0 | 0 | 0 | 0 | 0 | **3** | 0 | 0 | 0 | n/a | n/a |
 | 2.2 (`source_entities` table + anchor backfill) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | n/a | n/a |
 | 2.3 (pipeline writes + match_only) | 2026-05-06 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | **0** | **0** |
+| 2.4 (`entity_intel` reads `source_entities`) | 2026-05-08 | 0 | 0 | 24 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | **1** | 0 |
+| 2.5 (drop global unique constraint + project-scoped index) | 2026-05-08 | **1** | **1** | **25** | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | **4** | 0 | 0 | 0 | 1 | 0 |
 | 3a (workspaces + RLS) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 3b (reprocess txn swap) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 4a (chat evidence) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -323,3 +325,31 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
     is now closed via the structurally correct path.
 
   Phase 2.4 is pushed. Awaiting user manual smoke before commit.
+
+- 2026-05-08 — Migration `00031_entities_project_scoped_unique.sql`
+  applied (Phase 2.5). Pre/post verification confirmed:
+  - `entities_name_type_key` constraint: **dropped** (count 1 → 0).
+  - `entities_name_type_scope_unique` index: **created** (count 0 → 1).
+  - 63 total entities; all 63 are distinct under the new
+    `(normalized_name, type, COALESCE(project_id, sentinel))` scope —
+    no violation produced during the constraint swap.
+
+  **Post-Phase-2.5 audit deltas vs. Phase 2.4:**
+  - §12.1 = **1**, §12.2 = **1** (was 0). Sample: `test 2.3` source
+    now has `interviewee_entity_id` and `interviewee_org_entity_id` set
+    (written by a recent ingest after Phase 2.3 went live). Both
+    entities have no rows in `entity_mentions` for that source —
+    exactly the "anchor-only interviewee" pattern. This is intentional:
+    the Phase 1+2.4 `entity_intel` RPC reads from `source_entities`
+    (not `entity_mentions`) for anchor-type associations, so retrieval
+    works correctly despite §12.1/§12.2 being non-zero. The probes
+    measure the old FK-only path; non-zero values are the expected
+    steady state once Phase 2.3 writes `source_entities` rows and stops
+    creating redundant `entity_mentions` anchor rows.
+  - §12.3 = **25** (+1 orphan). Data delta — not caused by Phase 2.5.
+  - §12.13 = **4** (+1 reviewed interview). Data delta.
+  - §12.10 = **0**, §12.12 = **0** ✓ — the Phase 2.5 key metrics.
+    The constraint swap introduced zero collisions.
+
+  `match.ts` 23505 recovery hack removed in same commit.
+  All 6 unit tests pass (including new Phase 2.5 "23505 propagates" test).
