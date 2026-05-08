@@ -534,7 +534,7 @@ function EmptyState() {
           {[
             {
               icon: ({ className }: { className?: string }) => (
-                <img src="/aksum_white.svg" alt="" className={className} aria-hidden />
+                <img src="/ak.svg" alt="" className={className} aria-hidden />
               ),
               text: "What are the key risks in Mozambique's energy sector?",
             },

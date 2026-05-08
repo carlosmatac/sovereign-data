@@ -154,7 +154,7 @@ export function AppSidebar({
                   className="-ml-0.5 flex min-w-0 items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
                 >
                   <Image
-                    src="/aksum_white_long.svg"
+                    src="/aksum.svg"
                     alt="Aksum — Knowledge Platform"
                     width={2186}
                     height={885}
@@ -179,7 +179,7 @@ export function AppSidebar({
                   className="flex w-full items-center justify-center"
                 >
                   <Image
-                    src="/aksum_white.svg"
+                    src="/ak.svg"
                     alt=""
                     width={32}
                     height={32}

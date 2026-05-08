@@ -61,7 +61,7 @@ const entityTypeColors: Record<string, string> = {
 };
 
 const SdIcon = ({ className }: { className?: string }) => (
-  <img src="/aksum_white.svg" alt="" className={className} aria-hidden />
+  <img src="/ak.svg" alt="" className={className} aria-hidden />
 );
 
 const entityTypeIcons: Record<string, React.ReactNode> = {
