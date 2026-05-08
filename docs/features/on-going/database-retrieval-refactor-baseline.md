@@ -308,3 +308,18 @@ Rows: 16/16 queries succeeded; full markdown report in tmp/baseline.md (gitignor
   No data changed. The audit script preamble was updated to reference
   §12.17 / §12.18 alongside §12.1–§12.16. Manual upload smoke pending
   before Phase 2.3 commit (run by the user; the agent has stopped).
+
+- 2026-05-08 — Re-ran post-Phase-2.4 (`00030_entity_intel_rpc_v2.sql`
+  applied). All §12.1–§12.16 counts unchanged; §12.17 = 1 row
+  (`upload_anchor: 4`), §12.18 = 0 (invariant holds).
+
+  **Live probe results:**
+  - `entity_intel` function body: `reads_source_entities=true`,
+    `reads_legacy_fk=false` — confirmed no residual `interviewee_entity_id`
+    reference.
+  - Anchor-only entity (Martín Eurnekian, §12.1): `entity_intel` returns
+    `role='interviewee', kind='anchor'` via `source_entities`
+    (`origin='upload_anchor', is_primary=true`). The audit §13 symptom
+    is now closed via the structurally correct path.
+
+  Phase 2.4 is pushed. Awaiting user manual smoke before commit.
