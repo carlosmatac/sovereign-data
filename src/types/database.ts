@@ -1547,9 +1547,9 @@ export interface Database {
       replace_source_derived_data: {
         Args: {
           p_source_id: string;
-          p_chunks: string;
-          p_mentions: string;
-          p_relationships: string;
+          p_chunks: unknown[];
+          p_mentions: unknown[];
+          p_relationships: unknown[];
         };
         Returns: undefined;
       };

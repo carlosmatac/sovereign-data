@@ -645,9 +645,9 @@ export async function runIntelPipelineFromCanonicalSource(params: {
 
     const { error: rpcError } = await supabase.rpc("replace_source_derived_data", {
       p_source_id: interviewId,
-      p_chunks: JSON.stringify(chunksPayload),
-      p_mentions: JSON.stringify(mentionsPayload),
-      p_relationships: JSON.stringify(relationshipsPayload),
+      p_chunks: chunksPayload,
+      p_mentions: mentionsPayload,
+      p_relationships: relationshipsPayload,
     });
     if (rpcError) {
       throw new Error(`replace_source_derived_data failed: ${rpcError.message}`);

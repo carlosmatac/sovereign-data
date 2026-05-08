@@ -218,10 +218,10 @@ describe("Phase 3b — reprocess transactional swap", () => {
     expect(replaceRpc).toBeDefined();
     expect(replaceRpc?.args.p_source_id).toBe("source-reprocess-2");
 
-    // All three JSON array params must be present
-    const chunks = JSON.parse(replaceRpc?.args.p_chunks as string);
-    const mentions = JSON.parse(replaceRpc?.args.p_mentions as string);
-    const relationships = JSON.parse(replaceRpc?.args.p_relationships as string);
+    // All three params must be present as arrays (not JSON strings)
+    const chunks = replaceRpc?.args.p_chunks;
+    const mentions = replaceRpc?.args.p_mentions;
+    const relationships = replaceRpc?.args.p_relationships;
 
     expect(Array.isArray(chunks)).toBe(true);
     expect(Array.isArray(mentions)).toBe(true);
@@ -236,9 +236,10 @@ describe("Phase 3b — reprocess transactional swap", () => {
       (c) => c.fn === "replace_source_derived_data"
     );
 
-    const chunks = JSON.parse(replaceRpc?.args.p_chunks as string) as Array<Record<string, unknown>>;
+    const chunks = replaceRpc?.args.p_chunks as Array<Record<string, unknown>>;
 
     // Must have at least one chunk from the reviewed utterances
+    expect(Array.isArray(chunks)).toBe(true);
     expect(chunks.length).toBeGreaterThan(0);
 
     const chunk = chunks[0];
@@ -248,7 +249,7 @@ describe("Phase 3b — reprocess transactional swap", () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     );
 
-    // Embedding is JSON.stringify'd float array
+    // Embedding is a JSON.stringify'd float array (string inside the array element)
     expect(typeof chunk.embedding).toBe("string");
     const embedding = JSON.parse(chunk.embedding as string);
     expect(Array.isArray(embedding)).toBe(true);
