@@ -21,8 +21,8 @@ todos:
     content: Phase 2 / PR 2.4 — Update entity_intel RPC to read source_entities (chat tool unchanged externally)
     status: pending
   - id: phase-2-5-unique-constraint
-    content: "Phase 2 / PR 2.5 — Migration 00029: drop entities.UNIQUE(name,type) global constraint; add project-scoped unique index; remove 23505 recovery hack in match.ts (pre-flight audits §12.10/§12.12)"
-    status: pending
+    content: "Phase 2 / PR 2.5 — Migration 00031: drop entities.UNIQUE(name,type) global constraint; add project-scoped unique index; remove 23505 recovery hack in match.ts (pre-flight audits §12.10/§12.12)"
+    status: done
   - id: phase-2-6-doc-types-refresh
     content: Phase 2 / PR 2.6 — Refresh docs/infrastructure/database-schema.md and src/types/database.ts to match current + new schema (P7 fix)
     status: pending
