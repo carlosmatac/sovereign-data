@@ -539,9 +539,15 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
                   ? "Anchor interviewee on this source — no transcript excerpt for this row."
                   : m.role === "interviewee_org"
                     ? "Anchor interviewee org on this source — no transcript excerpt for this row."
-                    : m.role === "related_via_relationship"
-                      ? "Linked via an entity relationship on this source — no transcript excerpt for this row."
-                      : "No chunk content available",
+                    : m.role === "author"
+                      ? "Author or primary creator of this source."
+                      : m.role === "primary_subject"
+                        ? "Primary subject of this source."
+                        : m.role === "subject_organization"
+                          ? "Organization that is the primary subject of this source."
+                          : m.role === "related_via_relationship"
+                            ? "Linked via an entity relationship on this source — no transcript excerpt for this row."
+                            : "No chunk content available",
             })),
           };
         },

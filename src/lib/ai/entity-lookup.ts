@@ -24,24 +24,51 @@ export interface RelationshipEdge {
 /**
  * Mention/association role surfaced by the entity_intel RPC.
  *
- * - `mention`: an entity_mentions row with chunk content (today's behaviour)
- * - `interviewee`: the entity is the upload anchor interviewee on this
- *   interview, regardless of whether a chunk-level mention survived the
- *   persistence gate (audit §13)
- * - `interviewee_org`: same as above for the interviewee's org anchor
- * - `related_via_relationship`: an active (non-rejected) entity_relationships
- *   row touches this entity on this interview
+ * Roles from branch 1 (entity_mentions):
+ * - `mention`: chunk-level textual mention with content (today's behaviour)
  *
- * See migration 00026_entity_intel_rpc.sql and
- * docs/features/on-going/chat-entity-retrieval-rpc.md.
+ * Roles from branch 2 (source_entities — Phase 2.4):
+ * - `interviewee`: entity is the upload-anchor interviewee of this source
+ * - `interviewee_org`: entity is the upload-anchor org of the interviewee
+ * - `author`: entity is the author/creator of this source (LLM-extracted)
+ * - `primary_subject`: entity is the primary subject of this source
+ * - `subject_organization`: entity is the primary org subject of this source
+ * - `interviewer`, `translator`, `participant`: structured participant roles
+ * - `account`, `source_owner`: CRM/ownership roles (future use)
+ * - `mentioned_at_source_level`, `related_entity`: broad association roles
+ *
+ * Roles from branch 3 (entity_relationships):
+ * - `related_via_relationship`: active (non-rejected) relationship edge
+ *
+ * See migration 00030_entity_intel_rpc_v2.sql and
+ * docs/features/on-going/entity-intel-rpc-source-entities.md.
  */
 export type MentionRole =
   | "mention"
   | "interviewee"
   | "interviewee_org"
+  | "interviewer"
+  | "translator"
+  | "participant"
+  | "author"
+  | "primary_subject"
+  | "subject_organization"
+  | "account"
+  | "source_owner"
+  | "mentioned_at_source_level"
+  | "related_entity"
   | "related_via_relationship";
 
-export type MentionKind = "mention" | "anchor" | "relationship";
+/**
+ * Kind groups how the association row was sourced:
+ * - `mention`:       chunk-level entity_mentions row (branch 1)
+ * - `anchor`:        deterministic source_entities row (upload_anchor /
+ *                    metadata_import / manual_tag / human_review origin)
+ * - `source_entity`: inferred source_entities row (extraction / ai_inference /
+ *                    alias_propagation / prior_context origin)
+ * - `relationship`:  entity_relationships edge (branch 3)
+ */
+export type MentionKind = "mention" | "anchor" | "source_entity" | "relationship";
 
 export interface MentionRecord {
   interview_id: string;
@@ -54,17 +81,33 @@ export interface MentionRecord {
 }
 
 /**
- * Precedence used when an entity has multiple rows for the same interview
+ * Precedence used when an entity has multiple rows for the same source
  * (e.g. interviewee anchor + textual mention + relationship). Lower index =
- * higher precedence in the deduped output. The Copilot benefits more from
- * "this person was the interviewee" than from "this person was mentioned" or
- * "this person is in a relationship in this interview."
+ * higher precedence in the deduped output.
+ *
+ * Ordering logic:
+ *   1. Explicit interviewee anchors (most informative — the entity IS the subject)
+ *   2. Primary-subject-level source_entities (entity is the focus of the source)
+ *   3. Authorship (entity created/wrote the source)
+ *   4. Chunk-level textual mention (entity was mentioned in context)
+ *   5. Relationship edge (entity appeared with someone else in this source)
+ *   6. Other structured roles (participant, translator, …)
  */
 const MENTION_ROLE_PRECEDENCE: MentionRole[] = [
   "interviewee",
   "interviewee_org",
+  "primary_subject",
+  "subject_organization",
+  "author",
   "mention",
   "related_via_relationship",
+  "participant",
+  "interviewer",
+  "translator",
+  "account",
+  "source_owner",
+  "mentioned_at_source_level",
+  "related_entity",
 ];
 
 function rolePrecedence(role: MentionRole): number {

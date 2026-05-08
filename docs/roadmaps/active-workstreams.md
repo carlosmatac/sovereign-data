@@ -42,7 +42,7 @@ Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.
   migration `supabase/migrations/00028_source_entities_table.sql`
   applied to remote.
 - **Phase 2.3 (pipeline writes `source_entities` + orphan-anchor
-  reduction)** — in progress (2026-05-07). Spec at
+  reduction)** — shipped (2026-05-08). Spec at
   [`docs/features/on-going/source-entities-pipeline-writes.md`](../features/on-going/source-entities-pipeline-writes.md);
   migration `supabase/migrations/00029_clear_source_derived_extraction.sql`
   applied to remote. PR 2.3 also closes a regression in the upload
@@ -50,8 +50,14 @@ Right now, only focus on [`database-refactor-plan.md`](./database-refactor-plan.
   deterministically match-or-create their entity at the route layer
   via `ensureUploadAnchorEntity`, populating
   `sources.interviewee_*_entity_id` and the matching
-  `source_entities` upload-anchor row on every upload. Awaiting user
-  manual smoke before commit.
+  `source_entities` upload-anchor row on every upload. Committed.
+- **Phase 2.4 (`entity_intel` reads `source_entities`)** — shipped
+  (2026-05-08). Spec at
+  [`docs/features/on-going/entity-intel-rpc-source-entities.md`](../features/on-going/entity-intel-rpc-source-entities.md);
+  migration `supabase/migrations/00030_entity_intel_rpc_v2.sql` applied
+  to remote. Smoke test confirmed: Martín Eurnekian and Corporación
+  América Airports correctly linked to "test 2.3" via
+  `source_entities` (`interviewee` / `interviewee_org`). Committed.
 
 ---
 
@@ -84,14 +90,20 @@ that should not get lost behind the phased work:
   — surface the source-level primary entities (`interviewee`,
   `interviewee_org` rows in `source_entities`) at the top of the
   source detail page. Backend is in place (PR 2.3); pure frontend.
+- [`docs/features/to-do/anchor-row-context-enrichment.md`](../features/to-do/anchor-row-context-enrichment.md)
+  — when `entity_intel` returns a source-level anchor row
+  (`role='interviewee'`, etc.), the Copilot should surface the
+  source summary, representative chunk, or metadata instead of "no
+  transcript excerpt available." Non-blocking follow-up to Phase 2.4.
 
 ---
 
 ## Immediate next
 
-- **Refactor:** finish Phase 2.3 sign-off — user runs a fresh
-  upload with the `ensureUploadAnchorEntity` fix, then we commit and
-  queue Phase 2.4 (chat reads `source_entities` via `entity_intel`).
+- **Refactor:** Phase 2.5 — pre-flight audit §12.10 / §12.12 (both
+  currently 0), then drop `entities.UNIQUE(name, type)` global constraint
+  and replace with project-scoped unique index; remove the `23505`
+  recovery hack in `match.ts`.
 - **Backlog:** the queued specs above, in priority order set
   by the human reviewer.
 

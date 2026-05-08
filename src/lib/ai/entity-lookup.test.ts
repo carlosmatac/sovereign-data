@@ -28,7 +28,7 @@ type EntityIntelRow = {
   source_id: string;
   source_title: string;
   role: MentionRole;
-  kind: "mention" | "anchor" | "relationship";
+  kind: "mention" | "anchor" | "source_entity" | "relationship";
   evidence: string | null;
   chunk_id: string | null;
   sentiment: string | null;
@@ -302,5 +302,151 @@ describe("getMentions — entity_intel RPC consumer", () => {
     const { admin } = makeAdminClient(rows);
     const out = await getMentions(admin, ENTITY_ID);
     expect(out.length).toBeLessThanOrEqual(30);
+  });
+});
+
+// ── Phase 2.4 — source_entities roles ────────────────────────────────────────
+
+describe("getMentions — source_entities roles (Phase 2.4)", () => {
+  it("surfaces author rows from source_entities (kind=source_entity)", async () => {
+    // An entity written with link_type='author', origin='extraction' by Phase 2.3.
+    const rows: EntityIntelRow[] = [
+      {
+        source_id: "src-F",
+        source_title: "Policy Brief",
+        role: "author",
+        kind: "source_entity",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: t("2026-03-01T00:00:00.000Z"),
+        created_at: t("2026-03-02T00:00:00.000Z"),
+      },
+    ];
+    const { admin } = makeAdminClient(rows);
+    const out = await getMentions(admin, ENTITY_ID);
+    expect(out).toHaveLength(1);
+    expect(out[0].role).toBe("author");
+    expect(out[0].kind).toBe("source_entity");
+    expect(out[0].chunk_content).toBeNull();
+    expect(out[0].interview_id).toBe("src-F");
+  });
+
+  it("surfaces primary_subject rows (kind=source_entity)", async () => {
+    const rows: EntityIntelRow[] = [
+      {
+        source_id: "src-G",
+        source_title: "Market Report",
+        role: "primary_subject",
+        kind: "source_entity",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: null,
+        created_at: t("2026-04-01T00:00:00.000Z"),
+      },
+    ];
+    const { admin } = makeAdminClient(rows);
+    const out = await getMentions(admin, ENTITY_ID);
+    expect(out).toHaveLength(1);
+    expect(out[0].role).toBe("primary_subject");
+    expect(out[0].kind).toBe("source_entity");
+  });
+
+  it("dedup: interviewee (anchor) wins over author (source_entity) for same source", async () => {
+    // Phase 2.3 could write both an upload_anchor interviewee row AND an
+    // extraction author row for the same entity on the same source (they have
+    // different link_type so the quad key allows both). entity_intel will emit
+    // two rows; getMentions should keep only the higher-precedence one.
+    const rows: EntityIntelRow[] = [
+      {
+        source_id: "src-H",
+        source_title: "Interview H",
+        role: "author",
+        kind: "source_entity",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: t("2026-04-01T00:00:00.000Z"),
+        created_at: t("2026-04-02T00:00:00.000Z"),
+      },
+      {
+        source_id: "src-H",
+        source_title: "Interview H",
+        role: "interviewee",
+        kind: "anchor",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: t("2026-04-01T00:00:00.000Z"),
+        created_at: t("2026-04-02T00:00:00.000Z"),
+      },
+    ];
+    const { admin } = makeAdminClient(rows);
+    const out = await getMentions(admin, ENTITY_ID);
+    expect(out).toHaveLength(1);
+    expect(out[0].role).toBe("interviewee");
+  });
+
+  it("dedup: primary_subject wins over mention for same source", async () => {
+    const rows: EntityIntelRow[] = [
+      {
+        source_id: "src-I",
+        source_title: "Interview I",
+        role: "mention",
+        kind: "mention",
+        evidence: "She spoke at length about Angola.",
+        chunk_id: "chunk-x",
+        sentiment: "neutral",
+        conducted_at: null,
+        created_at: t("2026-04-03T00:00:00.000Z"),
+      },
+      {
+        source_id: "src-I",
+        source_title: "Interview I",
+        role: "primary_subject",
+        kind: "source_entity",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: null,
+        created_at: t("2026-04-03T00:00:00.000Z"),
+      },
+    ];
+    const { admin } = makeAdminClient(rows);
+    const out = await getMentions(admin, ENTITY_ID);
+    expect(out).toHaveLength(1);
+    expect(out[0].role).toBe("primary_subject");
+  });
+
+  it("dedup: author wins over related_via_relationship for same source", async () => {
+    const rows: EntityIntelRow[] = [
+      {
+        source_id: "src-J",
+        source_title: "Interview J",
+        role: "related_via_relationship",
+        kind: "relationship",
+        evidence: "partners with org X",
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: null,
+        created_at: t("2026-04-04T00:00:00.000Z"),
+      },
+      {
+        source_id: "src-J",
+        source_title: "Interview J",
+        role: "author",
+        kind: "source_entity",
+        evidence: null,
+        chunk_id: null,
+        sentiment: null,
+        conducted_at: null,
+        created_at: t("2026-04-04T00:00:00.000Z"),
+      },
+    ];
+    const { admin } = makeAdminClient(rows);
+    const out = await getMentions(admin, ENTITY_ID);
+    expect(out).toHaveLength(1);
+    expect(out[0].role).toBe("author");
   });
 });
