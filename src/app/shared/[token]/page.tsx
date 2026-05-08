@@ -158,7 +158,7 @@ export default function SharedReportPage() {
     <div className="mx-auto max-w-4xl p-6">
       {/* Branding */}
       <div className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
-        <img src="/aksum_white.svg" alt="Aksum" className="h-4 w-4" />
+        <img src="/ak.svg" alt="Aksum" className="h-4 w-4" />
         <span className="font-medium">Aksum</span>
         <span>·</span>
         <span>Shared Report</span>

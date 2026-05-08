@@ -34,7 +34,7 @@ type EntityMentionsListProps = {
 };
 
 const SdIcon = ({ className }: { className?: string }) => (
-  <img src="/aksum_white.svg" alt="" className={className} aria-hidden />
+  <img src="/ak.svg" alt="" className={className} aria-hidden />
 );
 
 const ENTITY_ICON_BY_TYPE: Record<string, React.ReactNode> = {
