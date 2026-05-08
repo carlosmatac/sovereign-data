@@ -105,20 +105,16 @@ that should not get lost behind the phased work:
   recovery hack removed from `match.ts`. Spec at
   [`docs/features/on-going/schema-doc-and-types-refresh.md`](../features/on-going/schema-doc-and-types-refresh.md).
 
-- **Phase 3a — on-going (2026-05-08).** Approved and implementation
-  started. Three migrations + TypeScript changes:
-  - `00032_tenants_core.sql` — `tenants`, `tenant_members`,
-    `tenant_settings`, `tenant_integrations`, `is_tenant_member()`,
-    bootstrap row.
-  - `00033_tenant_id_everywhere.sql` — `tenant_id` on every Tier A/B
-    table; backfill; NOT NULL; compound UNIQUE + compound FKs; Tier B
-    trigger; hot-path indexes.
-  - `00034_tenant_rls.sql` — direct `is_tenant_member(tenant_id)` RLS
-    on all customer-owned tables.
-  - Pipeline and TypeScript: `tenant_id` propagated through all batch
-    writes; `src/lib/tenant/scope.ts`; `src/lib/tenant/settings.ts`.
+- **Phase 3a — shipped (2026-05-08).** Three migrations applied to
+  remote; all 161 tests passing. `tenant_id` propagated through every
+  write path; RLS active on all 19 tables.
   Feature spec: [`docs/features/on-going/tenants-rls-and-customization.md`](../features/on-going/tenants-rls-and-customization.md).
   ADR: [`docs/architecture/tenant-model-adr.md`](../architecture/tenant-model-adr.md).
+
+- **Phase 3b — on-going (2026-05-08).** Reviewed-reprocess transactional
+  swap. Migration `00035_replace_source_derived_data.sql` written; pipeline
+  updated; 5 new tests passing. Pending: `supabase db push`.
+  Feature spec: [`docs/features/on-going/reprocess-transactional-swap.md`](../features/on-going/reprocess-transactional-swap.md).
 
 - **Backlog:** the queued specs above, in priority order set
   by the human reviewer.
