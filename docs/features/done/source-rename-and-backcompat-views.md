@@ -1,9 +1,9 @@
 ---
 title: "Source-first rename: interviews → sources, interview_chunks → source_chunks (Phase 2.1 / PR 2.1)"
-status: on-going
+status: done
 owner: team
 priority: high
-last_updated: 2026-05-06
+last_updated: 2026-05-08
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
   - docs/architecture/agentic-rag.md

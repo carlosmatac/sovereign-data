@@ -25,7 +25,7 @@ todos:
     status: done
   - id: phase-2-6-doc-types-refresh
     content: Phase 2 / PR 2.6 — Refresh docs/infrastructure/database-schema.md and src/types/database.ts to match current + new schema (P7 fix)
-    status: pending
+    status: done
   - id: phase-3a-1-workspaces
     content: "Phase 3a / PR 3a.1 — Migration 00030: workspaces table + workspace_id on projects/entities/entity_aliases + workspace_members + bootstrap workspace backfill"
     status: pending

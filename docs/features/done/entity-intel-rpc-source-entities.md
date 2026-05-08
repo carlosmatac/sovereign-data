@@ -1,6 +1,6 @@
 ---
 title: "Phase 2.4 — entity_intel RPC reads source_entities"
-status: on-going
+status: done
 owner: agent
 priority: high
 last_updated: 2026-05-08

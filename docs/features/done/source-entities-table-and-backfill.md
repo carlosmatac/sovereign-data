@@ -1,9 +1,9 @@
 ---
 title: "source_entities table + anchor backfill (Phase 2.2 / PR 2.2)"
-status: on-going
+status: done
 owner: team
 priority: high
-last_updated: 2026-05-06
+last_updated: 2026-05-08
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_infrastructure:
