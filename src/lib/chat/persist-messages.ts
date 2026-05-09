@@ -126,26 +126,64 @@ export async function persistAssistantTurn(params: {
   tenantId: string;
   userMessageDbId: string;
   text: string;
-}): Promise<void> {
+}): Promise<string | null> {
   const { admin, conversationId, tenantId, userMessageDbId, text } = params;
 
   const seq = await nextSequence(admin, conversationId);
-  if (seq === null) return;
+  if (seq === null) return null;
 
-  const { error } = await admin.from("chat_messages").insert({
-    tenant_id: tenantId,
-    conversation_id: conversationId,
-    role: "assistant",
-    content: text,
-    sequence: seq,
-    client_message_id: null,
-    user_message_id: userMessageDbId,
-  });
+  const { data: inserted, error } = await admin
+    .from("chat_messages")
+    .insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      role: "assistant",
+      content: text,
+      sequence: seq,
+      client_message_id: null,
+      user_message_id: userMessageDbId,
+    })
+    .select("id")
+    .single();
 
   if (error?.code === "23505") {
-    return;
+    return null;
   }
-  if (error) {
+  if (error || !inserted) {
     console.error("[chat-persist] insert assistant message", error);
+    return null;
+  }
+
+  return inserted.id;
+}
+
+export async function persistChatEvidence(params: {
+  admin: AdminClient;
+  messageId: string;
+  tenantId: string;
+  ragChunks: Array<{ chunk_id: string; similarity: number }>;
+  text: string;
+}): Promise<void> {
+  const { admin, messageId, tenantId, ragChunks, text } = params;
+  if (ragChunks.length === 0) return;
+
+  const citedPositions = new Set(
+    [...(text.match(/\[(\d+)\]/g) ?? [])].map((m) =>
+      parseInt(m.slice(1, -1), 10)
+    )
+  );
+
+  const rows = ragChunks.map((chunk, i) => ({
+    message_id: messageId,
+    tenant_id: tenantId,
+    chunk_id: chunk.chunk_id,
+    similarity: chunk.similarity,
+    position: i + 1,
+    used_in_text: citedPositions.has(i + 1),
+  }));
+
+  const { error } = await admin.from("chat_message_evidence").insert(rows);
+  if (error) {
+    console.error("[chat-persist] insert evidence", error);
   }
 }

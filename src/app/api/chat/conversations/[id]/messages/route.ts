@@ -48,7 +48,9 @@ export async function GET(
   let q = supabase
     .from("chat_messages")
     .select(
-      "id, role, content, sequence, client_message_id, user_message_id, created_at"
+      `id, role, content, sequence, client_message_id, user_message_id, created_at,
+       chat_message_evidence(id, chunk_id, position, similarity, used_in_text,
+         source_chunks(id, source_id, speaker, start_time))`
     )
     .eq("conversation_id", conversationId)
     .order("sequence", { ascending: false })

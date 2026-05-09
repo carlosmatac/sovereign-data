@@ -26,6 +26,7 @@ import {
 import { resolveChatConversation } from "@/lib/chat/resolve-conversation";
 import {
   persistAssistantTurn,
+  persistChatEvidence,
   persistUserTurn,
 } from "@/lib/chat/persist-messages";
 import {
@@ -584,13 +585,22 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
       console.log(
         `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent} temporal=${temporalClassification.temporal_intent}`
       );
-      await persistAssistantTurn({
+      const assistantMessageId = await persistAssistantTurn({
         admin,
         conversationId: activeConversationId,
         tenantId: activeTenantId,
         userMessageDbId,
         text,
       });
+      if (assistantMessageId && ragChunks.length > 0) {
+        await persistChatEvidence({
+          admin,
+          messageId: assistantMessageId,
+          tenantId: activeTenantId,
+          ragChunks,
+          text,
+        });
+      }
     },
   });
 
