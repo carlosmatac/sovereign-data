@@ -111,10 +111,13 @@ that should not get lost behind the phased work:
   Feature spec: [`docs/features/on-going/tenants-rls-and-customization.md`](../features/on-going/tenants-rls-and-customization.md).
   ADR: [`docs/architecture/tenant-model-adr.md`](../architecture/tenant-model-adr.md).
 
-- **Phase 3b — on-going (2026-05-08).** Reviewed-reprocess transactional
-  swap. Migration `00035_replace_source_derived_data.sql` written; pipeline
-  updated; 5 new tests passing. Pending: `supabase db push`.
-  Feature spec: [`docs/features/on-going/reprocess-transactional-swap.md`](../features/on-going/reprocess-transactional-swap.md).
+- **Phase 3b — on-going (2026-05-09).** Reviewed-reprocess transactional
+  swap. Migrations 00035–00038 applied to remote; all tests passing.
+  Three post-deployment incidents diagnosed and fixed (duplicate FKs from 3a,
+  `vector` type search_path, JSONB double-serialisation). Pending: manual
+  smoke reprocess to confirm COMPLETED end-to-end.
+  Feature spec + postmortem: [`docs/features/on-going/reprocess-transactional-swap.md`](../features/on-going/reprocess-transactional-swap.md).
+  **Known debt:** `interviews` back-compat view still used by 28 files (TD-1 in spec).
 
 - **Backlog:** the queued specs above, in priority order set
   by the human reviewer.
