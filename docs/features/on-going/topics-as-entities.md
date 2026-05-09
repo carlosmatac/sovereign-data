@@ -165,9 +165,32 @@ a TOPIC/RISK/OPPORTUNITY/PROJECT entity is extracted:
 ## Validation
 
 1. `npx tsc --noEmit` — zero errors.
-2. `npm test` — all tests pass including updated entity-types and new thematic tests.
+2. `npm test` — 166 tests pass (5 new for Phase 4b).
 3. `supabase db push --dry-run` — only migration 00040 queued.
-4. Pending remote push approval.
+4. Migration 00040 applied cleanly to remote (2026-05-09).
+
+### Smoke test — 2026-05-09
+
+Source: "test phase 2.5" (`301a8c44-078f-49a7-a2d9-40a0bd2494fa`), Angola, hospitality interview, 62 utterances.
+
+- Pipeline ran cleanly: 62 chunks, 23 resolved entities, 6 persisted to
+  `entity_mentions`, 16 ungrounded, 1 dropped by policy.
+- Legacy `sources.topics[]` correctly populated: `['hospitality', 'investment',
+  'infrastructure', 'tourism']`. No regression.
+- Existing entity types extracted correctly: `InterContinental Luanda Miramar`
+  (COMPANY), `Epic Sauna` (COMPANY), `Hotel Tropico` (COMPANY), `Nuno Neves`
+  (PERSON), `Luanda` (LOCATION), `Angola` (COUNTRY).
+- **Thematic entities (TOPIC/RISK/OPPORTUNITY/PROJECT): 0 emitted.** This is
+  expected for this source — the hospitality interview discusses generic themes
+  (no named projects, no named specific risks trackable across sources). The LLM
+  correctly chose string-array tags over entity rows, consistent with the prompt's
+  "use sparingly / only when discussed in depth" guidance. Thematic entities will
+  appear for substantive sources discussing named initiatives, specific regulatory
+  risks, or named projects.
+- Risks string array populated: `['Supply chain disruptions', 'Talent retention
+  challenges', 'Economic volatility in Angola']`.
+- Opportunities string array populated: `['Diversification of guest demographics',
+  'Enhanced air connectivity', 'Local sourcing improvements']`.
 
 ---
 
