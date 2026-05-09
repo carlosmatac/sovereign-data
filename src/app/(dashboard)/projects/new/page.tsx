@@ -58,7 +58,7 @@ export default function NewProjectPage() {
         <CardHeader>
           <CardTitle>New Project</CardTitle>
           <CardDescription>
-            Create an intelligence project to organize interviews by
+            Create a knowledge project to organize sources by
             country or region.
           </CardDescription>
         </CardHeader>
@@ -80,7 +80,7 @@ export default function NewProjectPage() {
               <Textarea
                 id="description"
                 name="description"
-                placeholder="Brief description of the intelligence focus..."
+                placeholder="Brief description of the knowledge focus..."
                 rows={3}
               />
             </div>

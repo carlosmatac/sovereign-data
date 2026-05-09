@@ -71,7 +71,7 @@ export function ProjectInterviewsSection({
   return (
     <Card>
       <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-        <CardTitle>Intelligence Sources</CardTitle>
+        <CardTitle>Knowledge Sources</CardTitle>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
             aria-label="Filter sources by status"
@@ -102,7 +102,7 @@ export function ProjectInterviewsSection({
         {filteredInterviews.length === 0 ? (
           <div className="rounded-lg border border-dashed py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              No intelligence sources yet for this project.
+              No knowledge sources yet for this project.
             </p>
           </div>
         ) : (

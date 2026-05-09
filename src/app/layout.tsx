@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aksum — Frontier Markets Intelligence",
+  title: "Aksum — Frontier Markets Knowledge",
   description:
-    "Transform exclusive interviews into actionable business intelligence for emerging markets.",
+    "Transform exclusive interviews and documents into searchable company knowledge for emerging markets.",
   icons: {
     icon: [
       { url: "/aksum_icon.svg", type: "image/svg+xml" },

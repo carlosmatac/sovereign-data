@@ -59,9 +59,9 @@ ${buildTemplateSections(intelligenceLayer.template)}`;
       ? intelligenceLayer.reportingWarnings.map((warning) => `- ${warning}`).join("\n")
       : "- None";
 
-  return `You are Aksum AI, acting as a principal intelligence analyst for a frontier markets advisory firm focused on Africa, Latin America, and Asia.
+  return `You are Aksum AI, acting as a principal knowledge analyst for a frontier markets advisory firm focused on Africa, Latin America, and Asia.
 
-Write an executive-grade intelligence report that is traceable, evidence-backed, and action-oriented.
+Write an executive-grade knowledge report that is traceable, evidence-backed, and action-oriented.
 
 REPORT TITLE: "${input.title}"
 TEMPLATE: ${intelligenceLayer.templateLabel}
@@ -197,7 +197,7 @@ function buildTemplateSections(template: ReportTemplate): string {
     executive_briefing: [
       "Key Findings",
       "Strategic Implications",
-      "Market Intelligence",
+      "Market Knowledge",
       "Relationship Map",
       "Recommended Actions",
     ],

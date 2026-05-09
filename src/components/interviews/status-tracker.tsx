@@ -34,7 +34,7 @@ const AUDIO_PIPELINE_STEPS: Array<{
   },
   {
     status: "EXTRACTING",
-    label: "Intelligence Extraction",
+    label: "Knowledge Extraction",
     description: "Extracting entities, risks & opportunities via GPT-4o-mini",
   },
   {
@@ -61,7 +61,7 @@ const DOCUMENT_PIPELINE_STEPS: Array<{
   },
   {
     status: "EXTRACTING",
-    label: "Intelligence Extraction",
+    label: "Knowledge Extraction",
     description: "Extracting entities, risks & opportunities via GPT-4o-mini",
   },
   {

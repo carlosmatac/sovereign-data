@@ -28,7 +28,7 @@ export default async function ProjectsPage() {
             Projects
           </h1>
           <p className="mt-1.5 text-[13px] text-white/62">
-            Manage your market intelligence projects by country or region.
+            Manage your market knowledge projects by country or region.
           </p>
         </div>
         <TonalActionButton

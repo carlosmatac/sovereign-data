@@ -83,11 +83,11 @@ export default async function InterviewsPage({
             className="text-[28px] font-semibold text-white"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
-            Intelligence Library
+            Knowledge Library
           </h1>
           <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-white/62">
             Cross-project source library for uploaded audio, documents, and
-            text-based intelligence. For day-to-day workflow, start in Projects
+            text-based company knowledge. For day-to-day workflow, start in Projects
             and manage sources in project context.
           </p>
         </div>
@@ -118,7 +118,7 @@ export default async function InterviewsPage({
       {error ? (
         <SectionSurface>
           <p className="py-10 text-center text-[13px] text-white/60">
-            Failed to load intelligence sources. Please try again.
+            Failed to load knowledge sources. Please try again.
           </p>
         </SectionSurface>
       ) : !interviews || interviews.length === 0 ? (
@@ -134,7 +134,7 @@ export default async function InterviewsPage({
             No sources yet
           </h3>
           <p className="mt-1.5 text-[12.5px] text-white/60">
-            Add your first source to start extracting intelligence.
+            Add your first source to start extracting knowledge.
           </p>
           {canUpload && (
             <div className="mt-4">

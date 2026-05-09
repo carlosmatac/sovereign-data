@@ -14,7 +14,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
  * gated by `md:hidden`. Desktop never shows it.
  *
  * Anatomy (left → right):
- *   [≡ on mobile]   AKSUM · INTELLIGENCE PLATFORM
+ *   [≡ on mobile]   AKSUM · KNOWLEDGE PLATFORM
  *
  * The strip uses a desaturated graphite/navy gradient so it reads as a
  * subtle structural band rather than a saturated blue chrome. Header
@@ -44,7 +44,7 @@ export function DashboardInsetHeader() {
           color: "rgba(255,255,255,0.32)",
         }}
       >
-        Aksum · Intelligence Platform
+        Aksum · Knowledge Platform
       </span>
     </header>
   );

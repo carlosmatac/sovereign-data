@@ -3,7 +3,7 @@
 // ============================================
 
 export const APP_NAME = "Aksum";
-export const APP_DESCRIPTION = "Frontier Markets Intelligence Platform";
+export const APP_DESCRIPTION = "Frontier Markets Knowledge Platform";
 
 // Interview processing statuses with UI labels and badge variants
 export const STATUS_LABELS: Record<
@@ -13,7 +13,7 @@ export const STATUS_LABELS: Record<
   UPLOADING: { label: "Uploading", variant: "warning" },
   PROCESSING: { label: "Processing", variant: "warning" },
   TRANSCRIBING: { label: "Transcribing", variant: "warning" },
-  EXTRACTING: { label: "Extracting Intel", variant: "warning" },
+  EXTRACTING: { label: "Extracting Knowledge", variant: "warning" },
   EMBEDDING: { label: "Indexing", variant: "warning" },
   COMPLETED: { label: "Ready", variant: "success" },
   FAILED: { label: "Failed", variant: "destructive-soft" },
@@ -105,7 +105,7 @@ export const REPORT_TEMPLATES = {
   country_risk: {
     label: "Country Risk Assessment",
     description:
-      "Political, economic, and operational risk analysis for a specific country based on interview intelligence.",
+      "Political, economic, and operational risk analysis for a specific country based on source knowledge.",
     icon: "Shield",
     sections: [
       "Executive Summary",
@@ -153,7 +153,7 @@ export const REPORT_TEMPLATES = {
     sections: [
       "Key Findings",
       "Strategic Implications",
-      "Market Intelligence",
+      "Market Knowledge",
       "Relationship Map",
       "Recommended Actions",
     ],
@@ -161,7 +161,7 @@ export const REPORT_TEMPLATES = {
   custom: {
     label: "Custom Report",
     description:
-      "Free-form intelligence report with a custom focus area you define.",
+      "Free-form knowledge report with a custom focus area you define.",
     icon: "Pencil",
     sections: [],
   },

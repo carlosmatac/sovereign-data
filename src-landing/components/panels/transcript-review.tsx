@@ -520,7 +520,7 @@ export default function CaptureOrganisePage() {
                 </h2>
               </div>
               <p className="text-[15px] leading-[1.80] tracking-[-0.011em] lg:pt-10" style={{ color: "rgba(255,255,255,0.48)" }}>
-                Sovereign is designed to preserve nuance. When the details matter, the platform gives your team a clear, fast way to verify what has been captured — so you can trust what you're working with.
+                Sovereign is designed to preserve nuance. When the details matter, the platform gives your team a clear, fast way to verify what has been captured — so you can trust what you&apos;re working with.
               </p>
             </div>
           </div>

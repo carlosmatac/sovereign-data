@@ -208,7 +208,7 @@ export function ReportPDF({
               {sourceInterviews.length} source interview
               {sourceInterviews.length !== 1 ? "s" : ""}
             </Text>
-            <Text style={styles.metaItem}>Aksum Intelligence Platform</Text>
+            <Text style={styles.metaItem}>Aksum Knowledge Platform</Text>
           </View>
         </View>
 
@@ -260,7 +260,7 @@ export function ReportPDF({
         {/* Footer */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
-            CONFIDENTIAL — Aksum Intelligence Platform
+            CONFIDENTIAL — Aksum Knowledge Platform
           </Text>
           <Text
             style={styles.footerText}

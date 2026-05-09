@@ -199,7 +199,7 @@ export default async function InterviewDetailPage({
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Intelligence
+          Back to Knowledge
         </Link>
       </div>
 
@@ -251,7 +251,7 @@ export default async function InterviewDetailPage({
                 className="gap-1 border-[rgba(74,222,128,0.28)] bg-[rgba(74,222,128,0.06)] text-[rgba(167,243,208,0.92)]"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" />
-                Human-reviewed intel
+                Human-reviewed knowledge
               </Badge>
             )}
             {canEdit && (
@@ -303,7 +303,7 @@ export default async function InterviewDetailPage({
              * page. It carries a subtle Sovereign-blue accent (border tint
              * + faint background tint + leading IconWell) so it reads as
              * the page's primary takeaway without becoming a colourful
-             * tile. All other intelligence cards stay neutral on purpose
+             * tile. All other knowledge cards stay neutral on purpose
              * so this one keeps its visual weight.
              */}
             {interview.summary && (
@@ -414,7 +414,7 @@ export default async function InterviewDetailPage({
           </div>
 
           {/*
-           * Right Column: Intelligence sidebar.
+           * Right Column: Knowledge sidebar.
            *
            * Bounded so it can't dictate the entire page height when an
            * interview has many entities (the previous layout grew

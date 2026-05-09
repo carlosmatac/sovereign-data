@@ -9,7 +9,7 @@
  *   it with `PanelShell` + `WindowChrome` to recreate the app frame.
  *
  *   ┌───────────────────────────────────────────────────────┐
- *   │ ● ● ●  Sovereign · Intelligence Platform     [Live]   │   ← WindowChrome
+ *   │ ● ● ●  Sovereign · Knowledge Platform        [Live]   │   ← WindowChrome
  *   ├───────────────────────────────────────────────────────┤
  *   │        │                                              │
  *   │  SIDE  │   ┌────────────────────────────────────┐    │   ← Central panel

@@ -52,8 +52,15 @@ export function EditableSpeakersCard({
 
   useEffect(() => {
     if (serverSig !== clientSig) {
-      setMap({ ...initialSpeakerMap });
-      setClientSig(serverSig);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setMap({ ...initialSpeakerMap });
+        setClientSig(serverSig);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [serverSig, clientSig, initialSpeakerMap]);
 
