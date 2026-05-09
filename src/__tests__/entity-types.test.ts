@@ -5,7 +5,7 @@ import {
   isEntityType,
   isOrgLikeEntityType,
 } from "@/types/database";
-import { EntityTypeSchema } from "@/lib/ai/extraction";
+import { EntityTypeSchema, buildEntityTypeGuidance } from "@/lib/ai/extraction";
 import { parseEntityTypeFilters } from "@/app/api/projects/[projectId]/entities/search/route";
 
 const NEW_ENTITY_TYPES = [
@@ -18,6 +18,13 @@ const NEW_ENTITY_TYPES = [
   "MEDIA_OR_PUBLICATION",
 ] as const;
 
+const PHASE_4B_ENTITY_TYPES = [
+  "TOPIC",
+  "RISK",
+  "OPPORTUNITY",
+  "PROJECT",
+] as const;
+
 describe("entity type expansion", () => {
   it("exposes the expanded entity type list from one source of truth", () => {
     expect(ENTITY_TYPE_VALUES).toEqual([
@@ -28,9 +35,14 @@ describe("entity type expansion", () => {
       "LOCATION",
       "EVENT",
       ...NEW_ENTITY_TYPES,
+      ...PHASE_4B_ENTITY_TYPES,
     ]);
 
     for (const type of NEW_ENTITY_TYPES) {
+      expect(isEntityType(type)).toBe(true);
+    }
+
+    for (const type of PHASE_4B_ENTITY_TYPES) {
       expect(isEntityType(type)).toBe(true);
     }
   });
@@ -69,5 +81,51 @@ describe("entity type expansion", () => {
     expect(isOrgLikeEntityType("COUNTRY")).toBe(false);
     expect(isOrgLikeEntityType("COMMODITY")).toBe(false);
     expect(isOrgLikeEntityType("LAW_OR_POLICY")).toBe(false);
+  });
+});
+
+describe("Phase 4b — thematic entity types", () => {
+  it("Phase 4b types are valid EntityType values", () => {
+    for (const type of PHASE_4B_ENTITY_TYPES) {
+      expect(EntityTypeSchema.parse(type)).toBe(type);
+      expect(isEntityType(type)).toBe(true);
+    }
+  });
+
+  it("Phase 4b types are NOT org-like", () => {
+    for (const type of PHASE_4B_ENTITY_TYPES) {
+      expect(isOrgLikeEntityType(type)).toBe(false);
+    }
+  });
+
+  it("buildEntityTypeGuidance includes thematic types when flag is on", () => {
+    const guidance = buildEntityTypeGuidance(true);
+    expect(guidance).toContain("TOPIC");
+    expect(guidance).toContain("RISK");
+    expect(guidance).toContain("OPPORTUNITY");
+    expect(guidance).toContain("PROJECT");
+  });
+
+  it("buildEntityTypeGuidance excludes thematic types when flag is off", () => {
+    const guidance = buildEntityTypeGuidance(false);
+    expect(guidance).not.toContain("TOPIC:");
+    expect(guidance).not.toContain("RISK:");
+    expect(guidance).not.toContain("OPPORTUNITY:");
+    expect(guidance).not.toContain("PROJECT:");
+    // Base types still present
+    expect(guidance).toContain("SECTOR");
+    expect(guidance).toContain("COMMODITY");
+  });
+
+  it("search allowlists accept Phase 4b entity types", () => {
+    expect(
+      parseEntityTypeFilters({ typeParam: "TOPIC", typesParam: "" })
+    ).toEqual(["TOPIC"]);
+    expect(
+      parseEntityTypeFilters({
+        typeParam: "",
+        typesParam: "RISK,OPPORTUNITY,PROJECT,NOT_A_TYPE",
+      })
+    ).toEqual(["RISK", "OPPORTUNITY", "PROJECT"]);
   });
 });

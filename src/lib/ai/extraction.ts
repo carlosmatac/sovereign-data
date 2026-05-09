@@ -205,7 +205,7 @@ const SOURCE_OVERLAYS: Record<string, string> = {
     "This is a published article. Attribution of statements to sources is important; distinguish between the author's voice and quoted entities.",
 };
 
-const ENTITY_TYPE_GUIDANCE = `ENTITY TYPE SELECTION (important — use the most specific type available):
+const ENTITY_TYPE_GUIDANCE_BASE = `ENTITY TYPE SELECTION (important — use the most specific type available):
 - PERSON: named individual people only. Do not use for job titles or roles by themselves.
 - COMPANY: private companies and commercial firms that are not primarily state-owned.
 - GOVERNMENT: national/subnational government as an actor or administration when no specific institution is named.
@@ -219,6 +219,18 @@ const ENTITY_TYPE_GUIDANCE = `ENTITY TYPE SELECTION (important — use the most 
 - STATE_OWNED_ENTERPRISE: state-controlled companies/utilities such as NNPC, TCN, national oil companies, public power utilities.
 - LAW_OR_POLICY: laws, acts, reforms, tariffs, subsidy policies, regulations, policy frameworks (e.g. Petroleum Industry Act).
 - MEDIA_OR_PUBLICATION: media outlets, publishers, newspapers, wire services, publications (e.g. Reuters, FT, Portafolio).`;
+
+const THEMATIC_ENTITY_TYPE_GUIDANCE = `
+- TOPIC: a substantive named theme or subject area discussed at length in this source (e.g. "Energy Transition", "Fiscal Reform", "Digital Infrastructure Policy"). Use for cross-cutting themes that deserve their own entity row so they can be linked across sources. Do NOT use for the short filter tags in the topics[] array — those remain lowercase single words. Only emit TOPIC when the interview dedicates significant discussion to a recognizable named theme.
+- RISK: a named, specific risk or threat identified in the source that can be tracked across interviews (e.g. "Regulatory Uncertainty in Angola", "Currency Devaluation Risk", "Supply Chain Disruption"). Must be a distinct named risk, not a generic worry. Emit at most 3–4 RISK entities per source.
+- OPPORTUNITY: a named, specific opportunity or positive prospect that can be tracked across sources (e.g. "LNG Export Corridor to Europe", "Green Hydrogen Investment", "Digital Payments Expansion"). Must be a distinct named opportunity. Emit at most 3–4 OPPORTUNITY entities per source.
+- PROJECT: a named real-world project, initiative, or programme mentioned in the source (e.g. "Trans-Saharan Gas Pipeline", "Dangote Refinery", "National Broadband Policy"). Distinct from Aksum workspace projects. Use when a project is named and discussed substantively.`;
+
+export function buildEntityTypeGuidance(topicEntitiesEnabled: boolean): string {
+  return topicEntitiesEnabled
+    ? ENTITY_TYPE_GUIDANCE_BASE + THEMATIC_ENTITY_TYPE_GUIDANCE
+    : ENTITY_TYPE_GUIDANCE_BASE;
+}
 
 /**
  * Stage 1: Extract raw structured intelligence from a transcript.
@@ -238,6 +250,7 @@ export async function extractIntelligence({
   sourceType,
   semanticSourceType,
   candidateEntities,
+  topicEntitiesEnabled = true,
 }: {
   transcript: string;
   interviewTitle: string;
@@ -260,6 +273,12 @@ export async function extractIntelligence({
     type: EntityType;
     aliases?: string[];
   }>;
+  /**
+   * Phase 4b flag — when true (default), emit TOPIC/RISK/OPPORTUNITY/PROJECT
+   * as entity types in addition to keeping topics[]/risks[]/opportunities[] as
+   * denormalized string-array fallback. Set false to revert to pre-4b behaviour.
+   */
+  topicEntitiesEnabled?: boolean;
 }): Promise<ExtractionResult> {
   const speakerContext = speakerMap
     ? `\nSpeaker identification: ${JSON.stringify(speakerMap)}`
@@ -304,6 +323,20 @@ ${reviewerSeedEntities
   .join("\n")}`
       : "";
 
+  const entityTypeGuidance = buildEntityTypeGuidance(topicEntitiesEnabled);
+
+  const thematicEntitiesBlock = topicEntitiesEnabled
+    ? `
+- THEMATIC ENTITIES (TOPIC / RISK / OPPORTUNITY / PROJECT — Phase 4b):
+  * These are ADDITIONAL to the topics[], risks[], and opportunities[] string arrays, which remain as short filter tags. Do NOT replace those arrays.
+  * Emit TOPIC entities for substantive named themes the source discusses at length (e.g. "Energy Transition", "Fiscal Reform"). Use only when a theme is discussed in depth, not for passing mentions.
+  * Emit RISK entities for named specific risks (e.g. "Regulatory Uncertainty in Angola"). Limit to the 3–4 most prominent risks.
+  * Emit OPPORTUNITY entities for named specific opportunities (e.g. "LNG Export Corridor to Europe"). Limit to the 3–4 most prominent.
+  * Emit PROJECT entities for named real-world projects/initiatives (e.g. "Trans-Saharan Gas Pipeline"). Only emit when a project is named and substantively discussed.
+  * For TOPIC/RISK/OPPORTUNITY/PROJECT entities: relationships should use "affiliated_with" (entity ↔ person/org that drives it) or "operates_in" (project ↔ country/location).
+  * Keep descriptions informative: what this topic/risk/opportunity/project is, in the context of this source.`
+    : "";
+
   const { object } = await withRetry(
     () =>
       generateObject({
@@ -322,7 +355,7 @@ ${transcript}
 INSTRUCTIONS:
 - Focus on geopolitical risks, market opportunities, regulatory changes, and power dynamics.
 - Extract EVERY named entity (people, companies, government bodies, locations).
-- ${ENTITY_TYPE_GUIDANCE}
+- ${entityTypeGuidance}
 - For each entity, provide BOTH:
   - raw_name: the name as it appears in the transcript (may contain ASR misspellings)
   - canonical_name: your best guess at the correct full name
@@ -330,8 +363,9 @@ INSTRUCTIONS:
 - If PROJECT ENTITIES were listed above, prefer matching those names as canonical_name when the transcript refers to the same entity. You may still create new entities if none of the listed entities match.
 - ALWAYS provide a factual description for each entity based on what the transcript reveals. Even a short role or affiliation is valuable.
 - Be precise with sentiment — distinguish between the interviewee's opinion and factual statements.
-- Topics should be lowercase, single-word or hyphenated tags useful for database filtering.
-- Risks and opportunities should be actionable intelligence, not generic statements.
+- topics[]: lowercase, single-word or hyphenated tags useful for database filtering (e.g. "energy", "regulation"). Keep this array as short filter tags; do not put full sentences here.
+- risks[]: short actionable risk descriptions (2–10 words each). Keep as string tags; named risks are also captured as RISK entities when topicEntitiesEnabled.
+- opportunities[]: short actionable opportunity descriptions (2–10 words each). Keep as string tags; named opportunities also captured as OPPORTUNITY entities when enabled.
 - RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.
 - RELATIONSHIP TYPE SELECTION (important — avoid generic catch-all labels):
   * For PERSON ↔ COMPANY / ORGANIZATION / GOVERNMENT / PUBLIC_INSTITUTION / STATE_OWNED_ENTERPRISE / MEDIA_OR_PUBLICATION: prefer "affiliated_with" (covers executives, directors, managers, ministry officials, spokespersons, marketing leads, senior staff). Do NOT use "business_partner" for a person-to-organisation tie.
@@ -339,7 +373,7 @@ INSTRUCTIONS:
   * For GOVERNMENT / PUBLIC_INSTITUTION / regulator ↔ COMPANY / ORGANIZATION / STATE_OWNED_ENTERPRISE / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
   * For commercial sales: pair "supplier" (seller → buyer) and "customer_of" (buyer → seller).
   * Only use "business_partner" or "ally" when no other type fits AND the transcript explicitly frames the link as a partnership or alliance.
-- If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.
+- If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.${thematicEntitiesBlock}
 - SOURCE-LEVEL ASSOCIATIONS (source_associations):
   * Distinct from entities/relationships: these describe the SOURCE itself, not links between entities.
   * Use ONLY when the source-as-a-whole is clearly about / by an entity. Examples:
