@@ -35,7 +35,14 @@ export const AI_CONFIG = {
   chunkOverlap: 50, // overlapping tokens between chunks
   similarityThreshold: 0.25,
   maxSearchResults: 10,
-} as const;
+  /**
+   * Phase 4b feature flag — emit TOPIC, RISK, OPPORTUNITY, PROJECT entities
+   * from extraction in addition to the existing topics[]/risks[]/opportunities[]
+   * string arrays (which remain as denormalized fallback for one release).
+   * Set ENABLE_TOPIC_ENTITIES=false to disable during A/B comparison.
+   */
+  topicEntitiesEnabled: process.env.ENABLE_TOPIC_ENTITIES !== "false",
+};
 
 // Speaker diarization — expected speaker count range for AssemblyAI `speakers_expected`
 export const MIN_EXPECTED_SPEAKERS = 1;

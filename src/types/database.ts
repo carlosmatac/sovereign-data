@@ -32,6 +32,11 @@ export const ENTITY_TYPE_VALUES = [
   "STATE_OWNED_ENTERPRISE",
   "LAW_OR_POLICY",
   "MEDIA_OR_PUBLICATION",
+  // Phase 4b — thematic entity types (migration 00040)
+  "TOPIC",
+  "RISK",
+  "OPPORTUNITY",
+  "PROJECT",
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPE_VALUES)[number];

@@ -42,6 +42,11 @@ const NODE_COLORS: Record<EntityType, string> = {
   STATE_OWNED_ENTERPRISE: "#2dd4bf",
   LAW_OR_POLICY: "#e879f9",
   MEDIA_OR_PUBLICATION: "#f472b6",
+  // Phase 4b — thematic entity types
+  TOPIC: "#64748b",
+  RISK: "#ef4444",
+  OPPORTUNITY: "#10b981",
+  PROJECT: "#8b5cf6",
 };
 
 function nodeColor(type: string): string {
