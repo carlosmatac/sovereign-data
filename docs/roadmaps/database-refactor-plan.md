@@ -42,11 +42,11 @@ todos:
     content: "Phase 3b / PR 3b.1 — Migration 00035: replace_source_derived_data SECURITY DEFINER function (transactional swap); pipeline calls single function for reviewed reprocess"
     status: on-going
   - id: phase-4a-1-evidence-table
-    content: "Phase 4a / PR 4a.1 — Migration 00036: chat_message_evidence table (with tenant_id NOT NULL + compound FK from day one per Phase 3a forward-compat) + RLS"
-    status: pending
+    content: "Phase 4a / PR 4a.1 — Migration 00039: chat_message_evidence table (with tenant_id NOT NULL + compound FK from day one per Phase 3a forward-compat) + RLS"
+    status: done
   - id: phase-4a-2-evidence-write
-    content: Phase 4a / PR 4a.2 — Persist citation chunks in onFinish/persistAssistantTurn; chat thread rehydrates citations on reload
-    status: pending
+    content: Phase 4a / PR 4a.2 — Persist citation chunks in onFinish/persistAssistantTurn; chat thread rehydrates citations on reload; citation chips rendered in UI
+    status: done
   - id: phase-4b-1-entity-types
     content: "Phase 4b / PR 4b.1 — Migration 00037: extend entity_type enum with SECTOR/TOPIC/COMMODITY/RISK/OPPORTUNITY (verify against 00025)"
     status: pending

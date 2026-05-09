@@ -39,12 +39,27 @@ const COPILOT_MODE_LABELS: Record<CopilotMode, string> = {
 const MAX_MESSAGES_CLIENT = 200;
 const INITIAL_MESSAGE_LIMIT = 40;
 
+type EvidenceChip = {
+  id: string;
+  chunk_id: string;
+  position: number;
+  similarity: number;
+  used_in_text: boolean;
+  source_chunks: {
+    id: string;
+    source_id: string;
+    speaker: string | null;
+    start_time: number | null;
+  } | null;
+};
+
 type ApiChatMessageRow = {
   id: string;
   role: "user" | "assistant";
   content: string;
   sequence: number;
   client_message_id: string | null;
+  chat_message_evidence?: EvidenceChip[] | null;
 };
 
 function getMessageText(
@@ -73,10 +88,84 @@ const UserBubble = memo(function UserBubble({ text }: { text: string }) {
   );
 });
 
-const AssistantBlock = memo(function AssistantBlock({ text }: { text: string }) {
+function formatMinSec(seconds: number | null): string | null {
+  if (seconds === null) return null;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+const SourceChips = memo(function SourceChips({
+  evidence,
+}: {
+  evidence: EvidenceChip[];
+}) {
+  // Deduplicate by source_id, collecting citation numbers
+  const bySource = new Map<
+    string,
+    { positions: number[]; speaker: string | null; start_time: number | null }
+  >();
+  for (const e of evidence) {
+    if (!e.source_chunks?.source_id) continue;
+    const sid = e.source_chunks.source_id;
+    const existing = bySource.get(sid);
+    if (existing) {
+      existing.positions.push(e.position);
+    } else {
+      bySource.set(sid, {
+        positions: [e.position],
+        speaker: e.source_chunks.speaker,
+        start_time: e.source_chunks.start_time,
+      });
+    }
+  }
+
+  if (bySource.size === 0) return null;
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {[...bySource.entries()].map(([sourceId, meta]) => {
+        const citationLabel = meta.positions
+          .sort((a, b) => a - b)
+          .map((p) => `[${p}]`)
+          .join(" ");
+        const timeLabel = formatMinSec(meta.start_time);
+        const label = [
+          citationLabel,
+          meta.speaker,
+          timeLabel ? `@ ${timeLabel}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        return (
+          <a
+            key={sourceId}
+            href={`/interviews/${sourceId}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
+          >
+            <span className="opacity-60">↗</span>
+            {label}
+          </a>
+        );
+      })}
+    </div>
+  );
+});
+
+const AssistantBlock = memo(function AssistantBlock({
+  text,
+  evidence,
+}: {
+  text: string;
+  evidence?: EvidenceChip[] | null;
+}) {
   return (
     <article className="w-full max-w-[40rem] text-foreground">
       <IntelligenceBriefMarkdown>{text}</IntelligenceBriefMarkdown>
+      {evidence && evidence.length > 0 && (
+        <SourceChips evidence={evidence} />
+      )}
     </article>
   );
 });
@@ -117,6 +206,9 @@ export function IntelligenceChatView({
    */
   const [selectedMode, setSelectedMode] = useState<CopilotMode | null>(null);
   const effectiveCopilotMode: CopilotMode = selectedMode ?? "general_context";
+  const [evidenceByMessageId, setEvidenceByMessageId] = useState<
+    Record<string, EvidenceChip[]>
+  >({});
 
   const effectiveConversationId = conversationId ?? bootstrapConversationId;
 
@@ -222,6 +314,13 @@ export function IntelligenceChatView({
         if (cancelled) return;
         const ui = data.messages.map((row) => uiMessageFromDbRow(row));
         setMessages(ui);
+        const evidenceMap: Record<string, EvidenceChip[]> = {};
+        for (const row of data.messages) {
+          if (row.role === "assistant" && row.chat_message_evidence?.length) {
+            evidenceMap[row.id] = row.chat_message_evidence;
+          }
+        }
+        setEvidenceByMessageId(evidenceMap);
         const seqs = data.messages.map((m) => m.sequence);
         setOldestSequence(seqs.length ? Math.min(...seqs) : null);
         setHasMoreOlder(data.hasMore);
@@ -288,6 +387,13 @@ export function IntelligenceChatView({
         hasMore: boolean;
       };
       const olderUi = data.messages.map((row) => uiMessageFromDbRow(row));
+      const olderEvidence: Record<string, EvidenceChip[]> = {};
+      for (const row of data.messages) {
+        if (row.role === "assistant" && row.chat_message_evidence?.length) {
+          olderEvidence[row.id] = row.chat_message_evidence;
+        }
+      }
+      setEvidenceByMessageId((prev) => ({ ...prev, ...olderEvidence }));
       const prevLen = messages.length;
       const mergedLen = olderUi.length + prevLen;
       const needsTrim = mergedLen > MAX_MESSAGES_CLIENT;
@@ -394,7 +500,13 @@ export function IntelligenceChatView({
                   return <UserBubble key={message.id} text={text} />;
                 }
 
-                return <AssistantBlock key={message.id} text={text} />;
+                return (
+                  <AssistantBlock
+                    key={message.id}
+                    text={text}
+                    evidence={evidenceByMessageId[message.id] ?? null}
+                  />
+                );
               })}
 
               {showIntelligenceActivity && (

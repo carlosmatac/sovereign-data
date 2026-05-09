@@ -111,13 +111,19 @@ that should not get lost behind the phased work:
   Feature spec: [`docs/features/on-going/tenants-rls-and-customization.md`](../features/on-going/tenants-rls-and-customization.md).
   ADR: [`docs/architecture/tenant-model-adr.md`](../architecture/tenant-model-adr.md).
 
-- **Phase 3b — on-going (2026-05-09).** Reviewed-reprocess transactional
+- **Phase 3b — smoke tested (2026-05-09).** Reviewed-reprocess transactional
   swap. Migrations 00035–00038 applied to remote; all tests passing.
   Three post-deployment incidents diagnosed and fixed (duplicate FKs from 3a,
-  `vector` type search_path, JSONB double-serialisation). Pending: manual
-  smoke reprocess to confirm COMPLETED end-to-end.
+  `vector` type search_path, JSONB double-serialisation). Smoke reprocess confirmed.
   Feature spec + postmortem: [`docs/features/on-going/reprocess-transactional-swap.md`](../features/on-going/reprocess-transactional-swap.md).
   **Known debt:** `interviews` back-compat view still used by 28 files (TD-1 in spec).
+
+- **Phase 4a — shipped (2026-05-09).** Persisted chat message evidence.
+  Migration 00039 applied to remote; `chat_message_evidence` table live with
+  compound FK to `chat_messages(id, tenant_id)` and RLS. Evidence rows written
+  in `onFinish`; evidence loaded with messages on thread reload; citation chips
+  rendered below assistant responses.
+  Feature spec: [`docs/features/on-going/chat-message-evidence.md`](../features/on-going/chat-message-evidence.md).
 
 - **Backlog:** the queued specs above, in priority order set
   by the human reviewer.

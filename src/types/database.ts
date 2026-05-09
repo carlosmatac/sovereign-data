@@ -1458,6 +1458,61 @@ export interface Database {
           },
         ];
       };
+      chat_message_evidence: {
+        Row: {
+          id: string;
+          message_id: string;
+          tenant_id: string;
+          chunk_id: string;
+          similarity: number;
+          position: number;
+          used_in_text: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          tenant_id: string;
+          chunk_id: string;
+          similarity: number;
+          position: number;
+          used_in_text?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          tenant_id?: string;
+          chunk_id?: string;
+          similarity?: number;
+          position?: number;
+          used_in_text?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_message_evidence_message_tenant_fkey";
+            columns: ["message_id", "tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "chat_messages";
+            referencedColumns: ["id", "tenant_id"];
+          },
+          {
+            foreignKeyName: "chat_message_evidence_chunk_id_fkey";
+            columns: ["chunk_id"];
+            isOneToOne: false;
+            referencedRelation: "source_chunks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_message_evidence_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_platform_roles: {
         Row: {
           id: string;
@@ -1647,3 +1702,4 @@ export type ValidatedPosition = Tables<"validated_positions">;
 export type UserPlatformRole = Tables<"user_platform_roles">;
 export type ChatConversation = Tables<"chat_conversations">;
 export type ChatMessage = Tables<"chat_messages">;
+export type ChatMessageEvidence = Tables<"chat_message_evidence">;
