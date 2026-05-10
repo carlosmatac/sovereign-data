@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserProjectRole } from "@/lib/auth/project-role";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { STATUS_LABELS } from "@/lib/constants";
+import {
+  STATUS_LABELS,
+  AUDIO_STORAGE_BUCKET,
+  AUDIO_PLAYER_SIGNED_URL_TTL,
+} from "@/lib/constants";
 import {
   ArrowLeft,
   Briefcase,
@@ -65,6 +70,16 @@ export default async function InterviewDetailPage({
 
   if (error || !interview) {
     notFound();
+  }
+
+  // Resolve audio playback URL: private bucket → signed URL; legacy → public URL.
+  let audioPlaybackUrl: string | null = interview.audio_url ?? null;
+  if (interview.audio_storage_path) {
+    const admin = createAdminClient();
+    const { data: signedData } = await admin.storage
+      .from(AUDIO_STORAGE_BUCKET)
+      .createSignedUrl(interview.audio_storage_path, AUDIO_PLAYER_SIGNED_URL_TTL);
+    audioPlaybackUrl = signedData?.signedUrl ?? null;
   }
 
   const userRole = await getUserProjectRole(interview.project_id);
@@ -277,9 +292,9 @@ export default async function InterviewDetailPage({
       </div>
 
       {/* Audio Player — only for audio source interviews */}
-      {interview.source_type !== "document" && interview.audio_url && (
+      {interview.source_type !== "document" && audioPlaybackUrl && (
         <div className="mb-6">
-          <AudioPlayer src={interview.audio_url} />
+          <AudioPlayer src={audioPlaybackUrl} />
         </div>
       )}
 

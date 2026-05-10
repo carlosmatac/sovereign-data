@@ -544,6 +544,7 @@ export interface Database {
           title: string;
           description: string | null;
           audio_url: string | null;
+          audio_storage_path: string | null;
           audio_duration: number | null;
           status: InterviewStatus;
           error_message: string | null;
@@ -580,6 +581,7 @@ export interface Database {
           title: string;
           description?: string | null;
           audio_url?: string | null;
+          audio_storage_path?: string | null;
           audio_duration?: number | null;
           status?: InterviewStatus;
           error_message?: string | null;
@@ -616,6 +618,7 @@ export interface Database {
           title?: string;
           description?: string | null;
           audio_url?: string | null;
+          audio_storage_path?: string | null;
           audio_duration?: number | null;
           status?: InterviewStatus;
           error_message?: string | null;

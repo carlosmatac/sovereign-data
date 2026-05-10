@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
-import { parseExpectedSpeakers } from "@/lib/constants";
+import {
+  parseExpectedSpeakers,
+  AUDIO_STORAGE_BUCKET,
+  AUDIO_ASSEMBLYAI_SIGNED_URL_TTL,
+} from "@/lib/constants";
 import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
@@ -130,6 +134,7 @@ export async function POST(request: NextRequest) {
     description,
     project_id,
     audio_url,
+    audio_storage_path,
     language,
     expectedSpeakers: rawExpectedSpeakers,
     interviewee_name: rawIntervieweeName,
@@ -140,7 +145,8 @@ export async function POST(request: NextRequest) {
   } = body as {
     title: string;
     project_id: string;
-    audio_url: string;
+    audio_url?: string;
+    audio_storage_path?: string;
     description?: string;
     language?: string;
     expectedSpeakers?: unknown;
@@ -151,10 +157,13 @@ export async function POST(request: NextRequest) {
     interviewee_org_entity_id?: unknown;
   };
 
-  // Validate required fields
-  if (!title || !project_id || !audio_url) {
+  // Validate required fields — accept either private path (new) or public URL (legacy)
+  if (!title || !project_id || (!audio_storage_path && !audio_url)) {
     return NextResponse.json(
-      { error: "Missing required fields: title, project_id, audio_url" },
+      {
+        error:
+          "Missing required fields: title, project_id, and either audio_storage_path or audio_url",
+      },
       { status: 400 }
     );
   }
@@ -239,7 +248,10 @@ export async function POST(request: NextRequest) {
       title,
       description: description ?? null,
       project_id,
-      audio_url,
+      // New uploads supply audio_storage_path (private bucket); legacy uploads
+      // supply audio_url (public bucket). Store whichever was provided.
+      audio_url: audio_storage_path ? null : (audio_url ?? null),
+      audio_storage_path: audio_storage_path ?? null,
       language: language ?? "en",
       status: "PROCESSING",
       created_by: user.id,
@@ -271,8 +283,31 @@ export async function POST(request: NextRequest) {
       intervieweeOrg,
     });
 
+    // Generate a short-lived signed URL for AssemblyAI when the file is in
+    // the private bucket. Legacy uploads still carry a plain public URL.
+    let audioUrlForAssemblyAI: string;
+    if (audio_storage_path) {
+      const { data: signedData, error: signedError } = await admin.storage
+        .from(AUDIO_STORAGE_BUCKET)
+        .createSignedUrl(audio_storage_path, AUDIO_ASSEMBLYAI_SIGNED_URL_TTL);
+      if (signedError || !signedData?.signedUrl) {
+        console.error("Failed to create signed URL for AssemblyAI:", signedError);
+        await admin
+          .from("sources")
+          .update({ status: "FAILED", error_message: "Failed to sign audio for transcription" })
+          .eq("id", interview.id);
+        return NextResponse.json(
+          { error: "Failed to prepare audio for transcription" },
+          { status: 500 }
+        );
+      }
+      audioUrlForAssemblyAI = signedData.signedUrl;
+    } else {
+      audioUrlForAssemblyAI = audio_url!;
+    }
+
     const { transcriptId } = await submitTranscription({
-      audioUrl: audio_url,
+      audioUrl: audioUrlForAssemblyAI,
       webhookUrl,
       webhookSecret: process.env.WEBHOOK_SECRET!,
       languageCode: language,

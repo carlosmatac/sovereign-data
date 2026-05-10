@@ -80,3 +80,61 @@ This is a serious data confidentiality breach for a platform handling exclusive,
 - [ ] Open the source detail page; confirm the audio player loads and plays back the recording.
 - [ ] Attempt to access the old public URL for the new file; confirm it returns 403 / access denied.
 - [ ] Existing sources (pre-migration) continue to play from the old public bucket until migrated.
+
+---
+
+## Implementation notes
+
+**Date shipped:** 2026-05-10
+
+### Bucket
+
+New private bucket: `source-audio-private` (`public: false`, 500 MB file size limit).  
+Created via migration 00041 using `INSERT INTO storage.buckets … ON CONFLICT DO NOTHING`.  
+Old bucket `interview-audio` is left untouched for legacy file reads.
+
+### DB columns added
+
+| Table | Column | Type | Notes |
+|-------|--------|------|-------|
+| `sources` | `audio_storage_path` | `TEXT NULL` | Path within the private bucket (e.g. `{projectId}/{uuid}.mp3`). NULL for legacy rows. |
+
+The `interviews` back-compat view was refreshed in the same migration (same pattern as 00036) so the new column appears through the view.
+
+`database.ts` types updated: `audio_storage_path: string | null` added to `interviews.Row`, `Insert`, and `Update`.
+
+### Where signed URLs are generated
+
+| Location | File | TTL | When |
+|----------|------|-----|------|
+| AssemblyAI submission | `src/app/api/interviews/route.ts` | 6 hours (`AUDIO_ASSEMBLYAI_SIGNED_URL_TTL`) | Server-side, immediately before `submitTranscription()` call; only when `audio_storage_path` is present |
+| Audio player (detail page) | `src/app/(dashboard)/interviews/[id]/page.tsx` | 1 hour (`AUDIO_PLAYER_SIGNED_URL_TTL`) | Server-side in the RSC render; only when `audio_storage_path` is present |
+
+Signed URLs are never stored in the database.
+
+### Constants added
+
+```typescript
+AUDIO_STORAGE_BUCKET = "source-audio-private"
+AUDIO_ASSEMBLYAI_SIGNED_URL_TTL = 21600  // 6 hours
+AUDIO_PLAYER_SIGNED_URL_TTL = 3600       // 1 hour
+```
+
+### Legacy fallback
+
+- Upload page no longer calls `getPublicUrl()`.
+- Detail page: if `audio_storage_path` is null, falls back to `audio_url` (legacy public URL).
+- DELETE route: if `audio_storage_path` is set, removes from `source-audio-private`; otherwise parses path from `audio_url` and removes from `interview-audio`.
+
+### Validation performed
+
+- `npx tsc --noEmit` — 0 errors.
+- `npm test` — 166/166 tests pass (no new tests needed; no pipeline logic changed).
+- Migration dry-run pending (`supabase db push --dry-run`) — to be run before push.
+
+### Remaining risks / follow-up
+
+- **Manual smoke required:** upload → transcription → playback flow must be confirmed against the live DB after `supabase db push`.
+- **Signed URL expiry edge case:** if AssemblyAI takes longer than 6 hours to start fetching the file (e.g. a large backlog), the signed URL will be expired. In practice AssemblyAI begins fetching within seconds; 6 hours is a very conservative margin.
+- **Existing files not migrated:** all existing audio files remain in the public `interview-audio` bucket. A future migration should copy them to `source-audio-private` and update `audio_storage_path` / nullify `audio_url`. Until then, existing sources fall through to the `audio_url` legacy path.
+- **Player URL refresh:** the 1-hour signed URL is baked into the RSC render at page load. If a user leaves the detail page open for more than 1 hour, the player will fail. A future improvement could use a client-side refresh endpoint.

@@ -74,6 +74,13 @@ export function parseExpectedSpeakers(
   return num;
 }
 
+// Private audio storage bucket (Phase 0 — private storage migration)
+export const AUDIO_STORAGE_BUCKET = "source-audio-private";
+/** Signed URL TTL for AssemblyAI — long enough to cover the full transcription window. */
+export const AUDIO_ASSEMBLYAI_SIGNED_URL_TTL = 6 * 60 * 60; // 6 hours in seconds
+/** Signed URL TTL for the in-app audio player — covers a typical review session. */
+export const AUDIO_PLAYER_SIGNED_URL_TTL = 60 * 60; // 1 hour in seconds
+
 // Supported audio formats
 export const SUPPORTED_AUDIO_FORMATS = [
   "audio/mpeg",      // .mp3

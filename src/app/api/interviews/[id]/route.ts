@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { AUDIO_STORAGE_BUCKET } from "@/lib/constants";
 
 /**
  * DELETE /api/interviews/[id]
@@ -27,10 +28,10 @@ export async function DELETE(
 
   const admin = createAdminClient();
 
-  // Fetch interview to get audio_url and verify it exists
+  // Fetch interview to get storage fields and verify it exists
   const { data: interview, error: fetchError } = await admin
     .from("interviews")
-    .select("id, audio_url, project_id")
+    .select("id, audio_url, audio_storage_path, project_id")
     .eq("id", id)
     .single();
 
@@ -41,20 +42,27 @@ export async function DELETE(
     );
   }
 
-  // Delete audio file from Storage if it exists
-  if (interview.audio_url) {
-    const bucketName = "interview-audio";
-    const urlParts = interview.audio_url.split(`${bucketName}/`);
+  // Delete audio file from Storage.
+  // New uploads: audio_storage_path set → private bucket.
+  // Legacy uploads: audio_url set → parse path from public URL.
+  if (interview.audio_storage_path) {
+    const { error: storageError } = await admin.storage
+      .from(AUDIO_STORAGE_BUCKET)
+      .remove([interview.audio_storage_path]);
+    if (storageError) {
+      console.error("Failed to delete private audio file:", storageError);
+      // Continue — storage cleanup failure must not block the DB deletion.
+    }
+  } else if (interview.audio_url) {
+    const legacyBucket = "interview-audio";
+    const urlParts = interview.audio_url.split(`${legacyBucket}/`);
     const filePath = urlParts[1];
-
     if (filePath) {
       const { error: storageError } = await admin.storage
-        .from(bucketName)
+        .from(legacyBucket)
         .remove([filePath]);
-
       if (storageError) {
-        console.error("Failed to delete audio file:", storageError);
-        // Continue with interview deletion even if storage cleanup fails
+        console.error("Failed to delete legacy audio file:", storageError);
       }
     }
   }

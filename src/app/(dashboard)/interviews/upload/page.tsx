@@ -42,6 +42,7 @@ import {
   MAX_PDF_SIZE_BYTES,
   MIN_EXPECTED_SPEAKERS,
   MAX_EXPECTED_SPEAKERS,
+  AUDIO_STORAGE_BUCKET,
 } from "@/lib/constants";
 import type { Project } from "@/types/database";
 import { InterviewAnchorEntityInput } from "@/components/interviews/interview-anchor-entity-input";
@@ -234,7 +235,7 @@ export default function UploadInterviewPage() {
       }, 200);
 
       const { error: uploadError } = await supabase.storage
-        .from("interview-audio")
+        .from(AUDIO_STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: "3600",
           upsert: false,
@@ -247,10 +248,6 @@ export default function UploadInterviewPage() {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      const { data: urlData } = supabase.storage
-        .from("interview-audio")
-        .getPublicUrl(filePath);
-
       setStep("processing");
 
       const response = await fetch("/api/interviews", {
@@ -260,7 +257,7 @@ export default function UploadInterviewPage() {
           title: title.trim(),
           description: description.trim() || undefined,
           project_id: projectId,
-          audio_url: urlData.publicUrl,
+          audio_storage_path: filePath,
           language,
           expectedSpeakers:
             expectedSpeakers === "auto"

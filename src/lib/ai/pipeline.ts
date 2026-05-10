@@ -6,7 +6,7 @@
 
 import { randomUUID } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTranscription } from "./assemblyai";
+import { getTranscription, type TranscriptionResponse } from "./assemblyai";
 import { extractIntelligence, type ExtractionResult } from "./extraction";
 import { chunkTranscript, chunkPlainText, type TranscriptUtterance } from "./chunking";
 import { chunkTextInterview, type TextStructureType } from "./chunking-text-interview";
@@ -775,12 +775,14 @@ export async function runIntelPipelineFromCanonicalSource(params: {
  */
 export async function processTranscription(
   interviewId: string,
-  assemblyaiId: string
+  assemblyaiId: string,
+  /** Pre-fetched transcription from the poll route — avoids a redundant download. */
+  prefetchedTranscription?: TranscriptionResponse
 ): Promise<void> {
   const supabase = createAdminClient();
 
   try {
-    const transcription = await getTranscription(assemblyaiId);
+    const transcription = prefetchedTranscription ?? await getTranscription(assemblyaiId);
 
     if (transcription.status === "error") {
       await updateInterviewStatus(interviewId, "FAILED", {

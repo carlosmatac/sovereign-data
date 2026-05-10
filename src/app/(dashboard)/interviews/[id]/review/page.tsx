@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserProjectRole } from "@/lib/auth/project-role";
+import {
+  AUDIO_STORAGE_BUCKET,
+  AUDIO_PLAYER_SIGNED_URL_TTL,
+} from "@/lib/constants";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -82,13 +87,23 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, source_type, source_metadata, audio_url, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, source_metadata, audio_url, audio_storage_path, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
     )
     .eq("id", id)
     .single();
 
   if (error || !interview) {
     notFound();
+  }
+
+  // Resolve audio playback URL: private bucket → signed URL; legacy → public URL.
+  let audioPlaybackUrl: string | null = interview.audio_url ?? null;
+  if (interview.audio_storage_path) {
+    const admin = createAdminClient();
+    const { data: signedData } = await admin.storage
+      .from(AUDIO_STORAGE_BUCKET)
+      .createSignedUrl(interview.audio_storage_path, AUDIO_PLAYER_SIGNED_URL_TTL);
+    audioPlaybackUrl = signedData?.signedUrl ?? null;
   }
 
   const userRole = await getUserProjectRole(interview.project_id);
@@ -184,7 +199,7 @@ export default async function InterviewTranscriptReviewPage({
       seeds={seeds}
       parseWarning={parseWarning}
       sourceType={sourceType}
-      audioUrl={interview.audio_url}
+      audioUrl={audioPlaybackUrl}
     />
   );
 }
