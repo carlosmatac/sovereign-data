@@ -1,9 +1,9 @@
 ---
 title: "Phase 3a — Tenants, tenant_id everywhere, RLS hardening, and tenant customization"
-status: on-going
+status: done
 owner: carlos
 priority: high
-last_updated: 2026-05-08
+last_updated: 2026-05-10
 related_architecture:
   - docs/architecture/tenant-model-adr.md
 related_infrastructure:

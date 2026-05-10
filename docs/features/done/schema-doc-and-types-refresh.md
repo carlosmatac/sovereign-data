@@ -1,9 +1,9 @@
 ---
 title: "Phase 2.6 — Schema doc + TypeScript types refresh"
-status: on-going
+status: done
 owner: agent
 priority: medium
-last_updated: 2026-05-08
+last_updated: 2026-05-10
 related_plan: docs/roadmaps/database-refactor-plan.md
 related_features:
   - docs/features/done/source-rename-and-backcompat-views.md

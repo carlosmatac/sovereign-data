@@ -10,7 +10,4 @@ See [`../README.md`](../README.md) for the full lifecycle.
 
 ## Active specs
 
-| Doc | Summary |
-|-----|--------|
-| [frontend-intelligence-rename-phase-1.md](./frontend-intelligence-rename-phase-1.md) | Frontend copy rename from interview-only language through Intelligence to Knowledge / Source framing; routes and backend names remain unchanged. |
-| [editable-relationship-governance.md](./editable-relationship-governance.md) | Interview-scoped MVP: editors can correct/reject LLM-extracted relationships; decisions survive reprocess. Phase 1.5 (2026-04-19) excludes rejected rows from active graph views and adds the v2 taxonomy values (`affiliated_with`, `operates_in`, `governs`, `customer_of`). |
+*No features currently in progress. See [`../to-do/`](../to-do/) for the next queue and [`../done/`](../done/) for shipped work.*

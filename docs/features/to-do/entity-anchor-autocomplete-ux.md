@@ -22,8 +22,17 @@ it queries `/api/projects/:id/entities/search` and lets the user pick
 an existing project-scoped or global entity, setting both the
 canonical name and the entity id on submit.
 
-**The autocomplete works, but it is not discoverable.** During
-manual smoke testing, the user did not realize it was active because:
+**The autocomplete has two distinct problems:**
+
+### 1 — Response latency
+
+The dropdown takes noticeably long to open after the user starts typing, to the point where users stop waiting and simply type past the suggestions. The likely causes are: no edge caching on the search route, no debounce tuning, or the search query itself being slow (trigram similarity scan without a suitable index). The feature is "vital for getting entity matches" (developer note) but is effectively unused because it is too slow to feel responsive.
+
+Target: the suggestion dropdown should open within ~200ms of the debounce settling (currently 300ms debounce + slow API = perceived latency of 500ms+).
+
+### 2 — Discoverability and feedback
+
+Even when results arrive, the UX provides no feedback about what is happening:
 
 - There is no visible cue while the user is typing (no "loading…",
   no project-scope tag, no "X existing matches").
@@ -38,6 +47,7 @@ This is a UX gap on top of an otherwise correct mechanism.
 
 ## Goals
 
+- **Performance:** the search route should respond in under 200ms p95 on the live DB so the suggestion dropdown opens without noticeable delay. Profile and optimize the `/api/projects/:id/entities/search` route (query plan, indexes, connection pooling).
 - Make it obvious that the field is searching for an existing entity
   vs. about to create a new one.
 - Show project-vs-global scope on each suggestion (so the user can

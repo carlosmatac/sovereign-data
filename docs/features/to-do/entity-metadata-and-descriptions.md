@@ -124,6 +124,7 @@ context.
 - Open question: do we use `entities.metadata` for retrieval-time
   filtering (e.g. country) or just for context? Probably both, but
   the index strategy differs.
+- **Description reinforcement over time:** entity descriptions should get richer as more sources mention the entity. The offline backfill script (Phase 3 of the Approach above) establishes a baseline; the pipeline integration (Phase 4) ensures new ingests contribute. An incremental "re-enrich when mention count crosses a threshold" strategy (e.g. re-run when `mention_count` doubles) would let the most-discussed entities accumulate the richest context without regenerating everything on every ingest. This is tracked here rather than as a separate spec since it is a natural extension of Phase 4 pipeline integration.
 
 ## Acceptance / how to validate
 

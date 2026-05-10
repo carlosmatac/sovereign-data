@@ -24,3 +24,9 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [entities-unique-constraint-swap.md](./entities-unique-constraint-swap.md) | Phase 2.5 — drop global `UNIQUE(name,type)` on `entities`; add project-scoped unique index; remove 23505 silent-recovery hack |
 
 New completed features: add a row here when you move a spec into this folder.
+| [database-retrieval-refactor-baseline.md](./database-retrieval-refactor-baseline.md) | Phase 0 — baseline diagnostics (read-only audit script + 16 SQL queries against live DB before refactor) |
+| [schema-doc-and-types-refresh.md](./schema-doc-and-types-refresh.md) | Phase 2.6 — full rewrite of database-schema.md + `database.ts` Views / entity_intel types to match post-Phase-2.5 schema |
+| [tenants-rls-and-customization.md](./tenants-rls-and-customization.md) | Phase 3a — `tenants` table, `tenant_id` on every customer-owned table, compound FKs, RLS via `is_tenant_member()` |
+| [reprocess-transactional-swap.md](./reprocess-transactional-swap.md) | Phase 3b — `replace_source_derived_data` SECURITY DEFINER function; atomic clear+insert; three post-deploy incident postmortems |
+| [chat-message-evidence.md](./chat-message-evidence.md) | Phase 4a — `chat_message_evidence` table; write RAG chunk citations on every assistant turn; read + render evidence chips in chat UI |
+| [topics-as-entities.md](./topics-as-entities.md) | Phase 4b — TOPIC/RISK/OPPORTUNITY/PROJECT added to `entity_type` enum; extraction pipeline emits thematic entities alongside existing string-tag arrays |

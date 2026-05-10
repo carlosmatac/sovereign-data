@@ -1,9 +1,9 @@
 ---
 id: topics-as-entities
 title: "Phase 4b — Topics / sectors / risks / opportunities as first-class entities"
-status: on-going
+status: done
 owner: carlos
-last_updated: 2026-05-09
+last_updated: 2026-05-10
 phase: 4b
 migrations:
   - supabase/migrations/00040_entity_type_topics.sql

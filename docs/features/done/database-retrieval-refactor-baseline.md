@@ -1,9 +1,9 @@
 ---
 title: "Database refactor — baseline diagnostics (Phase 0)"
-status: on-going
+status: done
 owner: team
 priority: high
-last_updated: 2026-05-08
+last_updated: 2026-05-10
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
   - docs/architecture/agentic-rag.md
