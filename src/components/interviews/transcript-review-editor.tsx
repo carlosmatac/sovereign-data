@@ -20,10 +20,12 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCcw,
   Save,
   Search,
   Trash2,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -75,7 +77,7 @@ import {
 import type { SpeakerMap } from "@/types/database";
 import {
   saveTranscriptReviewDraft,
-  markInterviewReviewReady,
+  saveAndReprocess,
   addReviewSeedFromEntity,
   createReviewSeedEntity,
   removeReviewSeedEntity,
@@ -263,6 +265,8 @@ type Props = {
   speakerMap: SpeakerMap;
   initialUtterances: ReviewedUtterance[];
   reviewStatus: TranscriptReviewStatus;
+  /** Current pipeline status of the source row — used to show a failure banner. */
+  sourceStatus: InterviewStatus;
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
   parseWarning?: string | null;
@@ -277,6 +281,7 @@ export function TranscriptReviewEditor({
   speakerMap,
   initialUtterances,
   reviewStatus,
+  sourceStatus: initialSourceStatus,
   lastIntelSource,
   seeds,
   parseWarning,
@@ -295,7 +300,8 @@ export function TranscriptReviewEditor({
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
-  const [reprocessStarting, setReprocessStarting] = useState(false);
+  const [lastClickedSaveType, setLastClickedSaveType] = useState<"draft" | "reprocess" | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<InterviewStatus>(initialSourceStatus);
   const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
   const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
   const segmentEndRef = useRef<number>(0);
@@ -429,7 +435,22 @@ export function TranscriptReviewEditor({
 
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
-  const reprocessBusy = reprocessStarting || reprocessing;
+
+  // Clear the "which button was last clicked" flag when the transition settles.
+  useEffect(() => {
+    if (!pending) setLastClickedSaveType(null);
+  }, [pending]);
+
+  // Warn before unloading the page while the pipeline is running (covers
+  // browser refresh / tab close / external navigation).
+  useEffect(() => {
+    if (!reprocessing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [reprocessing]);
 
   useEffect(() => {
     if (reprocessing) {
@@ -449,6 +470,8 @@ export function TranscriptReviewEditor({
     const applyPipelineStatus = (newStatus: InterviewStatus, err?: string | null) => {
       if (newStatus === lastPipelineStatusRef.current) return;
       lastPipelineStatusRef.current = newStatus;
+
+      setSourceStatus(newStatus);
 
       if (newStatus === "COMPLETED") {
         router.push(`/interviews/${interviewId}`);
@@ -503,49 +526,26 @@ export function TranscriptReviewEditor({
     };
   }, [reviewStatus, interviewId, router]);
 
-  useEffect(() => {
-    if (reviewStatus === "reprocessing") {
-      setReprocessStarting(false);
-    }
-  }, [reviewStatus]);
-
-  const onRunReprocess = async () => {
-    setReprocessStarting(true);
-    try {
-      const res = await fetch(`/api/interviews/${interviewId}/reprocess-review`, {
-        method: "POST",
-      });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        toast.error(json.error ?? "Could not start reprocessing");
-        setReprocessStarting(false);
-        return;
-      }
-      toast.success("Reprocessing started — pipeline runs in the background.");
-      router.refresh();
-    } catch {
-      toast.error("Could not start reprocessing");
-      setReprocessStarting(false);
-    }
-  };
-
-  const onSaveDraft = () => {
+  const onSaveAndReprocess = () => {
+    setLastClickedSaveType("reprocess");
     startTransition(async () => {
-      const r = await saveTranscriptReviewDraft(interviewId, utterances);
-      if ("error" in r && r.error) toast.error(r.error);
-      else {
-        toast.success("Draft saved");
+      const r = await saveAndReprocess(interviewId, utterances);
+      if ("error" in r && r.error) {
+        toast.error(r.error);
+      } else {
+        toast.success("Reprocessing started — knowledge pipeline is running.");
         router.refresh();
       }
     });
   };
 
-  const onMarkReady = () => {
+  const onSaveDraft = () => {
+    setLastClickedSaveType("draft");
     startTransition(async () => {
-      const r = await markInterviewReviewReady(interviewId);
+      const r = await saveTranscriptReviewDraft(interviewId, utterances);
       if ("error" in r && r.error) toast.error(r.error);
       else {
-        toast.success("Marked ready for reprocessing");
+        toast.success("Draft saved");
         router.refresh();
       }
     });
@@ -1074,37 +1074,41 @@ export function TranscriptReviewEditor({
               </div>
             </>
           )}
+          {sourceStatus === "FAILED" && !reprocessing && (
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Last reprocess failed. Correct any issues and click{" "}
+                <strong>Save &amp; Reprocess</strong> to retry.
+              </span>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap gap-2">
             <Button
+              onClick={onSaveAndReprocess}
+              disabled={pending || reprocessing || emptyState}
+            >
+              {pending && lastClickedSaveType === "reprocess" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="mr-2 h-4 w-4" />
+              )}
+              {pending && lastClickedSaveType === "reprocess"
+                ? "Saving & reprocessing…"
+                : "Save & Reprocess"}
+            </Button>
+            <Button
+              variant="secondary"
               onClick={onSaveDraft}
               disabled={pending || reprocessing || emptyState}
             >
-              {pending ? (
+              {pending && lastClickedSaveType === "draft" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              Save draft
+              {pending && lastClickedSaveType === "draft" ? "Saving…" : "Save draft"}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={onMarkReady}
-              disabled={pending || reprocessing || emptyState}
-            >
-              Mark ready for reprocess
-            </Button>
-            {(readyForReprocess || reprocessing) && (
-              <Button
-                variant="default"
-                onClick={() => void onRunReprocess()}
-                disabled={pending || emptyState || reprocessBusy}
-              >
-                {reprocessBusy ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {reprocessBusy ? "Reprocessing…" : "Run reprocessing"}
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { matchOrCreateEntity } from "@/lib/entities/match";
+import { reprocessInterviewFromReview } from "@/lib/ai/pipeline";
 import type { EntityType, ReviewedUtterance } from "@/types/database";
 
 type ActionResult = { success: true } | { error: string };
@@ -259,5 +260,64 @@ export async function removeReviewSeedEntity(seedId: string, interviewId: string
     return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Remove failed" };
+  }
+}
+
+/**
+ * Atomically saves the reviewed utterances and immediately triggers a pipeline
+ * reprocess — collapsing the old "Save Draft → Mark Ready → Run Reprocessing"
+ * three-step flow into a single user action.
+ *
+ * The pipeline function (`reprocessInterviewFromReview`) is fired as a
+ * fire-and-forget, identical to the pattern used by the reprocess-review API
+ * route. It sets `transcript_review_status = "reprocessing"` itself at the very
+ * start, so the UI transitions to the in-progress state on the next refresh.
+ */
+export async function saveAndReprocess(
+  interviewId: string,
+  reviewedUtterances: ReviewedUtterance[]
+): Promise<ActionResult> {
+  try {
+    const { admin, interview } = await requireInterviewEditor(interviewId);
+
+    if (interview.transcript_review_status === "reprocessing") {
+      return { error: "Already reprocessing." };
+    }
+
+    if (interview.status !== "COMPLETED" && interview.status !== "FAILED") {
+      return {
+        error:
+          "Save & Reprocess is only available when the source is completed or failed.",
+      };
+    }
+
+    if (!isReviewedUtteranceArray(reviewedUtterances)) {
+      return { error: "Invalid utterance payload." };
+    }
+
+    // Persist utterances and mark as ready so the pipeline function can proceed.
+    // error_message is cleared here so stale failure copy is not shown while
+    // the new run is in flight.
+    const { error: saveError } = await admin
+      .from("sources")
+      .update({
+        reviewed_utterances: reviewedUtterances,
+        transcript_review_status: "ready",
+        error_message: null,
+      })
+      .eq("id", interviewId);
+
+    if (saveError) return { error: saveError.message };
+
+    // Fire-and-forget — pipeline immediately transitions to "reprocessing".
+    void reprocessInterviewFromReview(interviewId).catch((err: unknown) => {
+      console.error("[saveAndReprocess] pipeline fire-and-forget error:", err);
+    });
+
+    revalidatePath(`/interviews/${interviewId}`);
+    revalidatePath(`/interviews/${interviewId}/review`);
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Reprocess failed" };
   }
 }

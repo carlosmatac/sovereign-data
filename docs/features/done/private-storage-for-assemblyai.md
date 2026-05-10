@@ -1,6 +1,7 @@
 ---
 title: "Private storage bucket for source audio files"
-status: to-do
+status: done
+shipped: 2026-05-10
 owner: team
 priority: critical
 last_updated: 2026-05-10

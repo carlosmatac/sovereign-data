@@ -1,6 +1,7 @@
 ---
 title: "Remove Tavily web search from Copilot"
-status: to-do
+status: done
+shipped: 2026-05-10
 owner: team
 priority: medium
 last_updated: 2026-05-10

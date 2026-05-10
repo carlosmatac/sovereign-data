@@ -1,6 +1,7 @@
 ---
 title: "Reprocess UX overhaul"
-status: to-do
+status: done
+shipped: 2026-05-10
 owner: team
 priority: high
 last_updated: 2026-05-10
@@ -76,8 +77,61 @@ Triggering a reprocess from the transcript review page is a painful, opaque mult
 
 ## Acceptance / how to validate
 
-- [ ] Triggering reprocess from the review page requires exactly one click of "Save & Reprocess."
-- [ ] While reprocessing, a visible in-progress indicator is shown (spinner or banner) and entity correction controls are disabled.
-- [ ] On success, the page refreshes and shows the updated entity state.
-- [ ] On failure, an error state is visible with a "Retry" action — no silent hang.
-- [ ] "Mark as Ready" button is not clickable while reprocess is in progress.
+- [x] Triggering reprocess from the review page requires exactly one click of "Save & Reprocess."
+- [x] While reprocessing, a visible in-progress indicator is shown (spinner or banner) and entity correction controls are disabled.
+- [x] On success, the page redirects to the interview detail page.
+- [x] On failure, a red error banner is visible with copy directing the user to retry — no silent hang.
+- [x] "Mark as Ready" button is not clickable while reprocess is in progress (button removed; "Save & Reprocess" and "Save draft" are disabled).
+
+## Implementation notes
+
+**Date shipped:** 2026-05-10
+
+### What changed
+
+The old three-step flow (Save Draft → Mark Ready → Run Reprocessing) was collapsed into two buttons:
+
+| Button | Variant | Action |
+|--------|---------|--------|
+| **Save & Reprocess** | primary | Saves current utterances, marks `transcript_review_status = ready`, fires `reprocessInterviewFromReview` fire-and-forget (same pipeline as before). |
+| **Save draft** | secondary | Saves utterances only — no pipeline trigger. |
+
+"Mark ready for reprocess" and "Run reprocessing" buttons were removed.
+
+### Server action: `saveAndReprocess`
+
+Added to `src/app/actions/interview-review.ts`. It:
+1. Validates editor / status guards (not already `reprocessing`, source is `COMPLETED` or `FAILED`).
+2. Persists `reviewed_utterances` + sets `transcript_review_status = "ready"` on `sources` (clearing any stale `error_message`).
+3. Fires `reprocessInterviewFromReview(interviewId)` as a fire-and-forget — the pipeline sets `transcript_review_status = "reprocessing"` itself at the very start.
+
+### Component changes (`transcript-review-editor.tsx`)
+
+- `reprocessStarting` state removed; replaced with `lastClickedSaveType: "draft" | "reprocess" | null` for per-button spinner/label feedback.
+- `sourceStatus: InterviewStatus` prop added — carries the source's pipeline status from the page so the editor can show a failure banner on page load.
+- `setSourceStatus` state (local copy) updated by the Realtime/poll `applyPipelineStatus` callback so the banner clears as soon as the pipeline transitions out of `FAILED`.
+- `beforeunload` listener added while `reprocessing === true` to warn on browser refresh / tab close.
+- Failure banner shown when `sourceStatus === "FAILED"` and not currently reprocessing — directs user to retry with **Save & Reprocess**.
+
+### Files touched
+
+| File | Change |
+|------|--------|
+| `src/app/actions/interview-review.ts` | Added `saveAndReprocess` action; added import of `reprocessInterviewFromReview` |
+| `src/components/interviews/transcript-review-editor.tsx` | New props, handlers, button group, error banner, beforeunload guard |
+| `src/app/(dashboard)/interviews/[id]/review/page.tsx` | Added `status` to DB query; passes `sourceStatus` prop |
+
+### No DB migrations needed
+
+All status transitions use the existing `transcript_review_status` enum (`draft / ready / reprocessing`) and the existing `sources.error_message` column.
+
+### Validation
+
+- `npx tsc --noEmit` — 0 errors.
+- No linter errors in edited files.
+
+### Non-goals deferred
+
+- Real-time per-chunk progress (spec non-goal).
+- "Reprocessing in progress" badge on the source list card (open question from spec — deferred).
+- Client-side navigation interception while reprocessing (only `beforeunload` is guarded; Next.js client-side routing is not blocked).

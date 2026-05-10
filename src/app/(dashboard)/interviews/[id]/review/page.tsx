@@ -20,6 +20,7 @@ import {
 } from "@/lib/interviews/transcript-utterances-from-full";
 import type { TextStructureType } from "@/lib/ai/chunking-text-interview";
 import type {
+  InterviewStatus,
   ReviewedUtterance,
   SourceType,
   SourceUtterance,
@@ -87,7 +88,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, source_type, source_metadata, audio_url, audio_storage_path, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, source_metadata, audio_url, audio_storage_path, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source, status"
     )
     .eq("id", id)
     .single();
@@ -199,6 +200,7 @@ export default async function InterviewTranscriptReviewPage({
       speakerMap={effectiveSpeakerMap}
       initialUtterances={initialUtterances}
       reviewStatus={interview.transcript_review_status}
+      sourceStatus={interview.status as InterviewStatus}
       lastIntelSource={interview.last_intel_source}
       seeds={seeds}
       parseWarning={parseWarning}
