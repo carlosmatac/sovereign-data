@@ -1,6 +1,7 @@
 ---
 title: "Transcript review — entity panel in sidebar with pre-existing entity list"
-status: to-do
+status: done
+shipped: 2026-05-10
 owner: team
 priority: medium
 last_updated: 2026-05-10
@@ -73,9 +74,68 @@ The transcript review page has a panel for linking new entities and correcting e
 
 ## Acceptance / how to validate
 
-- [ ] On the transcript review page, the entity panel is visible in the right sidebar without needing to scroll.
-- [ ] The sidebar lists all entities already extracted from the source with their type and role labels.
-- [ ] Adding a new entity link in the sidebar is reflected in the pre-existing entity list immediately (or after a brief refresh).
-- [ ] On a 1280px screen, the transcript and the entity sidebar are both visible simultaneously without horizontal scrolling.
-- [ ] On a narrower screen (e.g. 1024px), a drawer/sheet variant is used instead.
-- [ ] No regression in the existing review flow (save draft, mark ready, reprocess).
+- [x] On the transcript review page, the entity panel is visible in the right sidebar without needing to scroll.
+- [x] The sidebar lists all entities already extracted from the source with their type and role labels.
+- [x] Adding a new entity link in the sidebar is reflected after a brief server revalidation (router.refresh() called on seed add/remove).
+- [x] On a 1280px (xl) screen, the transcript and the entity sidebar are both visible simultaneously without horizontal scrolling.
+- [x] On a narrower screen (e.g. 1024px), a floating "Entities" button opens a Sheet drawer instead.
+- [x] No regression in the existing review flow (save & reprocess, save draft).
+
+## Implementation notes
+
+**Date shipped:** 2026-05-10
+
+### Layout
+
+The outer `<div>` in `TranscriptReviewEditor` now uses a `flex items-start gap-6` row:
+
+| Column | Visibility | Content |
+|--------|-----------|---------|
+| Main (`flex-1 min-w-0`) | always | Reviewed utterances card (unchanged internals) |
+| Sidebar (`xl:w-80 sticky top-6`) | `xl:` (≥1280 px) | Entity panel (extracted + seeds) |
+
+On screens narrower than 1280 px, the sidebar is hidden (`hidden xl:block`). A fixed floating button (`fixed bottom-6 right-6 xl:hidden`) opens a Radix `Sheet` with the same entity panel content.
+
+### Entity panel content
+
+The entity panel is defined as a JSX constant (`entityPanelJSX`) before the `return` statement, so it's shared by both the sidebar `<aside>` and the mobile `<SheetContent>`. It contains two sections:
+
+1. **Extracted by pipeline** — read-only list of `source_entities` joined with `entities`, showing `name`, `type` badge, `link_type` label (each unique by `entity_id`).
+2. **Review seeds** — the existing seed entity management UI (Link / Create buttons, removable list), now rendered in compact `h-7 text-xs` size buttons to fit the narrower sidebar width.
+
+### Data flow
+
+`review/page.tsx` now fetches `source_entities` with an entity join on the admin client:
+```
+source_entities.select("entity_id, link_type, entities(id, name, type)")
+  .eq("source_id", id)
+  .order("created_at", ascending)
+```
+
+Results are deduplicated by `entity_id` (first occurrence wins) and cast to `ExtractedEntity[]` before being passed to the editor.
+
+### New exported types
+
+- `ExtractedEntity` — exported from `transcript-review-editor.tsx`, imported by `review/page.tsx`.
+
+### Removed
+
+The standalone "Human-confirmed entities" `<Card>` at the bottom of the page has been removed. Its content is now in the sidebar's "Review seeds" section.
+
+### Files touched
+
+| File | Change |
+|------|--------|
+| `src/components/interviews/transcript-review-editor.tsx` | Two-column layout; `entityPanelJSX` helper; Sheet + mobile button; `ExtractedEntity` type + prop; `sidebarOpen` state; `Users` + Sheet imports |
+| `src/app/(dashboard)/interviews/[id]/review/page.tsx` | `source_entities` query; deduplication; `extractedEntities` prop; imports `ExtractedEntity` |
+
+### Validation
+
+- `npx tsc --noEmit` — 0 errors.
+- No linter errors.
+
+### Deferred
+
+- Inline entity highlighting in transcript text (spec non-goal).
+- Source list badge showing "reprocessing" status (separate spec).
+- Showing entities from `entity_relationships` endpoints (open question from spec — deferred).

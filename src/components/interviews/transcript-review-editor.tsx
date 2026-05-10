@@ -13,7 +13,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   ArrowLeft,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -24,8 +26,7 @@ import {
   Save,
   Search,
   Trash2,
-  CheckCircle2,
-  AlertCircle,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Command,
   CommandEmpty,
@@ -258,6 +265,13 @@ export type ReviewSeedRow = {
   entity_id: string | null;
 };
 
+/** An entity already linked to the source by the pipeline (from source_entities). */
+export type ExtractedEntity = {
+  entity_id: string;
+  link_type: string | null;
+  entity: { id: string; name: string; type: string };
+};
+
 type Props = {
   interviewId: string;
   projectId: string;
@@ -269,6 +283,8 @@ type Props = {
   sourceStatus: InterviewStatus;
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
+  /** Entities already extracted from this source by the pipeline (read-only display). */
+  extractedEntities: ExtractedEntity[];
   parseWarning?: string | null;
   sourceType: SourceType;
   audioUrl: string | null;
@@ -284,6 +300,7 @@ export function TranscriptReviewEditor({
   sourceStatus: initialSourceStatus,
   lastIntelSource,
   seeds,
+  extractedEntities,
   parseWarning,
   sourceType,
   audioUrl,
@@ -302,6 +319,7 @@ export function TranscriptReviewEditor({
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
   const [lastClickedSaveType, setLastClickedSaveType] = useState<"draft" | "reprocess" | null>(null);
   const [sourceStatus, setSourceStatus] = useState<InterviewStatus>(initialSourceStatus);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
   const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
   const segmentEndRef = useRef<number>(0);
@@ -747,8 +765,148 @@ export function TranscriptReviewEditor({
 
   const emptyState = utterances.length === 0;
 
+  // Reused in both the sticky desktop sidebar and the mobile Sheet.
+  const entityPanelJSX = (
+    <div className="space-y-5">
+      {/* Already extracted by pipeline (read-only) */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Extracted by pipeline
+        </p>
+        {extractedEntities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No entities extracted yet.</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {extractedEntities.map((ent) => (
+              <li key={ent.entity_id} className="flex items-start gap-2 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium leading-snug">{ent.entity.name}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                    <Badge variant="secondary" className="px-1 py-0 text-[11px]">
+                      {ent.entity.type}
+                    </Badge>
+                    {ent.link_type && (
+                      <span className="text-[11px] capitalize text-muted-foreground">
+                        {ent.link_type.toLowerCase().replace(/_/g, " ")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="border-t" />
+
+      {/* Review seeds (human-confirmed entities for next pipeline run) */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Review seeds
+          </p>
+          <div className="flex gap-1">
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={reprocessing}
+                >
+                  <Search className="mr-1 h-3 w-3" />
+                  Link
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="end">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Search entities…"
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {searchLoading ? (
+                        <span className="flex items-center justify-center gap-2 py-4 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Searching…
+                        </span>
+                      ) : searchQuery.trim().length < 2 ? (
+                        <span className="py-4 text-center text-sm text-muted-foreground">
+                          Type at least 2 characters
+                        </span>
+                      ) : (
+                        "No matches"
+                      )}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {searchResults.map((e) => (
+                        <CommandItem
+                          key={e.id}
+                          value={e.id}
+                          onSelect={() => onPickEntity(e.id)}
+                        >
+                          <span className="truncate font-medium">{e.name}</span>
+                          <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                            {e.type}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={reprocessing}
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Create
+            </Button>
+          </div>
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Strong inputs for the next reprocessing run.
+        </p>
+        {seeds.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No seed entities yet.</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {seeds.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{s.display_name}</div>
+                  <div className="text-xs text-muted-foreground">{s.entity_type}</div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  disabled={reprocessing}
+                  onClick={() => onRemoveSeed(s.id)}
+                  aria-label="Remove seed"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 px-6 py-8 lg:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 px-6 py-8 lg:px-8">
       {chunkAudioEnabled && audioUrl ? (
         <audio
           ref={sharedAudioRef}
@@ -800,14 +958,18 @@ export function TranscriptReviewEditor({
         </div>
       )}
 
-      <Card className="w-full min-w-0 shadow-sm">
-        <CardHeader className="space-y-1.5 pb-4">
-          <CardTitle className="text-xl">Reviewed utterances</CardTitle>
-          <CardDescription className="text-base leading-relaxed">
-            Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
-            unless you re-run from a future utterance editor.
-          </CardDescription>
-        </CardHeader>
+      {/* Two-column layout: transcript (left) + entity sidebar (right, xl+ only) */}
+      <div className="flex items-start gap-6">
+        {/* Main column: transcript content */}
+        <div className="min-w-0 flex-1">
+          <Card className="w-full min-w-0 shadow-sm">
+            <CardHeader className="space-y-1.5 pb-4">
+              <CardTitle className="text-xl">Reviewed utterances</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
+                unless you re-run from a future utterance editor.
+              </CardDescription>
+            </CardHeader>
         <CardContent>
           {emptyState ? (
             <p className="text-base text-muted-foreground">
@@ -1111,107 +1273,38 @@ export function TranscriptReviewEditor({
             </Button>
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </div>{/* end main column */}
 
-      <Card className="w-full min-w-0 shadow-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-xl">Human-confirmed entities</CardTitle>
-              <CardDescription className="text-base leading-relaxed">
-                Strong inputs for the next reprocessing run: mention recovery and relationships.
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={reprocessing}>
-                    <Search className="mr-2 h-4 w-4" />
-                    Link existing
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search entities…"
-                      value={searchQuery}
-                      onValueChange={setSearchQuery}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        {searchLoading ? (
-                          <span className="flex items-center justify-center gap-2 py-4 text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Searching…
-                          </span>
-                        ) : searchQuery.trim().length < 2 ? (
-                          <span className="py-4 text-center text-sm text-muted-foreground">
-                            Type at least 2 characters
-                          </span>
-                        ) : (
-                          "No matches"
-                        )}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {searchResults.map((e) => (
-                          <CommandItem
-                            key={e.id}
-                            value={e.id}
-                            onSelect={() => onPickEntity(e.id)}
-                          >
-                            <span className="truncate font-medium">{e.name}</span>
-                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                              {e.type}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <Button
-                variant="default"
-                size="sm"
-                disabled={reprocessing}
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Create &amp; add
-              </Button>
-            </div>
+        {/* Entity sidebar — visible on xl+ screens (≥1280 px) */}
+        <aside className="hidden xl:block xl:w-80 xl:shrink-0">
+          <div className="sticky top-6 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold">Entities</h2>
+            {entityPanelJSX}
           </div>
-        </CardHeader>
-        <CardContent>
-          {seeds.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No seed entities yet.</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {seeds.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{s.display_name}</div>
-                    <div className="text-xs text-muted-foreground">{s.entity_type}</div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    disabled={reprocessing}
-                    onClick={() => onRemoveSeed(s.id)}
-                    aria-label="Remove seed"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+        </aside>
+      </div>{/* end two-column flex */}
+
+      {/* Mobile: floating button opens entity Sheet on screens narrower than xl */}
+      <div className="fixed bottom-6 right-6 z-30 xl:hidden">
+        <Button size="sm" className="shadow-lg" onClick={() => setSidebarOpen(true)}>
+          <Users className="mr-2 h-4 w-4" />
+          Entities
+          {seeds.length + extractedEntities.length > 0 && (
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {seeds.length + extractedEntities.length}
+            </Badge>
           )}
-        </CardContent>
-      </Card>
+        </Button>
+      </div>
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="right" className="w-80 overflow-y-auto p-0">
+          <SheetHeader className="px-4 pb-2 pt-4">
+            <SheetTitle>Entities</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-6">{entityPanelJSX}</div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
