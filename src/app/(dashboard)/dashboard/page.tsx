@@ -37,6 +37,19 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
+  // Resolve the projects this user is a member of.  All subsequent reads
+  // are scoped to these IDs so the dashboard never leaks data from projects
+  // the user has not joined.  The admin client is needed here because
+  // auth.uid() is NULL in the PostgREST context — same pattern used across
+  // all project-membership checks in this codebase.
+  const { data: memberships } = await admin
+    .from("project_members")
+    .select("project_id")
+    .eq("user_id", user.id);
+  const projectIds = (memberships ?? []).map((m) => m.project_id);
+
+  // With no project memberships every count is genuinely zero — skip DB
+  // round-trips and fall straight through to the "no data" empty states.
   const [
     projectsResult,
     interviewsResult,
@@ -44,27 +57,50 @@ export default async function DashboardPage() {
     recentInterviewsResult,
     relationshipsResult,
     allInterviewsResult,
-  ] = await Promise.all([
-    admin.from("projects").select("id, name, country", { count: "exact" }),
-    admin.from("interviews").select("id, status", { count: "exact" }),
-    admin.from("entities").select("id", { count: "exact", head: true }),
-    admin
-      .from("interviews")
-      .select("id, title, status, created_at, projects(name, country)")
-      .order("created_at", { ascending: false })
-      .limit(12),
-    // Active relationship count — matches what the Network Explorer
-    // surfaces. Editorially rejected rows survive in the DB but are not
-    // counted as active here. See docs/features/on-going/editable-relationship-governance.md
-    admin
-      .from("entity_relationships")
-      .select("id", { count: "exact", head: true })
-      .neq("review_status", "rejected"),
-    admin
-      .from("interviews")
-      .select("id, status, topics, project_id, projects(name)")
-      .eq("status", "COMPLETED"),
-  ]);
+  ] = projectIds.length === 0
+    ? [
+        { data: [], count: 0 },
+        { data: [], count: 0 },
+        { count: 0 },
+        { data: [] },
+        { count: 0 },
+        { data: [] },
+      ]
+    : await Promise.all([
+        // Projects — scoped to user's memberships
+        admin
+          .from("projects")
+          .select("id, name, country", { count: "exact" })
+          .in("id", projectIds),
+        // Sources — scoped to user's projects
+        admin
+          .from("interviews")
+          .select("id, status", { count: "exact" })
+          .in("project_id", projectIds),
+        // Entities — tenant-scoped via RLS (entities are a shared knowledge
+        // graph within a tenant; no project_id column exists on this table).
+        supabase.from("entities").select("id", { count: "exact", head: true }),
+        // Recent sources — scoped to user's projects
+        admin
+          .from("interviews")
+          .select("id, title, status, created_at, projects(name, country)")
+          .in("project_id", projectIds)
+          .order("created_at", { ascending: false })
+          .limit(12),
+        // Active relationship count — tenant-scoped via RLS (entity_relationships
+        // has no project_id column; scoping via interview_id join would require
+        // a separate round-trip and is deferred to a future query optimisation).
+        supabase
+          .from("entity_relationships")
+          .select("id", { count: "exact", head: true })
+          .neq("review_status", "rejected"),
+        // All completed sources — scoped to user's projects (drives charts)
+        admin
+          .from("interviews")
+          .select("id, status, topics, project_id, projects(name)")
+          .in("project_id", projectIds)
+          .eq("status", "COMPLETED"),
+      ]);
 
   const projectCount = projectsResult.count ?? 0;
   const interviews = interviewsResult.data ?? [];

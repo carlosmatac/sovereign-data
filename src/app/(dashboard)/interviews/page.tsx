@@ -23,32 +23,52 @@ export default async function InterviewsPage({
   const { project: projectFilter } = await searchParams;
   const supabase = await createClient();
 
-  let query = supabase
+  // Fetch all project memberships in one query (all roles).
+  // We need the full set for both list-scoping (viewer+) and edit gating
+  // (owner/editor only).  Admin client is required because auth.uid() is
+  // NULL in the PostgREST context.
+  const user = await getAuthUser();
+  const admin = createAdminClient();
+  const { data: allMemberships } = user
+    ? await admin
+        .from("project_members")
+        .select("project_id, role")
+        .eq("user_id", user.id)
+    : { data: [] };
+
+  const editableProjectIds = new Set(
+    (allMemberships ?? [])
+      .filter((m) => ["owner", "editor"].includes(m.role))
+      .map((m) => m.project_id)
+  );
+  // All projects the user can at least view (any role)
+  const viewableProjectIds = (allMemberships ?? []).map((m) => m.project_id);
+  const canUpload = editableProjectIds.size > 0;
+
+  // Build a scoped query — the user may only see sources from their projects.
+  // If a ?project= filter is supplied, honour it only when it falls within the
+  // user's membership list; otherwise fall back to their full project scope.
+  const scopedProjectFilter =
+    projectFilter && viewableProjectIds.includes(projectFilter)
+      ? projectFilter
+      : null;
+
+  const baseQuery = supabase
     .from("interviews")
     .select("*, projects(name)")
     .order("created_at", { ascending: false });
 
-  if (projectFilter) {
-    query = query.eq("project_id", projectFilter);
-  }
+  const interviewsQuery =
+    viewableProjectIds.length === 0
+      ? // No memberships → short-circuit; don't hit the DB
+        null
+      : scopedProjectFilter
+        ? baseQuery.eq("project_id", scopedProjectFilter)
+        : baseQuery.in("project_id", viewableProjectIds);
 
-  const { data: interviews, error } = await query;
-
-  // Fetch user's editable project IDs for role-based UI
-  const user = await getAuthUser();
-  const admin = createAdminClient();
-  const { data: editableMemberships } = user
-    ? await admin
-        .from("project_members")
-        .select("project_id")
-        .eq("user_id", user.id)
-        .in("role", ["owner", "editor"])
-    : { data: [] };
-
-  const editableProjectIds = new Set(
-    (editableMemberships ?? []).map((m) => m.project_id)
-  );
-  const canUpload = editableProjectIds.size > 0;
+  const { data: interviews, error } = interviewsQuery
+    ? await interviewsQuery
+    : { data: [], error: null };
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds || seconds <= 0) return "—";

@@ -83,6 +83,11 @@ export default async function InterviewDetailPage({
   }
 
   const userRole = await getUserProjectRole(interview.project_id);
+  // Block access entirely for users who are not members of this project,
+  // rather than letting them view but not edit.
+  if (userRole === null) {
+    notFound();
+  }
   const canEdit = userRole === "owner" || userRole === "editor";
 
   const transcriptForViewer = resolveTranscriptTextForInterviewViewer({

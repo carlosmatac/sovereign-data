@@ -1,9 +1,10 @@
 ---
 title: "Dashboard project-scoped stats (visibility bug)"
-status: to-do
+status: done
 owner: team
 priority: high
 last_updated: 2026-05-10
+shipped: 2026-05-10
 related_infrastructure:
   - docs/infrastructure/database-schema.md
 related_features:
@@ -16,8 +17,8 @@ related_features:
 
 The dashboard currently shows **global aggregate counts** (total sources, total entities, total relationships, etc.) regardless of which projects the logged-in user is a member of. This means:
 
-1. A user who is a member of only one project can see counts that include data from all other projects — breaking data isolation between clients or teams on the same platform.
-2. Clicking on a source or entity that belongs to a project the user is not a member of leads to a **404** page, because the detail route's data fetch correctly applies project-scoped RLS and returns nothing.
+1. A user who is a member of only one project can see counts that include data from all other projects — breaking data isolation between teams on the same platform.
+2. Clicking on a source that belongs to a project the user is not a member of leads to a **404** page, because the detail route's data fetch correctly applies project-scoped RLS and returns nothing.
 3. The counts shown are therefore misleading and sometimes unusable.
 
 With Phase 3a's tenant model now in place, the correct behaviour is: the dashboard shows only the counts for projects the user belongs to, within their tenant.

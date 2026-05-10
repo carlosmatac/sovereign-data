@@ -107,6 +107,10 @@ export default async function InterviewTranscriptReviewPage({
   }
 
   const userRole = await getUserProjectRole(interview.project_id);
+  // Non-members get 404 — same gate as the interview detail page.
+  if (userRole === null) {
+    notFound();
+  }
   const canEdit = userRole === "owner" || userRole === "editor";
 
   const sourceType = interview.source_type as SourceType;

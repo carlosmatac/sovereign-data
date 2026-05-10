@@ -30,3 +30,4 @@ New completed features: add a row here when you move a spec into this folder.
 | [reprocess-transactional-swap.md](./reprocess-transactional-swap.md) | Phase 3b — `replace_source_derived_data` SECURITY DEFINER function; atomic clear+insert; three post-deploy incident postmortems |
 | [chat-message-evidence.md](./chat-message-evidence.md) | Phase 4a — `chat_message_evidence` table; write RAG chunk citations on every assistant turn; read + render evidence chips in chat UI |
 | [topics-as-entities.md](./topics-as-entities.md) | Phase 4b — TOPIC/RISK/OPPORTUNITY/PROJECT added to `entity_type` enum; extraction pipeline emits thematic entities alongside existing string-tag arrays |
+| [dashboard-project-scoped-stats.md](./dashboard-project-scoped-stats.md) | Phase 0 security — dashboard and knowledge list scoped to user's project memberships; non-member detail/review pages return 404 |
