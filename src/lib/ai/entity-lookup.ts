@@ -8,6 +8,7 @@ export interface EntityMatch {
   name: string;
   type: string;
   description: string | null;
+  metadata: Record<string, unknown> | null;
   project_id: string | null;
 }
 
@@ -131,30 +132,30 @@ export async function findEntity(
   if (projectId) {
     const { data } = await admin
       .from("entities")
-      .select("id, name, type, description, project_id")
+      .select("id, name, type, description, metadata, project_id")
       .eq("normalized_name", normalized)
       .eq("project_id", projectId)
       .is("canonical_entity_id", null)
       .limit(1)
       .maybeSingle();
-    if (data) return data;
+    if (data) return data as EntityMatch;
   }
 
   // Global exact match
   const { data: globalExact } = await admin
     .from("entities")
-    .select("id, name, type, description, project_id")
+    .select("id, name, type, description, metadata, project_id")
     .eq("normalized_name", normalized)
     .is("canonical_entity_id", null)
     .limit(1)
     .maybeSingle();
-  if (globalExact) return globalExact;
+  if (globalExact) return globalExact as EntityMatch;
 
   // Alias exact match (project-scoped first)
   if (projectId) {
     const { data: aliasMatch } = await admin
       .from("entity_aliases")
-      .select("entity_id, entities!entity_aliases_entity_id_fkey(id, name, type, description, project_id)")
+      .select("entity_id, entities!entity_aliases_entity_id_fkey(id, name, type, description, metadata, project_id)")
       .eq("alias_normalized", normalized)
       .eq("project_id", projectId)
       .limit(1)
@@ -166,7 +167,7 @@ export async function findEntity(
   // Global alias exact match
   const { data: globalAlias } = await admin
     .from("entity_aliases")
-    .select("entity_id, entities!entity_aliases_entity_id_fkey(id, name, type, description, project_id)")
+    .select("entity_id, entities!entity_aliases_entity_id_fkey(id, name, type, description, metadata, project_id)")
     .eq("alias_normalized", normalized)
     .limit(1)
     .maybeSingle();
@@ -373,7 +374,7 @@ async function fuzzySearch(
 ): Promise<EntityMatch | null> {
   let query = admin
     .from("entities")
-    .select("id, name, type, description, project_id, normalized_name")
+    .select("id, name, type, description, metadata, project_id, normalized_name")
     .is("canonical_entity_id", null)
     .limit(100);
 
@@ -389,7 +390,14 @@ async function fuzzySearch(
     const score = diceCoeff(normalized, row.normalized_name);
     if (score >= 0.6 && (!best || score > best.score)) {
       best = {
-        entity: { id: row.id, name: row.name, type: row.type, description: row.description, project_id: row.project_id },
+        entity: {
+          id: row.id,
+          name: row.name,
+          type: row.type,
+          description: row.description,
+          metadata: (row as unknown as { metadata: Record<string, unknown> | null }).metadata ?? null,
+          project_id: row.project_id,
+        },
         score,
       };
     }

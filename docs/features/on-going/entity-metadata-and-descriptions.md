@@ -1,9 +1,9 @@
 ---
 title: "Entity metadata and richer descriptions for retrieval"
-status: to-do
+status: on-going
 owner: team
 priority: medium
-last_updated: 2026-05-06
+last_updated: 2026-05-11
 related_architecture:
   - docs/audits/database-retrieval-architecture-audit.md
   - docs/architecture/ingestion-pipeline.md
@@ -138,7 +138,88 @@ context.
 - `lookupEntity` returns the `metadata` field; the `chat` route's
   system prompt prints it when non-empty.
 
+## Implementation notes (2026-05-11)
+
+### Metadata shape used: `entity_metadata_v1`
+
+```
+{
+  schema_version: "entity_metadata_v1",
+  summary_tags:   string[]          // 2–8 lowercase keyword tags
+  countries:      string[]          // full English country names grounded in sources
+  sectors:        string[]          // economic/thematic sectors
+  confidence:     "high"|"medium"|"low"
+  generated_from: {
+    source_count:  number
+    chunk_count:   number
+    generated_at:  ISO timestamp string
+    model:         string
+  }
+}
+```
+
+Fields NOT in metadata (stored elsewhere):
+- `type` → `entities.type` column
+- `aliases` → `entity_aliases` table
+- `related_entities` → `entity_relationships` table
+- Current roles/titles → `validated_positions` table
+
+### Description length rules
+
+- **Floor:** descriptions shorter than 120 chars from the generation path are not written (guard against degenerate model output).
+- **Target:** 200–600 chars; the LLM prompt asks for this range explicitly.
+- **Ceiling:** `trimToSentenceBoundary(text, 600)` — cuts at the last `. ` before 600 chars; falls back to last ` `. No mid-word or mid-sentence truncation.
+- **Pipeline enrichment path (`enrichEntityDescriptions`):** the existing per-source description enrichment now overwrites if the new description is strictly longer than the stored one (removed the old `currentDesc.length < 100` guard that blocked updates on descriptions ≥ 100 chars).
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `src/lib/entities/metadata-schema.ts` | **New.** `EntityMetadataV1Schema` (Zod) + `EntityContextGenerationSchema` (generation subset, all required for OpenAI structured outputs) |
+| `src/lib/entities/generate-entity-context.ts` | **New.** `generateEntityContext` (single entity, LLM call + DB write) + `enrichNewEntityContexts` (pipeline helper, up to 5 entities/run, concurrent) |
+| `src/lib/entities/resolve.ts` | Fixed `enrichEntityDescriptions`: removed `< 100` cap; added `trimToSentenceBoundary` (max 600 chars at sentence boundary) |
+| `src/lib/ai/entity-lookup.ts` | Added `metadata` field to `EntityMatch`; added to all `.select()` calls in `findEntity` and `fuzzySearch` |
+| `src/app/api/chat/route.ts` | `lookupEntity` tool now returns `metadata` as compact pipe-delimited string when entity has v1 metadata; added `formatEntityMetadata` helper |
+| `src/lib/ai/pipeline.ts` | Hooks `enrichNewEntityContexts` after source_entities writes; errors are swallowed (non-critical) |
+| `scripts/entities/refresh-entity-context.ts` | **New.** Offline backfill script with `--project`, `--dry-run`, `--force`, `--concurrency` flags |
+
+### Validation / how to test
+
+1. **Pre-flight diagnostic (before backfill):**
+   ```sql
+   select count(*) filter (where metadata->>'schema_version' = 'entity_metadata_v1') as with_v1,
+          count(*) total,
+          round(avg(length(description))) as avg_desc_len
+   from entities where canonical_entity_id is null;
+   ```
+   Expected before backfill: `with_v1 = 0`.
+
+2. **Run the backfill (dry-run first):**
+   ```bash
+   npx tsx scripts/entities/refresh-entity-context.ts --dry-run
+   npx tsx scripts/entities/refresh-entity-context.ts
+   ```
+
+3. **Post-backfill check:**
+   - `with_v1 >= 50` (of 56 canonical entities — some may have < 2 chunks and be skipped)
+   - `avg_desc_len >= 200`
+
+4. **Chat test:**
+   Ask the Copilot: *"What does the database say about One World Media?"*
+   Expected: answer includes at least one structured metadata claim (country, sector, or tag) grounded in the entity's chunks rather than the previous 100-char verbatim description.
+
+5. **`lookupEntity` tool output:**
+   Verify a `metadata: "countries: ... | sectors: ... | tags: ..."` field appears in the tool call result when the entity has v1 metadata.
+
+### Remaining follow-ups
+
+- **Description reinforcement over time:** re-enrich when `mention_count` crosses a threshold (e.g. doubles). This is a Phase 3 / pipeline-extension concern; the `enrichNewEntityContexts` function in the pipeline already runs on each new ingest and skips entities that have v1 metadata + rich descriptions.
+- **pg_trgm index for the search route:** if p95 search latency remains above 200ms after query parallelisation, add `CREATE INDEX CONCURRENTLY ON entities USING gin (name gin_trgm_ops)`. Separate migration, out of scope here.
+- **Human-review flag on metadata:** a "needs_human_review" badge for metadata not yet verified. Tracked in `entity-correction-governance.md`.
+
 ## Implementation log
 
 - 2026-05-06 — Spec drafted from Phase 1 manual-chat-test findings
   (folds findings #2 and #7).
+- 2026-05-11 — Implemented: metadata schema, generator, backfill script,
+  description cap lifted, pipeline hook, lookupEntity updated.

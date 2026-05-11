@@ -394,7 +394,7 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
 
       lookupEntity: tool({
         description:
-          "Look up a person, company, or organization in the Aksum knowledge database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
+          "Look up a person, company, or organization in the Aksum knowledge database by name. Returns the canonical entity record if found (id, name, type, description, metadata). Use this FIRST before making any factual claim about who someone is or what they manage.",
         inputSchema: z.object({
           name: z
             .string()
@@ -409,12 +409,14 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
               message: `No entity matching "${name}" was found in our database.`,
             };
           }
+          const metaSummary = formatEntityMetadata(entity.metadata);
           return {
             found: true,
             entity_id: entity.id,
             name: entity.name,
             type: entity.type,
             description: entity.description,
+            ...(metaSummary ? { metadata: metaSummary } : {}),
           };
         },
       }),
@@ -593,4 +595,26 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Render entity_metadata_v1 as a compact pipe-delimited string for the
+ * LLM tool output. Returns null when no v1 metadata is present.
+ */
+function formatEntityMetadata(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata || metadata.schema_version !== "entity_metadata_v1") return null;
+  const parts: string[] = [];
+  if (Array.isArray(metadata.countries) && metadata.countries.length > 0) {
+    parts.push(`countries: ${(metadata.countries as string[]).join(", ")}`);
+  }
+  if (Array.isArray(metadata.sectors) && metadata.sectors.length > 0) {
+    parts.push(`sectors: ${(metadata.sectors as string[]).join(", ")}`);
+  }
+  if (Array.isArray(metadata.summary_tags) && metadata.summary_tags.length > 0) {
+    parts.push(`tags: ${(metadata.summary_tags as string[]).join(", ")}`);
+  }
+  if (typeof metadata.confidence === "string") {
+    parts.push(`confidence: ${metadata.confidence}`);
+  }
+  return parts.length > 0 ? parts.join(" | ") : null;
 }

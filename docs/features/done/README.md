@@ -24,6 +24,7 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [entities-unique-constraint-swap.md](./entities-unique-constraint-swap.md) | Phase 2.5 — drop global `UNIQUE(name,type)` on `entities`; add project-scoped unique index; remove 23505 silent-recovery hack |
 
 New completed features: add a row here when you move a spec into this folder.
+|| [entity-anchor-autocomplete-ux.md](./entity-anchor-autocomplete-ux.md) | Phase 1 operational UX — parallel search queries, loading/no-match/scope-badge/linked-chip UX states in Add Source autocomplete |
 | [database-retrieval-refactor-baseline.md](./database-retrieval-refactor-baseline.md) | Phase 0 — baseline diagnostics (read-only audit script + 16 SQL queries against live DB before refactor) |
 | [schema-doc-and-types-refresh.md](./schema-doc-and-types-refresh.md) | Phase 2.6 — full rewrite of database-schema.md + `database.ts` Views / entity_intel types to match post-Phase-2.5 schema |
 | [tenants-rls-and-customization.md](./tenants-rls-and-customization.md) | Phase 3a — `tenants` table, `tenant_id` on every customer-owned table, compound FKs, RLS via `is_tenant_member()` |

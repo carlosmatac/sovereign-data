@@ -1,6 +1,6 @@
 ---
 title: "Entity-anchor autocomplete UX in Add Source form"
-status: on-going
+status: done
 owner: unassigned
 priority: medium
 last_updated: 2026-05-11

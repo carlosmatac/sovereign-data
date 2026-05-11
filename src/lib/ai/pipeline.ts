@@ -33,6 +33,7 @@ import {
   writeAnchorSourceEntities,
   writeExtractionSourceEntities,
 } from "@/lib/entities/source-entities-writer";
+import { enrichNewEntityContexts } from "@/lib/entities/generate-entity-context";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -724,6 +725,20 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     associations: extraction.source_associations ?? [],
     entityIdMap,
   });
+
+  // ── Entity context enrichment (description + metadata_v1) ────────────────
+  // Best-effort: runs after all pipeline writes so chunks and mentions are
+  // available. Errors per entity are swallowed; a failure here never blocks
+  // the pipeline from completing.
+  try {
+    await enrichNewEntityContexts(
+      supabase,
+      resolvedEntities.map((r) => r.entityId),
+      projectId
+    );
+  } catch (ctxErr) {
+    console.error(`[pipeline] entity context enrichment failed (non-critical):`, ctxErr);
+  }
 
   const completedPatch: Record<string, unknown> = {
     last_intel_source: lastIntelSource,
