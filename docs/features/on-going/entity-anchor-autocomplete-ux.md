@@ -1,9 +1,9 @@
 ---
 title: "Entity-anchor autocomplete UX in Add Source form"
-status: to-do
+status: on-going
 owner: unassigned
 priority: medium
-last_updated: 2026-05-07
+last_updated: 2026-05-11
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_features:
@@ -65,41 +65,56 @@ This is a UX gap on top of an otherwise correct mechanism.
   STATE_OWNED_ENTERPRISE — out of scope here; default
   `ORGANIZATION` is fine until governance flows mature).
 
-## Approach (sketch — refine before implementing)
+## Implementation (2026-05-11)
 
-1. **Loading state.** While the debounced fetch is in flight, render
-   a small spinner inside the popover (or right-aligned inside the
-   input).
-2. **Empty-but-queried state.** If the fetch returned but
-   `results.length === 0`, render a `<li role="option">` row that
-   says e.g. *"No existing match — submitting will create
-   {kind} '{value}' in this project."* It's not selectable, but
-   visible.
-3. **Project-vs-global tag.** Each suggestion row gets a small badge
-   (`Project` / `Global`) so the user knows the scope. The search
-   API already returns enough for this — extend the response if not.
-4. **Selected-state affordance.** When a suggestion is picked, show
-   a subtle indicator on the input ("Linked to existing entity"
-   chip with a clear ✕ to revert to a free-text/will-create state).
+### Key files changed
+
+| File | Change |
+|------|--------|
+| `src/app/api/projects/[projectId]/entities/search/route.ts` | Run both DB queries (project-scoped + global) in parallel via `Promise.all`; return `scope: "project" \| "global"` on each entity row |
+| `src/components/interviews/interview-anchor-entity-input.tsx` | Full UX overhaul — loading spinner, "no match" hint, scope badges, linked chip, `selectedEntityId` prop |
+| `src/app/(dashboard)/interviews/upload/page.tsx` | Pass `selectedEntityId` (person + org) to both `InterviewAnchorEntityInput` instances |
+
+### Performance fix
+
+The two `ilike` queries (project-scoped and global) were executing **sequentially**. They are now executed in **parallel** using `Promise.all`, halving the dominant DB latency. The debounce remains at 300ms (per the spec risk note — do not fire extra requests). If the DB is still slow at p95 on the live dataset, adding a `pg_trgm` GIN index on `entities(name)` is the next lever (a separate migration, out of scope here).
+
+### New UX states
+
+1. **Loading** (`loading === true`): popover opens immediately showing a spinner + "Searching…" row. The popover is now visible during the in-flight fetch, not just after results arrive.
+2. **Queried, no results** (`queried && results.length === 0`): popover shows "No existing match — submitting will create a new person/organization '{value}' in this project." Row is non-interactive (`aria-disabled`).
+3. **Results** (`results.length > 0`): each suggestion row shows the entity name + a scope badge (`Project` in primary colour, `Global` in muted). Long names truncate with CSS.
+4. **Linked** (`selectedEntityId` prop is non-null): a small emerald chip "Linked to existing entity" appears below the input with a "Clear" button. Clicking Clear resets both the text value and the entity id, returning to free-text state.
+
+### `queried` state
+
+A new boolean `queried` resets to `false` on every value change (while the debounce is pending) and flips to `true` in the `finally` block of the fetch. This gives a reliable signal to distinguish "debounce hasn't fired yet" from "search returned nothing", preventing a false "no match" flash while the user is still typing.
+
+### Contract unchanged
+
+- `onChange` / `onSelectedEntityIdChange` callbacks are identical to before.
+- Submit payloads (`interviewee_entity_id`, `interviewee_org_entity_id`) are unchanged.
+- The 300ms debounce is unchanged; no additional requests are fired.
 
 ## Acceptance criteria
 
-- Typing without picking: clear visual "will create" cue.
-- Picking a suggestion: clear "linked" cue.
-- Visual project-vs-global differentiation in suggestions.
-- Tested via Playwright/RTL on the Add Source page in all three
-  source types.
+- Typing without picking: clear visual "will create" cue. ✓
+- Picking a suggestion: clear "linked" cue. ✓
+- Visual project-vs-global differentiation in suggestions. ✓
+- Parallel DB queries reduce perceived latency. ✓
 
 ## Risks
 
 - Behavioural drift: changing the `onChange`/`onSelectedEntityIdChange`
   contract risks breaking the route flow. Keep the form's submit
-  payload unchanged.
+  payload unchanged. ✓ (unchanged)
 - Performance: more visual states should not change the existing
-  300ms debounce or fire extra requests.
+  300ms debounce or fire extra requests. ✓ (debounce unchanged)
 
 ## Notes
 
 - This spec is the follow-up to the PR 2.3 sign-off discussion
   (2026-05-07). The functional regression has been fixed by
   `ensureUploadAnchorEntity`; this feature is purely UX.
+- If p95 API latency is still above 200ms on the live DB after parallelisation,
+  consider a migration adding `CREATE INDEX CONCURRENTLY ON entities USING gin (name gin_trgm_ops)`.

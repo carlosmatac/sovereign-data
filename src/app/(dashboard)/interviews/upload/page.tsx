@@ -795,6 +795,7 @@ export default function UploadInterviewPage() {
                     value={intervieweeName}
                     onChange={setIntervieweeName}
                     onSelectedEntityIdChange={setIntervieweeEntityId}
+                    selectedEntityId={intervieweeEntityId}
                     disabled={loading}
                     aria-label="Primary person"
                   />
@@ -811,6 +812,7 @@ export default function UploadInterviewPage() {
                     value={intervieweeOrg}
                     onChange={setIntervieweeOrg}
                     onSelectedEntityIdChange={setIntervieweeOrgEntityId}
+                    selectedEntityId={intervieweeOrgEntityId}
                     disabled={loading}
                     aria-label="Organization or company"
                   />
