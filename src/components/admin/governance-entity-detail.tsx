@@ -34,6 +34,11 @@ import type {
   GovernanceRelationshipStatusFilter,
 } from "@/lib/admin/load-governance-relationships";
 import { GovernanceRelationshipsSection } from "@/components/admin/governance-relationships-section";
+import {
+  EntityProjectLinksPanel,
+  type ProjectEntityLink,
+  type AvailableProject,
+} from "@/components/admin/entity-project-links-panel";
 import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
 import { updateGovernedEntity } from "@/app/actions/admin-entity-governance";
 
@@ -49,12 +54,16 @@ interface Props {
     statusFilter: GovernanceRelationshipStatusFilter;
     directionFilter: GovernanceRelationshipDirectionFilter;
   };
+  projectLinks: ProjectEntityLink[];
+  availableProjects: AvailableProject[];
 }
 
 export function GovernanceEntityDetailPanel({
   entity,
   isSuperuser,
   relationships,
+  projectLinks,
+  availableProjects,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -323,6 +332,14 @@ export function GovernanceEntityDetailPanel({
           </p>
         ) : null}
       </section>
+
+      <Separator />
+
+      <EntityProjectLinksPanel
+        entityId={entity.id}
+        initialLinks={projectLinks}
+        availableProjects={availableProjects}
+      />
 
       <Separator />
 

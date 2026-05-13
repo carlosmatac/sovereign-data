@@ -35,6 +35,7 @@ import {
 } from "@/lib/entities/source-entities-writer";
 import { enrichNewEntityContexts } from "@/lib/entities/generate-entity-context";
 import { generateSourceEntityContexts } from "@/lib/entities/generate-source-entity-context";
+import { writeProjectEntityLinks } from "@/lib/entities/project-entity-links-writer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -755,6 +756,21 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     );
   } catch (ctxErr) {
     console.error(`[pipeline] entity context enrichment failed (non-critical):`, ctxErr);
+  }
+
+  // ── Project-entity direct links ───────────────────────────────────────────
+  // Upsert project_entities rows for upload anchors and high-confidence
+  // extracted entities. Uses source_entities.context (populated above) as
+  // the note. Idempotent — duplicates are silently ignored.
+  try {
+    await writeProjectEntityLinks({
+      supabase,
+      sourceId: interviewId,
+      projectId,
+      tenantId,
+    });
+  } catch (pelErr) {
+    console.error(`[pipeline] project-entity links write failed (non-critical):`, pelErr);
   }
 
   const completedPatch: Record<string, unknown> = {
