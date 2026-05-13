@@ -16,7 +16,7 @@ You may even find ideas in different languages
 - La pagina de knowledge debe estar mucho mas ordenada. Ahora mismo aparecen ahi todos los sources volcados. Habría que divirdirlo de alguna manera que todavia no se.
 - En el transcript review solo aparecen las entidades del pipeline (las que escribe el usuario) y no las que saca la IA. Y al contrario. En la pagina de la entrevista solo aparecen las entidades que saca la IA y no las del pipeline. Hay que tener todas en los dos sitios.
 - api de chat : scope global o solo de proyecto?
-- Parece que lo de la descripcion rica y metadata solo se aplica a los sources que son entrevistas. No me ha dejado hacerlo con un texto. 
+- IMPORTANTE: Parece que el LLM en el retrieval da unas respuestas muy cortas. No debe estar usando todo el contexto de manera apropiada. 
 - No deben aparecer todos los sources en la pagina de proyecto. Esa lista puede crecer hacia abajo de manera infinita. Hay que organizarlo mejor. 
 - Hay que quitar del sales war room todo lo equivalente a cash, revenue etc o por lo menos hacerlo editable. La idea de esto era volcar la info de los crm de los clientes pero ahora mismo tenemos mock data y es el mismo en todos los proyectos. O lo quitamos o lo hacemos editable. 
 - El label que sale en el autocompletado de una entidad cuando se sube un source  es siempre "project". No sé que sentido tiene. No coge el type real de la entidad.
