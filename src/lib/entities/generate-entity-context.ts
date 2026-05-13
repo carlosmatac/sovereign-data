@@ -41,11 +41,14 @@ export function trimToSentenceBoundary(text: string, maxLen: number): string {
  *
  * Behaviour:
  * - Fetches the top CHUNK_SAMPLE chunks that mention the entity.
- * - If fewer than MIN_CHUNKS are found, skips (not enough grounding).
+ * - If fewer than MIN_CHUNKS are found AND fallbackContextText is provided,
+ *   uses that text (e.g. source_entities.context) as grounding instead of
+ *   skipping. Upload anchors typically have no entity_mentions but always
+ *   have a source_entities.context — this path handles them.
+ * - If fewer than MIN_CHUNKS AND no fallback → skip (logs reason).
  * - Calls gpt-4o-mini via generateObject to extract description + metadata.
  * - Trims description to DESCRIPTION_MAX_CHARS at a sentence boundary.
  * - Only writes to the DB if the new description is >= DESCRIPTION_MIN_CHARS.
- *   (Guards against degenerate model output with no useful content.)
  * - Always overwrites metadata when the write condition passes.
  */
 export async function generateEntityContext(params: {
@@ -54,8 +57,11 @@ export async function generateEntityContext(params: {
   entityName: string;
   entityType: EntityType;
   projectId: string | null;
+  /** Optional grounding text used when entity_mentions chunks are sparse.
+   *  Typically the source_entities.context generated earlier in the pipeline. */
+  fallbackContextText?: string;
 }): Promise<void> {
-  const { supabase, entityId, entityName, entityType, projectId } = params;
+  const { supabase, entityId, entityName, entityType, projectId, fallbackContextText } = params;
 
   const CHUNK_SAMPLE = 8;
   const MIN_CHUNKS = 2;
@@ -88,19 +94,29 @@ export async function generateEntityContext(params: {
     })
     .filter((c): c is { content: string; source_id: string } => c !== null);
 
+  const hasFallback = !!fallbackContextText?.trim();
+
   if (chunkRows.length < MIN_CHUNKS) {
+    if (!hasFallback) {
+      console.log(
+        `[generate-entity-context] skip "${entityName}" — ${chunkRows.length} chunk(s) found (min ${MIN_CHUNKS}), no fallback context`
+      );
+      return;
+    }
     console.log(
-      `[generate-entity-context] skip "${entityName}" — only ${chunkRows.length} chunk(s) found (min ${MIN_CHUNKS})`
+      `[generate-entity-context] "${entityName}" — ${chunkRows.length} chunk(s), using source context as fallback`
     );
-    return;
   }
 
-  const sourceCount = new Set(chunkRows.map((c) => c.source_id)).size;
-  const chunkCount = chunkRows.length;
+  const usingFallback = chunkRows.length < MIN_CHUNKS;
+  const sourceCount = usingFallback ? 1 : new Set(chunkRows.map((c) => c.source_id)).size;
+  const chunkCount = usingFallback ? 0 : chunkRows.length;
 
-  const chunksText = chunkRows
-    .map((c, i) => `[${i + 1}] ${c.content.trim()}`)
-    .join("\n\n");
+  const contextSection = usingFallback
+    ? `SOURCE CONTEXT (entity is a primary participant — no direct transcript excerpts available):\n${fallbackContextText}`
+    : `SOURCE EXCERPTS (${chunkCount} chunks from ${sourceCount} source(s)):\n${chunkRows
+        .map((c, i) => `[${i + 1}] ${c.content.trim()}`)
+        .join("\n\n")}`;
 
   const { object } = await withRetry(
     () =>
@@ -109,21 +125,20 @@ export async function generateEntityContext(params: {
         schema: EntityContextGenerationSchema,
         prompt: `You are an expert intelligence analyst for Aksum, a knowledge platform for frontier markets.
 
-TASK: Write a structured description and metadata for the following entity, based ONLY on the excerpts from Aksum's internal interview sources provided below. Do not use general knowledge beyond what the excerpts ground.
+TASK: Write a structured description and metadata for the following entity, based ONLY on the context from Aksum's internal interview sources provided below. Do not use general knowledge beyond what is grounded here.
 
 Entity name: "${entityName}"
 Entity type: ${entityType}
 ${projectId ? `Project scope: ${projectId}` : "Global entity"}
 
-SOURCE EXCERPTS (${chunkCount} chunks from ${sourceCount} source(s)):
-${chunksText}
+${contextSection}
 
 INSTRUCTIONS:
 - description: natural language, 200–600 characters, dense and concise. Explain who/what "${entityName}" is and why it matters in these sources. Do not pad with filler. Do not end mid-sentence.
 - summary_tags: 2–8 lowercase keyword tags (e.g. "energy", "regulation", "west-africa"). Do not repeat the entity type.
-- countries: full English country names grounded in the excerpts (e.g. "Nigeria"). Empty array if none.
-- sectors: economic/thematic sectors grounded in the excerpts (e.g. "energy", "telecoms"). Empty array if none.
-- confidence: "high" if entity is a primary subject across 3+ chunks with rich context; "medium" if mentioned materially in 1–2 sources; "low" if only briefly referenced.`,
+- countries: full English country names grounded in the context (e.g. "Nigeria"). Empty array if none.
+- sectors: economic/thematic sectors grounded in the context (e.g. "energy", "telecoms"). Empty array if none.
+- confidence: "high" if entity is a primary subject across 3+ chunks with rich context; "medium" if mentioned materially in 1–2 sources; "low" if only briefly referenced or based on limited context.`,
       }),
     "generateEntityContext"
   );
@@ -175,18 +190,24 @@ INSTRUCTIONS:
 
 /**
  * Called from the ingestion pipeline after entity resolution.
- * Generates context for up to MAX_PER_RUN entities that don't yet have
+ * Generates context for all candidate entities that don't yet have
  * entity_metadata_v1 or have thin descriptions. Runs concurrently.
  * Errors are swallowed per-entity so one failure doesn't block the rest.
+ *
+ * @param entityIds  All entity IDs relevant to this source run: resolved
+ *                   entities + upload anchors + additional participants.
+ * @param contextHints  Map<entityId, contextText> of pre-fetched
+ *                   source_entities.context strings used as fallback when
+ *                   an entity has insufficient entity_mentions chunks
+ *                   (typical for upload anchors).
  */
 export async function enrichNewEntityContexts(
   supabase: SupabaseClient<Database>,
   entityIds: string[],
-  projectId: string
+  projectId: string,
+  contextHints?: Map<string, string>
 ): Promise<void> {
   if (entityIds.length === 0) return;
-
-  const MAX_PER_RUN = 5;
 
   const { data: entities, error } = await supabase
     .from("entities")
@@ -194,21 +215,29 @@ export async function enrichNewEntityContexts(
     .in("id", entityIds)
     .is("canonical_entity_id", null);
 
-  if (error || !entities) return;
+  if (error || !entities) {
+    console.error("[generate-entity-context] failed to fetch entities for enrichment:", error);
+    return;
+  }
 
-  const needsEnrichment = entities
-    .filter((e) => {
-      const meta = e.metadata as Record<string, unknown> | null;
-      const hasV1 = meta?.schema_version === "entity_metadata_v1";
-      const hasThinDesc = !e.description || e.description.length < 150;
-      return !hasV1 || hasThinDesc;
-    })
-    .slice(0, MAX_PER_RUN);
+  const needsEnrichment = entities.filter((e) => {
+    const meta = e.metadata as Record<string, unknown> | null;
+    const hasV1 = meta?.schema_version === "entity_metadata_v1";
+    const hasThinDesc = !e.description || e.description.length < 150;
+    return !hasV1 || hasThinDesc;
+  });
+
+  const skipped = entities.length - needsEnrichment.length;
+  if (skipped > 0) {
+    console.log(
+      `[generate-entity-context] ${skipped} entity(ies) already have v1 metadata + rich description — skipped`
+    );
+  }
 
   if (needsEnrichment.length === 0) return;
 
   console.log(
-    `[generate-entity-context] enriching ${needsEnrichment.length} new entity context(s) for project ${projectId}`
+    `[generate-entity-context] enriching ${needsEnrichment.length}/${entities.length} entity(ies) for project ${projectId}`
   );
 
   await Promise.allSettled(
@@ -219,6 +248,7 @@ export async function enrichNewEntityContexts(
         entityName: e.name,
         entityType: e.type as EntityType,
         projectId,
+        fallbackContextText: contextHints?.get(e.id),
       }).catch((err) =>
         console.error(`[generate-entity-context] entity "${e.name}" failed:`, err)
       )

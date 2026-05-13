@@ -223,3 +223,25 @@ Fields NOT in metadata (stored elsewhere):
   (folds findings #2 and #7).
 - 2026-05-11 — Implemented: metadata schema, generator, backfill script,
   description cap lifted, pipeline hook, lookupEntity updated.
+- 2026-05-13 — **Regression fix:** four root causes identified and fixed:
+
+  **Root causes:**
+  1. `MAX_PER_RUN = 5` in `enrichNewEntityContexts` — silently capped
+     enrichment at 5 entities per pipeline run regardless of how many were
+     relevant.
+  2. Upload anchor entity IDs (`interviewee_entity_id`,
+     `interviewee_org_entity_id`, multi-participant `source_entities` rows)
+     were never included in the ID list passed to `enrichNewEntityContexts`.
+     Only `resolvedEntities` (LLM extraction output) was passed.
+  3. `generateEntityContext` skipped at `MIN_CHUNKS = 2` with no fallback —
+     upload anchors are the primary subject of the source, so they rarely
+     appear as third-party `entity_mentions` in chunks. They consistently
+     hit the guard and were silently dropped despite `source_entities.context`
+     (generated earlier in the same pipeline run) being available.
+  4. No logging of which entities were skipped and why.
+
+  **Files changed:**
+  | File | Change |
+  |------|--------|
+  | `src/lib/entities/generate-entity-context.ts` | Removed `MAX_PER_RUN = 5`; added `fallbackContextText?: string` param to `generateEntityContext`; when chunks < `MIN_CHUNKS` AND fallback is provided, uses it as context instead of skipping; added `contextHints?: Map<string, string>` param to `enrichNewEntityContexts`; improved skip-reason logging |
+  | `src/lib/ai/pipeline.ts` | Enrichment call now builds a unified entity ID set (`resolvedEntities` + `interviewee_entity_id` + `interviewee_org_entity_id` + all `source_entities.entity_id` for the source); pre-fetches `source_entities.context` in one query and passes it as `contextHints` to `enrichNewEntityContexts` |
