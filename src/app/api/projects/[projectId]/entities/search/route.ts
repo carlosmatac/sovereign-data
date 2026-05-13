@@ -70,13 +70,6 @@ export async function GET(
     projectQuery = projectQuery.in("type", typeFilters);
   }
 
-  const { data: projectScoped, error: e1 } = await projectQuery;
-
-  if (e1) {
-    console.error("entity search project:", e1);
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
-  }
-
   let globalQuery = admin
     .from("entities")
     .select("id, name, type")
@@ -90,20 +83,34 @@ export async function GET(
     globalQuery = globalQuery.in("type", typeFilters);
   }
 
-  const { data: globalScoped, error: e2 } = await globalQuery;
+  const [
+    { data: projectScoped, error: e1 },
+    { data: globalScoped, error: e2 },
+  ] = await Promise.all([projectQuery, globalQuery]);
 
+  if (e1) {
+    console.error("entity search project:", e1);
+    return NextResponse.json({ error: "Search failed" }, { status: 500 });
+  }
   if (e2) {
     console.error("entity search global:", e2);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 
   const seen = new Set<string>();
-  const merged: Array<{ id: string; name: string; type: string }> = [];
-  for (const row of [...(projectScoped ?? []), ...(globalScoped ?? [])]) {
+  const merged: Array<{ id: string; name: string; type: string; scope: "project" | "global" }> = [];
+
+  for (const row of (projectScoped ?? [])) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    merged.push(row);
+    merged.push({ ...row, scope: "project" });
     if (merged.length >= 20) break;
+  }
+
+  for (const row of (globalScoped ?? [])) {
+    if (seen.has(row.id) || merged.length >= 20) continue;
+    seen.add(row.id);
+    merged.push({ ...row, scope: "global" });
   }
 
   return NextResponse.json({ entities: merged });

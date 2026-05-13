@@ -32,6 +32,10 @@ import {
   X,
   Mic,
   Type,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -42,11 +46,53 @@ import {
   MAX_PDF_SIZE_BYTES,
   MIN_EXPECTED_SPEAKERS,
   MAX_EXPECTED_SPEAKERS,
+  AUDIO_STORAGE_BUCKET,
 } from "@/lib/constants";
 import type { Project } from "@/types/database";
 import { InterviewAnchorEntityInput } from "@/components/interviews/interview-anchor-entity-input";
 
 type SourceType = "audio" | "document" | "text";
+
+type ParticipantRow = {
+  id: string; // local key only
+  name: string;
+  entityId: string | null;
+  entityType: string;
+  linkType: string;
+  title: string;
+};
+
+const PARTICIPANT_ENTITY_TYPES = [
+  { value: "PERSON", label: "Person" },
+  { value: "COMPANY", label: "Company" },
+  { value: "ORGANIZATION", label: "Organization" },
+  { value: "GOVERNMENT", label: "Government" },
+  { value: "PUBLIC_INSTITUTION", label: "Public Institution" },
+] as const;
+
+const PARTICIPANT_LINK_TYPES = [
+  { value: "participant", label: "Participant" },
+  { value: "interviewer", label: "Interviewer" },
+  { value: "author", label: "Author" },
+  { value: "primary_subject", label: "Primary subject" },
+] as const;
+
+function makeParticipantRow(): ParticipantRow {
+  return {
+    id: Math.random().toString(36).slice(2),
+    name: "",
+    entityId: null,
+    entityType: "PERSON",
+    linkType: "participant",
+    title: "",
+  };
+}
+
+/** Map entity type → search typeFilter query string for InterviewAnchorEntityInput. */
+function typeFilterForEntityType(entityType: string): string {
+  if (entityType === "PERSON") return "type=PERSON";
+  return `types=${encodeURIComponent("COMPANY,ORGANIZATION,GOVERNMENT,PUBLIC_INSTITUTION,STATE_OWNED_ENTERPRISE")}`;
+}
 
 export default function UploadInterviewPage() {
   const router = useRouter();
@@ -73,6 +119,49 @@ export default function UploadInterviewPage() {
   const [intervieweeOrgEntityId, setIntervieweeOrgEntityId] = useState<
     string | null
   >(null);
+
+  // Additional participants (optional)
+  const [participants, setParticipants] = useState<ParticipantRow[]>([]);
+  const [participantSectionOpen, setParticipantSectionOpen] = useState(false);
+
+  function addParticipant() {
+    setParticipants((prev) => [...prev, makeParticipantRow()]);
+    setParticipantSectionOpen(true);
+  }
+
+  function removeParticipant(id: string) {
+    setParticipants((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function updateParticipant(id: string, patch: Partial<ParticipantRow>) {
+    setParticipants((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...patch,
+              // Clear entity link when type changes (stale entity may be wrong type)
+              ...(patch.entityType && patch.entityType !== p.entityType
+                ? { entityId: null, name: "" }
+                : {}),
+            }
+          : p
+      )
+    );
+  }
+
+  /** Serialise participants to the shape the API expects. */
+  function participantsPayload() {
+    return participants
+      .filter((p) => p.name.trim() || p.entityId)
+      .map((p) => ({
+        name: p.name.trim() || undefined,
+        entity_id: p.entityId || undefined,
+        entity_type: p.entityType,
+        link_type: p.linkType,
+        title: p.title.trim() || undefined,
+      }));
+  }
 
   // Audio-specific state
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -234,7 +323,7 @@ export default function UploadInterviewPage() {
       }, 200);
 
       const { error: uploadError } = await supabase.storage
-        .from("interview-audio")
+        .from(AUDIO_STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: "3600",
           upsert: false,
@@ -247,10 +336,6 @@ export default function UploadInterviewPage() {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      const { data: urlData } = supabase.storage
-        .from("interview-audio")
-        .getPublicUrl(filePath);
-
       setStep("processing");
 
       const response = await fetch("/api/interviews", {
@@ -260,7 +345,7 @@ export default function UploadInterviewPage() {
           title: title.trim(),
           description: description.trim() || undefined,
           project_id: projectId,
-          audio_url: urlData.publicUrl,
+          audio_storage_path: filePath,
           language,
           expectedSpeakers:
             expectedSpeakers === "auto"
@@ -275,6 +360,7 @@ export default function UploadInterviewPage() {
           ...(intervieweeOrgEntityId
             ? { interviewee_org_entity_id: intervieweeOrgEntityId }
             : {}),
+          participants: participantsPayload(),
         }),
       });
 
@@ -324,6 +410,9 @@ export default function UploadInterviewPage() {
         formData.append("interviewee_entity_id", intervieweeEntityId);
       if (intervieweeOrgEntityId)
         formData.append("interviewee_org_entity_id", intervieweeOrgEntityId);
+      const pdfParticipants = participantsPayload();
+      if (pdfParticipants.length > 0)
+        formData.append("participants", JSON.stringify(pdfParticipants));
 
       const response = await fetch("/api/interviews/from-pdf", {
         method: "POST",
@@ -373,6 +462,8 @@ export default function UploadInterviewPage() {
       if (intervieweeEntityId) body.interviewee_entity_id = intervieweeEntityId;
       if (intervieweeOrgEntityId)
         body.interviewee_org_entity_id = intervieweeOrgEntityId;
+      const textParticipants = participantsPayload();
+      if (textParticipants.length > 0) body.participants = textParticipants;
 
       const response = await fetch("/api/interviews/from-text", {
         method: "POST",
@@ -798,6 +889,7 @@ export default function UploadInterviewPage() {
                     value={intervieweeName}
                     onChange={setIntervieweeName}
                     onSelectedEntityIdChange={setIntervieweeEntityId}
+                    selectedEntityId={intervieweeEntityId}
                     disabled={loading}
                     aria-label="Primary person"
                   />
@@ -814,6 +906,7 @@ export default function UploadInterviewPage() {
                     value={intervieweeOrg}
                     onChange={setIntervieweeOrg}
                     onSelectedEntityIdChange={setIntervieweeOrgEntityId}
+                    selectedEntityId={intervieweeOrgEntityId}
                     disabled={loading}
                     aria-label="Organization or company"
                   />
@@ -834,6 +927,149 @@ export default function UploadInterviewPage() {
                     autoComplete="off"
                   />
                 </div>
+              </div>
+
+              {/* Additional known entities — collapsible */}
+              <div className="rounded-md border border-dashed">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => setParticipantSectionOpen((v) => !v)}
+                  disabled={loading}
+                >
+                  <span className="flex items-center gap-1.5 font-medium">
+                    {participantSectionOpen
+                      ? <ChevronDown className="h-3.5 w-3.5" />
+                      : <ChevronRight className="h-3.5 w-3.5" />}
+                    Additional known entities
+                    {participants.length > 0 && (
+                      <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        {participants.length}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[11px] font-normal">optional</span>
+                </button>
+
+                {participantSectionOpen && (
+                  <div className="border-t px-3 pb-3 pt-2 space-y-3">
+                    <p className="text-[11px] text-muted-foreground">
+                      Pre-tag additional participants, interviewers, or authors you know are in this source. Each becomes an entity anchor before extraction runs.
+                    </p>
+
+                    {participants.map((p, idx) => (
+                      <div
+                        key={p.id}
+                        className="rounded-md border bg-muted/20 p-2.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                            Entity {idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => removeParticipant(p.id)}
+                            disabled={loading}
+                            aria-label="Remove entity"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Type + Link type row */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[11px]">Entity type</Label>
+                            <Select
+                              value={p.entityType}
+                              onValueChange={(v) => updateParticipant(p.id, { entityType: v })}
+                              disabled={loading}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PARTICIPANT_ENTITY_TYPES.map((t) => (
+                                  <SelectItem key={t.value} value={t.value} className="text-xs">
+                                    {t.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[11px]">Role in source</Label>
+                            <Select
+                              value={p.linkType}
+                              onValueChange={(v) => updateParticipant(p.id, { linkType: v })}
+                              disabled={loading}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PARTICIPANT_LINK_TYPES.map((lt) => (
+                                  <SelectItem key={lt.value} value={lt.value} className="text-xs">
+                                    {lt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Name autocomplete */}
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">Name</Label>
+                          <InterviewAnchorEntityInput
+                            id={`participant-name-${p.id}`}
+                            projectId={projectId}
+                            kind="person"
+                            typeFilter={typeFilterForEntityType(p.entityType)}
+                            entityLabel={
+                              PARTICIPANT_ENTITY_TYPES.find((t) => t.value === p.entityType)?.label.toLowerCase() ?? "entity"
+                            }
+                            placeholder="Search or type a name…"
+                            value={p.name}
+                            onChange={(v) => updateParticipant(p.id, { name: v })}
+                            onSelectedEntityIdChange={(id) => updateParticipant(p.id, { entityId: id })}
+                            selectedEntityId={p.entityId}
+                            disabled={loading || !projectId}
+                          />
+                        </div>
+
+                        {/* Optional title */}
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">
+                            Title / context{" "}
+                            <span className="font-normal text-muted-foreground">(optional)</span>
+                          </Label>
+                          <Input
+                            placeholder="e.g., Head of Strategy, Energy Division"
+                            value={p.title}
+                            onChange={(e) => updateParticipant(p.id, { title: e.target.value })}
+                            disabled={loading}
+                            className="h-8 text-xs"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-8 text-xs"
+                      onClick={addParticipant}
+                      disabled={loading}
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Add entity
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Description */}

@@ -12,7 +12,7 @@ For **AI coding agents** (e.g. Cursor) and anyone delegating work. Defines **rea
 4. **The feature spec** — if the task is a feature: the relevant file in `docs/features/on-going/` or `to-do/` (human points you to it)  
 5. **Topic docs** — only what you need: `docs/architecture/*`, `docs/infrastructure/*`, and **`docs/features/done/*`** for *reference* on shipped behavior  
 
-Do **not** treat **`docs/roadmaps/phased-delivery-history.md`** or **`docs/roadmaps/intelligence-commercial-copilot.md`** as the task list. They are **legacy / planning**. If they conflict with `HANDOVER.md` or `active-workstreams.md`, **prefer the latter** and say so in your summary.
+Do **not** treat **`docs/roadmaps/done/phased-delivery-history.md`** or **`docs/roadmaps/done/intelligence-commercial-copilot.md`** as the task list. They are **legacy / planning**. If they conflict with `HANDOVER.md` or `active-workstreams.md`, **prefer the latter** and say so in your summary.
 
 ---
 
@@ -29,8 +29,8 @@ Do **not** treat **`docs/roadmaps/phased-delivery-history.md`** or **`docs/roadm
 | **Feature spec template** | [`docs/features/feature-spec-template.md`](./docs/features/feature-spec-template.md) |
 | Agent workflow | **`AGENTS.md`** (this file) |
 | System design (pipelines, chat, schema) | `docs/architecture/*`, `docs/infrastructure/*` |
-| Historical phased delivery | [`phased-delivery-history.md`](./docs/roadmaps/phased-delivery-history.md) *(legacy)* |
-| Long-form product plan | [`intelligence-commercial-copilot.md`](./docs/roadmaps/intelligence-commercial-copilot.md) *(planning)* |
+| Historical phased delivery | [`phased-delivery-history.md`](./docs/roadmaps/done/phased-delivery-history.md) *(legacy)* |
+| Long-form product plan | [`intelligence-commercial-copilot.md`](./docs/roadmaps/done/intelligence-commercial-copilot.md) *(planning)* |
 
 **Rule:** one authoritative place per topic. Do not paste the same long specification into `HANDOVER.md`, `active-workstreams.md`, and a feature doc — **link** the feature doc instead.
 

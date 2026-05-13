@@ -24,3 +24,19 @@ Shipped feature documentation. **Do not treat these as a task list** — they de
 | [entities-unique-constraint-swap.md](./entities-unique-constraint-swap.md) | Phase 2.5 — drop global `UNIQUE(name,type)` on `entities`; add project-scoped unique index; remove 23505 silent-recovery hack |
 
 New completed features: add a row here when you move a spec into this folder.
+|| [entity-anchor-autocomplete-ux.md](./entity-anchor-autocomplete-ux.md) | Phase 1 operational UX — parallel search queries, loading/no-match/scope-badge/linked-chip UX states in Add Source autocomplete |
+| [database-retrieval-refactor-baseline.md](./database-retrieval-refactor-baseline.md) | Phase 0 — baseline diagnostics (read-only audit script + 16 SQL queries against live DB before refactor) |
+| [schema-doc-and-types-refresh.md](./schema-doc-and-types-refresh.md) | Phase 2.6 — full rewrite of database-schema.md + `database.ts` Views / entity_intel types to match post-Phase-2.5 schema |
+| [tenants-rls-and-customization.md](./tenants-rls-and-customization.md) | Phase 3a — `tenants` table, `tenant_id` on every customer-owned table, compound FKs, RLS via `is_tenant_member()` |
+| [reprocess-transactional-swap.md](./reprocess-transactional-swap.md) | Phase 3b — `replace_source_derived_data` SECURITY DEFINER function; atomic clear+insert; three post-deploy incident postmortems |
+| [chat-message-evidence.md](./chat-message-evidence.md) | Phase 4a — `chat_message_evidence` table; write RAG chunk citations on every assistant turn; read + render evidence chips in chat UI |
+| [topics-as-entities.md](./topics-as-entities.md) | Phase 4b — TOPIC/RISK/OPPORTUNITY/PROJECT added to `entity_type` enum; extraction pipeline emits thematic entities alongside existing string-tag arrays |
+| [dashboard-project-scoped-stats.md](./dashboard-project-scoped-stats.md) | Phase 0 security — dashboard and knowledge list scoped to user's project memberships; non-member detail/review pages return 404 |
+| [private-storage-for-assemblyai.md](./private-storage-for-assemblyai.md) | Phase 0 security — audio uploads use a private Supabase bucket; signed URLs generated on-demand for AssemblyAI and the audio player; poll hardened with 30-second AbortController timeout |
+| [remove-tavily-web-search.md](./remove-tavily-web-search.md) | Phase 0 security — removed Tavily webSearch tool and TAVILY_API_KEY dependency; Copilot now answers honestly from internal knowledge only |
+| [reprocess-ux-overhaul.md](./reprocess-ux-overhaul.md) | Phase 1 operational UX — collapsed 3-step reprocess flow into a single "Save & Reprocess" button; failure banner with retry affordance; beforeunload guard while pipeline is running |
+| [transcript-review-entity-panel-sidebar.md](./transcript-review-entity-panel-sidebar.md) | Phase 1 operational UX — entity panel moved to sticky right sidebar (xl+); mobile Sheet drawer; "Extracted by pipeline" read-only list from source_entities |
+| [entity-metadata-and-descriptions.md](./entity-metadata-and-descriptions.md) | `entity_metadata_v1` schema (Zod), description cap lifted to 600 chars, offline backfill script, pipeline hook, `lookupEntity` surfaces metadata |
+| [source-entity-relationship-context.md](./source-entity-relationship-context.md) | `source_entities.context` column; `generateSourceEntityContexts` batched LLM call per source; `entity_intel` v3 COALESCE surfaces context in chat |
+| [source-all-related-entities-panel.md](./source-all-related-entities-panel.md) | Unified entity set (source_entities + entity_mentions) on Source Detail and Transcript Review; shared aggregator + SourceEntityList component |
+| [project-entity-linking.md](./project-entity-linking.md) | `project_entities` join table (migration 00043); project-entity direct links with RLS; "Link to project" panel on entity governance page; linked entities card on project detail page |

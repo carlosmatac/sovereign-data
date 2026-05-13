@@ -419,9 +419,26 @@ function fuzzyAnchorMatch(
 
 // ── Description enrichment ──────────────────────────────────────────
 
+const DESCRIPTION_MAX_CHARS = 600;
+
+/**
+ * Trim text to at most maxLen characters without cutting mid-word or
+ * mid-sentence. Prefers the last ". " boundary; falls back to last " ".
+ */
+function trimToSentenceBoundary(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const sub = text.slice(0, maxLen);
+  const lastPeriod = sub.lastIndexOf(". ");
+  if (lastPeriod > maxLen / 2) return text.slice(0, lastPeriod + 1);
+  const lastSpace = sub.lastIndexOf(" ");
+  if (lastSpace > maxLen / 3) return text.slice(0, lastSpace);
+  return sub;
+}
+
 /**
  * Populate entities.description in the DB when the extraction provides
  * a description but the stored entity has none (or a shorter one).
+ * Descriptions are trimmed to DESCRIPTION_MAX_CHARS at a sentence boundary.
  */
 async function enrichEntityDescriptions(
   supabase: SupabaseClient<Database>,
@@ -444,15 +461,13 @@ async function enrichEntityDescriptions(
 
   for (const entity of entitiesToEnrich) {
     const currentDesc = existingMap.get(entity.entityId);
+    const newDesc = trimToSentenceBoundary(entity.description, DESCRIPTION_MAX_CHARS);
 
-    // Update if current description is empty or shorter than what we have
-    if (
-      !currentDesc ||
-      (entity.description.length > currentDesc.length && currentDesc.length < 100)
-    ) {
+    // Update if current description is absent or the new one is longer
+    if (!currentDesc || newDesc.length > currentDesc.length) {
       const { error } = await supabase
         .from("entities")
-        .update({ description: entity.description })
+        .update({ description: newDesc })
         .eq("id", entity.entityId);
 
       if (error) {

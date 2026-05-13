@@ -47,16 +47,6 @@ interface RagChunk {
   similarity: number;
 }
 
-interface TavilyResult {
-  title: string;
-  url: string;
-  content: string;
-  score: number;
-}
-
-interface TavilyResponse {
-  results: TavilyResult[];
-}
 
 async function loadInterviewTimesForChunks(
   admin: ReturnType<typeof createAdminClient>,
@@ -115,50 +105,6 @@ function rerankRagChunksForTemporal(
   return copy;
 }
 
-async function tavilySearch(
-  query: string,
-  topic: "general" | "news"
-): Promise<TavilyResult[]> {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) {
-    return [
-      {
-        title: "Web search unavailable",
-        url: "",
-        content: "TAVILY_API_KEY is not configured. Web search is disabled.",
-        score: 0,
-      },
-    ];
-  }
-
-  const res = await fetch("https://api.tavily.com/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      api_key: apiKey,
-      query,
-      topic,
-      search_depth: "advanced",
-      max_results: 5,
-      include_answer: false,
-    }),
-  });
-
-  if (!res.ok) {
-    return [
-      {
-        title: "Search failed",
-        url: "",
-        content: `Web search returned HTTP ${res.status}. Respond using only internal context.`,
-        score: 0,
-      },
-    ];
-  }
-
-  const data = (await res.json()) as TavilyResponse;
-  return data.results ?? [];
-}
-
 /**
  * POST /api/chat
  *
@@ -167,8 +113,8 @@ async function tavilySearch(
  * Flow:
  * 1. Accept messages + optional projectId from client
  * 2. Embed query, run hybrid_search with project filter
- * 3. Provide 3 internal tools (findEntity, getRelationships, getMentions)
- *    + 1 external tool (webSearch)
+ * 3. Provide 4 internal tools: lookupPositions, lookupEntity,
+ *    lookupRelationships, lookupMentions
  * 4. Stream a grounded response (up to 5 steps)
  * 5. Log grounding metrics
  */
@@ -398,7 +344,6 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
 
   // ── Grounding metrics ─────────────────────────────────────────
   let usedInternalTools = false;
-  let tavilyCallsCount = 0;
 
   // ── Stream Response with Internal + External Tools ────────────
   const result = streamText({
@@ -449,7 +394,7 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
 
       lookupEntity: tool({
         description:
-          "Look up a person, company, or organization in the Aksum knowledge database by name. Returns the canonical entity record if found (id, name, type, description). Use this FIRST before making any factual claim about who someone is or what they manage.",
+          "Look up a person, company, or organization in the Aksum knowledge database by name. Returns the canonical entity record if found (id, name, type, description, metadata). Use this FIRST before making any factual claim about who someone is or what they manage.",
         inputSchema: z.object({
           name: z
             .string()
@@ -464,12 +409,14 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
               message: `No entity matching "${name}" was found in our database.`,
             };
           }
+          const metaSummary = formatEntityMetadata(entity.metadata);
           return {
             found: true,
             entity_id: entity.id,
             name: entity.name,
             type: entity.type,
             description: entity.description,
+            ...(metaSummary ? { metadata: metaSummary } : {}),
           };
         },
       }),
@@ -556,34 +503,12 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
         },
       }),
 
-      webSearch: tool({
-        description:
-          "Search the live internet for real-time information. Use ONLY when internal tools and transcript context are insufficient — for example, current events, companies not in our database, or market trends. Internal evidence always takes priority over web results.",
-        inputSchema: z.object({
-          query: z
-            .string()
-            .describe("Specific search query with company names, countries, or sectors"),
-          topic: z
-            .enum(["general", "news"])
-            .describe("general for company/sector research, news for current events"),
-        }),
-        execute: async ({ query, topic }) => {
-          tavilyCallsCount++;
-          const results = await tavilySearch(query, topic);
-          return results.map((r) => ({
-            title: r.title,
-            url: r.url,
-            content: r.content,
-            score: r.score,
-          }));
-        },
-      }),
     },
     stopWhen: stepCountIs(5),
     async onFinish({ text }) {
       const citationsUsed = (text.match(/\[\d+\]/g) ?? []).length;
       console.log(
-        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} tavily=${tavilyCallsCount} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent} temporal=${temporalClassification.temporal_intent}`
+        `[chat-grounding] chunks=${ragChunks.length} internalTools=${usedInternalTools} citations=${citationsUsed} project=${projectId ?? "all"} interview=${effectiveInterviewId ?? "all"} scope=${scopeIntent} temporal=${temporalClassification.temporal_intent}`
       );
       const assistantMessageId = await persistAssistantTurn({
         admin,
@@ -670,4 +595,26 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Render entity_metadata_v1 as a compact pipe-delimited string for the
+ * LLM tool output. Returns null when no v1 metadata is present.
+ */
+function formatEntityMetadata(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata || metadata.schema_version !== "entity_metadata_v1") return null;
+  const parts: string[] = [];
+  if (Array.isArray(metadata.countries) && metadata.countries.length > 0) {
+    parts.push(`countries: ${(metadata.countries as string[]).join(", ")}`);
+  }
+  if (Array.isArray(metadata.sectors) && metadata.sectors.length > 0) {
+    parts.push(`sectors: ${(metadata.sectors as string[]).join(", ")}`);
+  }
+  if (Array.isArray(metadata.summary_tags) && metadata.summary_tags.length > 0) {
+    parts.push(`tags: ${(metadata.summary_tags as string[]).join(", ")}`);
+  }
+  if (typeof metadata.confidence === "string") {
+    parts.push(`confidence: ${metadata.confidence}`);
+  }
+  return parts.length > 0 ? parts.join(" | ") : null;
 }

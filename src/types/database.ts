@@ -544,6 +544,7 @@ export interface Database {
           title: string;
           description: string | null;
           audio_url: string | null;
+          audio_storage_path: string | null;
           audio_duration: number | null;
           status: InterviewStatus;
           error_message: string | null;
@@ -580,6 +581,7 @@ export interface Database {
           title: string;
           description?: string | null;
           audio_url?: string | null;
+          audio_storage_path?: string | null;
           audio_duration?: number | null;
           status?: InterviewStatus;
           error_message?: string | null;
@@ -616,6 +618,7 @@ export interface Database {
           title?: string;
           description?: string | null;
           audio_url?: string | null;
+          audio_storage_path?: string | null;
           audio_duration?: number | null;
           status?: InterviewStatus;
           error_message?: string | null;
@@ -789,6 +792,58 @@ export interface Database {
           },
         ];
       };
+      project_entities: {
+        Row: {
+          id: string;
+          project_id: string;
+          entity_id: string;
+          tenant_id: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          entity_id: string;
+          tenant_id: string;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          entity_id?: string;
+          tenant_id?: string;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_entities_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_entities_entity_id_fkey";
+            columns: ["entity_id"];
+            isOneToOne: false;
+            referencedRelation: "entities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_entities_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       source_entities: {
         Row: {
           id: string;
@@ -801,6 +856,8 @@ export interface Database {
           speaker_label: string | null;
           source_metadata: Record<string, unknown> | null;
           evidence: Record<string, unknown> | null;
+          /** LLM-generated 1–2 sentence source-scoped context (migration 00042). */
+          context: string | null;
           confidence: number | null;
           created_by: string | null;
           created_at: string;
@@ -817,6 +874,7 @@ export interface Database {
           speaker_label?: string | null;
           source_metadata?: Record<string, unknown> | null;
           evidence?: Record<string, unknown> | null;
+          context?: string | null;
           confidence?: number | null;
           created_by?: string | null;
           created_at?: string;
@@ -833,6 +891,7 @@ export interface Database {
           speaker_label?: string | null;
           source_metadata?: Record<string, unknown> | null;
           evidence?: Record<string, unknown> | null;
+          context?: string | null;
           confidence?: number | null;
           created_by?: string | null;
           created_at?: string;

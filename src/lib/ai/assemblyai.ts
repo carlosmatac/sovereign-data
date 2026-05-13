@@ -4,27 +4,14 @@
 
 const ASSEMBLYAI_BASE_URL = "https://api.assemblyai.com/v2";
 
-interface TranscriptionRequest {
-  audio_url: string;
-  speech_models: string[];
-  webhook_url: string;
-  webhook_auth_header_name?: string;
-  webhook_auth_header_value?: string;
-  speaker_labels: boolean;
-  speakers_expected?: number;
-  keyterms_prompt?: string[];
-  language_code?: string;
-  language_detection?: boolean;
-}
-
-interface TranscriptionResponse {
+export interface TranscriptionResponse {
   id: string;
   status: "queued" | "processing" | "completed" | "error";
   text?: string;
   utterances?: Array<{
     speaker: string;
     text: string;
-    start: number; // milliseconds
+    start: number;
     end: number;
     confidence: number;
     words: Array<{
@@ -38,6 +25,20 @@ interface TranscriptionResponse {
   error?: string;
   audio_duration?: number;
 }
+
+interface TranscriptionRequest {
+  audio_url: string;
+  speech_models: string[];
+  webhook_url: string;
+  webhook_auth_header_name?: string;
+  webhook_auth_header_value?: string;
+  speaker_labels: boolean;
+  speakers_expected?: number;
+  keyterms_prompt?: string[];
+  language_code?: string;
+  language_detection?: boolean;
+}
+
 
 /**
  * With `universal-2`, `keyterms_prompt` is only accepted for English locales.
@@ -128,10 +129,15 @@ export async function submitTranscription({
 }
 
 /**
- * Fetch a completed transcription result.
+ * Fetch a transcription result by ID.
+ *
+ * @param signal - Optional AbortSignal so callers can set a hard deadline.
+ *   The poll route passes a 30-second signal so a stalled network connection
+ *   fails fast instead of hanging until Node's body-timeout fires (~5 min).
  */
 export async function getTranscription(
-  transcriptId: string
+  transcriptId: string,
+  { signal }: { signal?: AbortSignal } = {}
 ): Promise<TranscriptionResponse> {
   const response = await fetch(
     `${ASSEMBLYAI_BASE_URL}/transcript/${transcriptId}`,
@@ -139,6 +145,7 @@ export async function getTranscription(
       headers: {
         Authorization: process.env.ASSEMBLYAI_API_KEY!,
       },
+      signal,
     }
   );
 

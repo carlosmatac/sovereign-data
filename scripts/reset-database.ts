@@ -2,11 +2,18 @@
  * Reset Database — Wipe all project data and storage.
  *
  * Preserves: schema, extensions, RLS policies, functions, auth users, profiles,
- *            and platform roles.
- * Deletes:   all projects, interviews, chunks, entities, aliases, positions,
- *            reports, snippets, chats, and storage files.
+ *            platform roles, and tenants.
+ * Deletes:   all projects, sources (was "interviews"), chunks, entities, aliases,
+ *            source_entities, project_entities, reports, snippets, chats, and
+ *            audio storage files.
  *
  * Usage:  npx tsx scripts/reset-database.ts
+ *
+ * Updated 2026-05-13:
+ *   - Renamed interviews → sources, interview_chunks → source_chunks
+ *   - Added source_entities (migration 00028)
+ *   - Added project_entities (migration 00043)
+ *   - Updated storage bucket to source-audio-private (+ legacy interview-audio)
  */
 
 import { config } from "dotenv";
@@ -30,56 +37,71 @@ type StorageEntry = {
   id?: string | null;
 };
 
-type DataTable = {
-  name: string;
-  nonNullColumn: string;
-};
-
-const DATA_TABLES: DataTable[] = [
-  { name: "chat_messages", nonNullColumn: "id" },
-  { name: "chat_conversation_seq", nonNullColumn: "conversation_id" },
-  { name: "chat_conversations", nonNullColumn: "id" },
-  { name: "reports", nonNullColumn: "id" },
-  { name: "content_snippets", nonNullColumn: "id" },
-  { name: "entity_relationships", nonNullColumn: "id" },
-  { name: "entity_mentions", nonNullColumn: "id" },
+/**
+ * Tables to wipe, in dependency order (most-dependent first so FK constraints
+ * are never violated when using row-level deletes as fallback).
+ */
+const DATA_TABLES: Array<{ name: string; nonNullColumn: string }> = [
+  // Chat layer
+  { name: "chat_messages",           nonNullColumn: "id" },
+  { name: "chat_conversation_seq",   nonNullColumn: "conversation_id" },
+  { name: "chat_conversations",      nonNullColumn: "id" },
+  // Reports
+  { name: "reports",                 nonNullColumn: "id" },
+  // Source-derived data
+  { name: "content_snippets",        nonNullColumn: "id" },
+  { name: "entity_relationships",    nonNullColumn: "id" },
+  { name: "entity_mentions",         nonNullColumn: "id" },
   { name: "interview_review_entities", nonNullColumn: "id" },
-  { name: "interview_chunks", nonNullColumn: "id" },
-  { name: "validated_positions", nonNullColumn: "id" },
-  { name: "entity_aliases", nonNullColumn: "id" },
-  { name: "interviews", nonNullColumn: "id" },
-  { name: "entities", nonNullColumn: "id" },
-  { name: "project_members", nonNullColumn: "id" },
-  { name: "projects", nonNullColumn: "id" },
+  { name: "source_entities",         nonNullColumn: "id" },   // added 00028
+  { name: "project_entities",        nonNullColumn: "id" },   // added 00043
+  { name: "source_chunks",           nonNullColumn: "id" },   // renamed from interview_chunks
+  // Entity graph
+  { name: "validated_positions",     nonNullColumn: "id" },
+  { name: "entity_aliases",          nonNullColumn: "id" },
+  // Top-level project data
+  { name: "sources",                 nonNullColumn: "id" },   // renamed from interviews
+  { name: "entities",                nonNullColumn: "id" },   // canonical_entity_id cleared first
+  { name: "project_members",         nonNullColumn: "id" },
+  { name: "projects",                nonNullColumn: "id" },
+];
+
+// Storage buckets to wipe
+const STORAGE_BUCKETS = [
+  "source-audio-private",  // current bucket (migration: be888f4)
+  "interview-audio",       // legacy bucket (pre-rename)
 ];
 
 function joinStoragePath(prefix: string, name: string) {
   return prefix ? `${prefix}/${name}` : name;
 }
 
-async function listStorageFiles(prefix = ""): Promise<string[]> {
+async function listStorageFiles(bucket: string, prefix = ""): Promise<string[]> {
   const limit = 1000;
   let offset = 0;
   const paths: string[] = [];
 
   while (true) {
     const { data, error } = await admin.storage
-      .from("interview-audio")
+      .from(bucket)
       .list(prefix, { limit, offset });
 
     if (error) {
-      throw new Error(`Could not list storage path "${prefix || "/"}": ${error.message}`);
+      // Bucket may not exist — treat as empty
+      if (error.message?.includes("not found") || error.message?.includes("does not exist")) {
+        return [];
+      }
+      throw new Error(`Could not list "${bucket}/${prefix || "/"}": ${error.message}`);
     }
 
     const entries = (data ?? []) as StorageEntry[];
 
     for (const entry of entries) {
       const path = joinStoragePath(prefix, entry.name);
-
       if (entry.id) {
         paths.push(path);
       } else {
-        paths.push(...(await listStorageFiles(path)));
+        paths.push(...(await listStorageFiles(bucket, path)));
       }
     }
 
@@ -90,70 +112,49 @@ async function listStorageFiles(prefix = ""): Promise<string[]> {
   return paths;
 }
 
-async function clearStorage() {
-  console.log("\n🗑️  Clearing storage bucket: interview-audio ...");
+async function clearStorageBucket(bucket: string) {
+  process.stdout.write(`  Clearing bucket "${bucket}" ... `);
 
-  const paths = await listStorageFiles();
+  let paths: string[];
+  try {
+    paths = await listStorageFiles(bucket);
+  } catch (err) {
+    console.log(`skipped (${(err as Error).message})`);
+    return;
+  }
 
   if (paths.length === 0) {
-    console.log("  ✓ Bucket already empty.");
+    console.log("already empty.");
     return;
   }
 
   for (let i = 0; i < paths.length; i += 100) {
     const batch = paths.slice(i, i + 100);
-    const { error } = await admin.storage.from("interview-audio").remove(batch);
-
+    const { error } = await admin.storage.from(bucket).remove(batch);
     if (error) {
-      throw new Error(`Could not remove storage files: ${error.message}`);
+      throw new Error(`Could not remove files from "${bucket}": ${error.message}`);
     }
   }
 
-  console.log(`  ✓ Removed ${paths.length} file(s).`);
+  console.log(`removed ${paths.length} file(s).`);
 }
 
-async function truncateTables() {
-  console.log("\n🧹 Truncating all data tables ...");
-
-  const { error } = await admin.rpc("exec_sql" as never, {
-    query: `
-      TRUNCATE TABLE
-        chat_messages,
-        chat_conversation_seq,
-        chat_conversations,
-        reports,
-        content_snippets,
-        entity_relationships,
-        entity_mentions,
-        interview_review_entities,
-        interview_chunks,
-        validated_positions,
-        entity_aliases,
-        interviews,
-        entities,
-        project_members,
-        projects
-      CASCADE;
-    `,
-  } as never);
-
-  if (error) {
-    // If the RPC doesn't exist, fall back to manual deletes in dependency order
-    console.log("  ℹ️  exec_sql RPC not available, using row-level deletes ...");
-    await deleteInOrder();
-  } else {
-    console.log("  ✓ All tables truncated.");
+async function clearStorage() {
+  console.log("\n🗑️  Clearing storage buckets ...");
+  for (const bucket of STORAGE_BUCKETS) {
+    await clearStorageBucket(bucket);
   }
 }
 
 async function deleteInOrder() {
-  const { error: canonicalResetError } = await admin
+  // Clear the self-referential FK on entities before deleting them.
+  const { error: canonicalErr } = await admin
     .from("entities")
     .update({ canonical_entity_id: null })
     .not("canonical_entity_id", "is", null);
 
-  if (canonicalResetError) {
-    throw new Error(`entities canonical reset failed: ${canonicalResetError.message}`);
+  if (canonicalErr) {
+    throw new Error(`entities canonical_entity_id reset failed: ${canonicalErr.message}`);
   }
 
   for (const table of DATA_TABLES) {
@@ -166,17 +167,61 @@ async function deleteInOrder() {
       throw new Error(`${table.name}: ${error.message}`);
     }
 
-    console.log(`  ✓ ${table.name} cleared${count === null ? "" : ` (${count} row(s))`}.`);
+    const suffix = count === null ? "" : ` (${count} row(s))`;
+    console.log(`  ✓ ${table.name}${suffix}`);
+  }
+}
+
+async function truncateTables() {
+  console.log("\n🧹 Wiping all data tables ...");
+
+  // Prefer TRUNCATE via exec_sql RPC for speed; fall back to per-row deletes
+  // if the RPC is not installed.
+  const { error } = await admin.rpc("exec_sql" as never, {
+    query: `
+      -- Clear self-referential FK first
+      UPDATE entities SET canonical_entity_id = NULL WHERE canonical_entity_id IS NOT NULL;
+
+      TRUNCATE TABLE
+        chat_messages,
+        chat_conversation_seq,
+        chat_conversations,
+        reports,
+        content_snippets,
+        entity_relationships,
+        entity_mentions,
+        interview_review_entities,
+        source_entities,
+        project_entities,
+        source_chunks,
+        validated_positions,
+        entity_aliases,
+        sources,
+        entities,
+        project_members,
+        projects
+      CASCADE;
+    `,
+  } as never);
+
+  if (error) {
+    console.log("  ℹ️  exec_sql RPC not available — using row-level deletes ...");
+    await deleteInOrder();
+  } else {
+    console.log("  ✓ All tables truncated.");
   }
 }
 
 async function main() {
-  console.log("═══════════════════════════════════════");
-  console.log("  SOVEREIGN DATA — DATABASE RESET");
-  console.log("═══════════════════════════════════════");
+  console.log("═══════════════════════════════════════════");
+  console.log("   SOVEREIGN DATA — DATABASE RESET");
+  console.log("═══════════════════════════════════════════");
   console.log(`\nTarget: ${supabaseUrl}`);
-  console.log("This will DELETE all product data, chats, graph data, reports, and audio files.");
-  console.log("Auth users, profiles, and platform roles will be preserved.\n");
+  console.log(
+    "This will DELETE all projects, sources, entities, graph data, reports,\n" +
+    "chats, and audio files.\n" +
+    "Auth users, profiles, platform roles, and tenants are preserved.\n"
+  );
 
   await truncateTables();
   await clearStorage();
@@ -185,6 +230,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  console.error("\nFatal error:", err);
   process.exit(1);
 });

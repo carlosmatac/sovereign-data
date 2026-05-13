@@ -9,7 +9,11 @@ const pdfParse = require("pdf-parse/lib/pdf-parse") as (
 ) => Promise<{ text: string; numpages: number }>;
 import { processDocument } from "@/lib/ai/document-pipeline";
 import { MAX_PDF_SIZE_BYTES, MIN_PDF_TEXT_LENGTH } from "@/lib/constants";
-import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
+import {
+  ensureUploadAnchorEntity,
+  parseAndResolveParticipants,
+} from "@/lib/entities/validate-interview-anchor";
+import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 // Force Node.js runtime — pdf-parse requires Node APIs (not Edge compatible)
@@ -84,6 +88,11 @@ export async function POST(request: NextRequest) {
   const rawIntervieweeEntityId = formData.get("interviewee_entity_id");
   const rawIntervieweeOrgEntityId = formData.get("interviewee_org_entity_id");
   const rawSemanticSourceType = formData.get("semantic_source_type");
+  const rawParticipantsJson = formData.get("participants");
+  let rawParticipants: unknown = undefined;
+  if (typeof rawParticipantsJson === "string" && rawParticipantsJson.trim()) {
+    try { rawParticipants = JSON.parse(rawParticipantsJson); } catch { /* ignore */ }
+  }
 
   // Validate required fields
   if (!pdfFile || !(pdfFile instanceof File)) {
@@ -232,6 +241,21 @@ export async function POST(request: NextRequest) {
       { error: "Failed to create interview" },
       { status: 500 }
     );
+  }
+
+  // Write additional participant source_entities (non-fatal)
+  try {
+    const resolvedParticipants = await parseAndResolveParticipants(
+      admin, rawParticipants, projectIdTrim, tenantId
+    );
+    await writeParticipantSourceEntities({
+      supabase: admin,
+      sourceId: interview.id,
+      tenantId,
+      participants: resolvedParticipants,
+    });
+  } catch (participantError) {
+    console.error("[participants] write failed (non-fatal):", participantError);
   }
 
   // 5. Fire-and-forget: run document intelligence pipeline

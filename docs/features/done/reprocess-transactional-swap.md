@@ -1,9 +1,9 @@
 ---
 title: "Phase 3b — Reprocess transactional swap"
-status: on-going
+status: done
 owner: agent
 priority: high
-last_updated: 2026-05-09
+last_updated: 2026-05-10
 migrations:
   - 00035_replace_source_derived_data.sql
   - 00036_refresh_backcompat_views.sql      (hotfix — stale views after 00033)

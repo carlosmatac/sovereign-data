@@ -13,6 +13,7 @@ import {
   BookOpen,
   MapPin,
   MessageSquare,
+  Network,
   Users,
   Calendar,
   Upload,
@@ -48,7 +49,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   if (!project) notFound();
 
-  const [interviewsRes, memberRes] = await Promise.all([
+  const [interviewsRes, memberRes, linkedEntitiesRes] = await Promise.all([
     admin
       .from("interviews")
       .select("id, title, status, audio_duration, created_at")
@@ -59,12 +60,17 @@ export default async function ProjectDetailPage({ params }: Props) {
       .select("id", { count: "exact", head: true })
       .eq("project_id", projectId)
       .not("user_id", "is", null),
+    admin
+      .from("project_entities")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId),
   ]);
 
   const interviews = interviewsRes.data ?? [];
   const interviewCount = interviews.length;
   const memberCount = memberRes.count ?? 0;
   const canEdit = role === "owner" || role === "editor";
+  const linkedEntityCount = linkedEntitiesRes.count ?? 0;
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-7">
@@ -244,6 +250,24 @@ export default async function ProjectDetailPage({ params }: Props) {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Linked Entities — count + network link */}
+            <Link href="/network">
+              <Card className="sv-hover-card">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Linked Entities
+                  </CardTitle>
+                  <Network className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{linkedEntityCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    View in Network Explorer
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
 
             {/* Quick Actions */}
             <Card className="sv-hover-card">

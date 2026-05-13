@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchPlatformRolesForUser,
   hasEntityGovernanceAccess,
@@ -18,6 +19,10 @@ import {
   EntityGovernanceLoadError,
   EntityGovernanceNotFound,
 } from "@/components/admin/entity-governance-detail-states";
+import type {
+  ProjectEntityLink,
+  AvailableProject,
+} from "@/components/admin/entity-project-links-panel";
 import { ArrowLeft } from "lucide-react";
 
 const UUID_RE =
@@ -98,16 +103,54 @@ export default async function AdminEntityDetailPage({
   }
 
   const isSuperuser = roles.includes("superuser");
-  const [result, relationships] = await Promise.all([
-    loadGovernedEntityDetail(id),
-    loadRelationshipsForEntity({
-      entityId: id,
-      page,
-      pageSize: GOVERNANCE_RELATIONSHIPS_PAGE_SIZE,
-      statusFilter,
-      directionFilter,
-    }),
-  ]);
+  const admin = createAdminClient();
+
+  const [result, relationships, projectLinksRes, memberProjectsRes] =
+    await Promise.all([
+      loadGovernedEntityDetail(id),
+      loadRelationshipsForEntity({
+        entityId: id,
+        page,
+        pageSize: GOVERNANCE_RELATIONSHIPS_PAGE_SIZE,
+        statusFilter,
+        directionFilter,
+      }),
+      // Direct project_entities rows for this entity
+      admin
+        .from("project_entities")
+        .select("id, project_id, note, created_at, projects(id, name)")
+        .eq("entity_id", id)
+        .order("created_at", { ascending: false }),
+      // Projects this user is a member of (to populate the "link to project" dropdown)
+      admin
+        .from("project_members")
+        .select("project_id, role, projects(id, name)")
+        .eq("user_id", user.id),
+    ]);
+
+  const projectLinks: ProjectEntityLink[] = (projectLinksRes.data ?? []).map(
+    (row) => {
+      const proj = row.projects as { id: string; name: string } | null;
+      return {
+        id: row.id,
+        project_id: row.project_id,
+        project_name: proj?.name ?? row.project_id,
+        note: row.note,
+        created_at: row.created_at,
+      };
+    }
+  );
+
+  const availableProjects: AvailableProject[] = (
+    memberProjectsRes.data ?? []
+  ).map((row) => {
+    const proj = row.projects as { id: string; name: string } | null;
+    return {
+      id: row.project_id,
+      name: proj?.name ?? row.project_id,
+      role: row.role as AvailableProject["role"],
+    };
+  });
 
   if (!result.ok) {
     if (result.reason === "not_found") {
@@ -198,6 +241,8 @@ export default async function AdminEntityDetailPage({
           statusFilter,
           directionFilter,
         }}
+        projectLinks={projectLinks}
+        availableProjects={availableProjects}
       />
     </div>
   );

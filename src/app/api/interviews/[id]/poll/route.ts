@@ -51,7 +51,18 @@ export async function GET(
     interview.assemblyai_id
   ) {
     try {
-      const transcription = await getTranscription(interview.assemblyai_id);
+      // 30-second hard deadline: stalled network connections fail fast instead
+      // of hanging until Node's default body-timeout fires (~5 minutes).
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+      let transcription;
+      try {
+        transcription = await getTranscription(interview.assemblyai_id, {
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (transcription.status === "completed") {
         // Atomically claim this transcription to prevent double-triggering.
@@ -66,10 +77,12 @@ export async function GET(
 
         if (claimed) {
           // We successfully claimed it — trigger the pipeline.
+          // Pass the already-fetched transcription so processTranscription
+          // doesn't download the (potentially large) body a second time.
           console.log(
             `[poll] AssemblyAI transcription completed for interview ${id}, triggering pipeline`
           );
-          processTranscription(interview.id, interview.assemblyai_id!).catch(
+          processTranscription(interview.id, interview.assemblyai_id!, transcription).catch(
             (err) => {
               console.error("[poll] Pipeline fire-and-forget error:", err);
             }

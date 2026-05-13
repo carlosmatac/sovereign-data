@@ -91,7 +91,7 @@
 
 8. **Interview deletion uses CASCADE** — Deleting from `interviews` removes all chunks, mentions, relationships, and snippets. Audio is deleted from Storage separately.
 
-9. **`stopWhen: stepCountIs(5)`** — AI SDK v6 replaced `maxSteps`. The `tool()` helper uses `inputSchema` (not `parameters`). Tavily is optional — if `TAVILY_API_KEY` is missing, tool returns graceful "unavailable" message.
+9. **`stopWhen: stepCountIs(5)`** — AI SDK v6 replaced `maxSteps`. The `tool()` helper uses `inputSchema` (not `parameters`).
 
 ---
 
@@ -126,7 +126,6 @@ ASSEMBLYAI_API_KEY=<set>
 OPENAI_API_KEY=<set>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 WEBHOOK_SECRET=<set>
-TAVILY_API_KEY=<set>  # Optional — web search disabled gracefully if missing
 ```
 
 ---

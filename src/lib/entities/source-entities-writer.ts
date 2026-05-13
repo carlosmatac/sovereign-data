@@ -103,6 +103,55 @@ export async function writeAnchorSourceEntities(args: {
   return rows.length;
 }
 
+// ── Participant anchor writer ─────────────────────────────────────────────
+
+/**
+ * Persist `upload_anchor` rows for additional participants tagged at upload
+ * time (the "Additional known entities" form section).
+ *
+ * Idempotent — upserts against (source_id, entity_id, link_type, origin).
+ * Safe to call on reprocess: `clear_source_derived_data` preserves
+ * `origin='upload_anchor'` rows, so participant tags survive reprocessing.
+ */
+export async function writeParticipantSourceEntities(args: {
+  supabase: SupabaseClient<Database>;
+  sourceId: string;
+  tenantId: string;
+  participants: Array<{
+    entityId: string;
+    linkType: SourceEntityLinkType;
+    context: string | null;
+  }>;
+}): Promise<void> {
+  const { supabase, sourceId, tenantId, participants } = args;
+  if (participants.length === 0) return;
+
+  const rows: SourceEntityInsert[] = participants.map((p) => ({
+    source_id: sourceId,
+    tenant_id: tenantId,
+    entity_id: p.entityId,
+    link_type: p.linkType,
+    origin: "upload_anchor" as SourceEntityOrigin,
+    is_primary: false,
+    confidence: null,
+    context: p.context ?? null,
+  }));
+
+  const { error } = await supabase
+    .from("source_entities")
+    .upsert(rows, {
+      onConflict: "source_id,entity_id,link_type,origin",
+      ignoreDuplicates: true,
+    });
+
+  if (error) {
+    console.error(
+      `[source-entities] participant write failed for source ${sourceId}:`,
+      error
+    );
+  }
+}
+
 // ── Extraction writer ──────────────────────────────────────────────────
 
 /** Shape emitted by extraction.ts after Zod inference. Kept narrow on purpose. */

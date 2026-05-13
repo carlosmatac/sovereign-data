@@ -6,7 +6,7 @@
 
 import { randomUUID } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTranscription } from "./assemblyai";
+import { getTranscription, type TranscriptionResponse } from "./assemblyai";
 import { extractIntelligence, type ExtractionResult } from "./extraction";
 import { chunkTranscript, chunkPlainText, type TranscriptUtterance } from "./chunking";
 import { chunkTextInterview, type TextStructureType } from "./chunking-text-interview";
@@ -33,6 +33,9 @@ import {
   writeAnchorSourceEntities,
   writeExtractionSourceEntities,
 } from "@/lib/entities/source-entities-writer";
+import { enrichNewEntityContexts } from "@/lib/entities/generate-entity-context";
+import { generateSourceEntityContexts } from "@/lib/entities/generate-source-entity-context";
+import { writeProjectEntityLinks } from "@/lib/entities/project-entity-links-writer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -725,6 +728,87 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     entityIdMap,
   });
 
+  // ── Source-entity context (why/how each entity relates to this source) ─────
+  // Runs after source_entities rows are written so it can read them.
+  // Single batched LLM call per source; errors are non-critical.
+  try {
+    await generateSourceEntityContexts({
+      supabase,
+      sourceId: interviewId,
+      sourceSummary: extraction.summary,
+      sourceTitle: interview.title,
+      intervieweeName: interview.interviewee_name ?? null,
+      intervieweeOrg: interview.interviewee_org ?? null,
+    });
+  } catch (srcCtxErr) {
+    console.error(`[pipeline] source-entity context generation failed (non-critical):`, srcCtxErr);
+  }
+
+  // ── Entity context enrichment (description + metadata_v1) ────────────────
+  // Best-effort: runs after all pipeline writes so chunks and mentions are
+  // available. Errors per entity are swallowed; a failure here never blocks
+  // the pipeline from completing.
+  //
+  // We build a *complete* entity set for this source:
+  //   1. LLM-resolved entities (extraction output)
+  //   2. Upload anchor entities (interviewee + org) — these are NOT in
+  //      resolvedEntities because they bypass LLM extraction
+  //   3. Additional participants written to source_entities (multi-participant
+  //      upload form entries with origin='upload_anchor')
+  //
+  // We also fetch source_entities.context for every entity in this source so
+  // that entities with few/no literal entity_mentions chunks (typical for
+  // upload anchors who are the primary subject, not third-party mentions) can
+  // still be enriched using that source-scoped context as fallback grounding.
+  try {
+    // Build unified, deduplicated entity ID set
+    const enrichEntityIds = new Set<string>(resolvedEntities.map((r) => r.entityId));
+    if (interview.interviewee_entity_id) enrichEntityIds.add(interview.interviewee_entity_id);
+    if (interview.interviewee_org_entity_id) enrichEntityIds.add(interview.interviewee_org_entity_id);
+
+    // Fetch source_entities for this source — catches additional participants
+    // and provides context hints to use as fallback when chunks are sparse
+    const { data: seContextRows } = await supabase
+      .from("source_entities")
+      .select("entity_id, context")
+      .eq("source_id", interviewId);
+
+    for (const row of seContextRows ?? []) {
+      if (row.entity_id) enrichEntityIds.add(row.entity_id);
+    }
+
+    const contextHints = new Map<string, string>(
+      (seContextRows ?? [])
+        .filter((r) => r.entity_id && r.context)
+        .map((r) => [r.entity_id!, r.context!])
+    );
+
+    console.log(
+      `[pipeline] enriching ${enrichEntityIds.size} entity(ies) ` +
+        `(${resolvedEntities.length} resolved + anchors/participants); ` +
+        `${contextHints.size} source context hint(s) available`
+    );
+
+    await enrichNewEntityContexts(supabase, [...enrichEntityIds], projectId, contextHints);
+  } catch (ctxErr) {
+    console.error(`[pipeline] entity context enrichment failed (non-critical):`, ctxErr);
+  }
+
+  // ── Project-entity direct links ───────────────────────────────────────────
+  // Upsert project_entities rows for upload anchors and high-confidence
+  // extracted entities. Uses source_entities.context (populated above) as
+  // the note. Idempotent — duplicates are silently ignored.
+  try {
+    await writeProjectEntityLinks({
+      supabase,
+      sourceId: interviewId,
+      projectId,
+      tenantId,
+    });
+  } catch (pelErr) {
+    console.error(`[pipeline] project-entity links write failed (non-critical):`, pelErr);
+  }
+
   const completedPatch: Record<string, unknown> = {
     last_intel_source: lastIntelSource,
     ...completedInterviewExtra,
@@ -775,12 +859,14 @@ export async function runIntelPipelineFromCanonicalSource(params: {
  */
 export async function processTranscription(
   interviewId: string,
-  assemblyaiId: string
+  assemblyaiId: string,
+  /** Pre-fetched transcription from the poll route — avoids a redundant download. */
+  prefetchedTranscription?: TranscriptionResponse
 ): Promise<void> {
   const supabase = createAdminClient();
 
   try {
-    const transcription = await getTranscription(assemblyaiId);
+    const transcription = prefetchedTranscription ?? await getTranscription(assemblyaiId);
 
     if (transcription.status === "error") {
       await updateInterviewStatus(interviewId, "FAILED", {

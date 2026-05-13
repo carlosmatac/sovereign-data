@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { submitTranscription } from "@/lib/ai/assemblyai";
-import { parseExpectedSpeakers } from "@/lib/constants";
-import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
+import {
+  parseExpectedSpeakers,
+  AUDIO_STORAGE_BUCKET,
+  AUDIO_ASSEMBLYAI_SIGNED_URL_TTL,
+} from "@/lib/constants";
+import {
+  ensureUploadAnchorEntity,
+  parseAndResolveParticipants,
+} from "@/lib/entities/validate-interview-anchor";
+import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 const MAX_ANCHOR_LENGTH = 120;
@@ -74,7 +82,24 @@ async function getKeytermsPrompt(
 
   const out: string[] = [];
   const seen = new Set<string>();
-  const MAX_KEYTERMS = 220;
+  // AssemblyAI universal-2 hard limit: 200 *words* across all terms (not 200 terms).
+  // Use 190 as the budget to leave a safe margin.
+  const MAX_WORDS = 190;
+  let wordCount = 0;
+
+  function countWords(term: string): number {
+    return term.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function tryAdd(term: string): boolean {
+    if (!term || seen.has(term)) return true; // skip, continue
+    const w = countWords(term);
+    if (wordCount + w > MAX_WORDS) return false; // budget exhausted
+    seen.add(term);
+    out.push(term);
+    wordCount += w;
+    return true;
+  }
 
   const anchorCandidates = [
     ...(anchors.intervieweeName ? buildAnchorKeyterms(anchors.intervieweeName) : []),
@@ -82,24 +107,15 @@ async function getKeytermsPrompt(
   ];
 
   for (const term of anchorCandidates) {
-    if (!term || seen.has(term)) continue;
-    seen.add(term);
-    out.push(term);
-    if (out.length >= MAX_KEYTERMS) return out;
+    if (!tryAdd(term)) return out;
   }
 
   for (const alias of projectAliasesRes.data ?? []) {
-    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
-    seen.add(alias.alias_normalized);
-    out.push(alias.alias_normalized);
-    if (out.length >= MAX_KEYTERMS) return out;
+    if (!tryAdd(alias.alias_normalized)) return out;
   }
 
   for (const alias of globalAliasesRes.data ?? []) {
-    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
-    seen.add(alias.alias_normalized);
-    out.push(alias.alias_normalized);
-    if (out.length >= MAX_KEYTERMS) break;
+    if (!tryAdd(alias.alias_normalized)) break;
   }
 
   return out;
@@ -130,6 +146,7 @@ export async function POST(request: NextRequest) {
     description,
     project_id,
     audio_url,
+    audio_storage_path,
     language,
     expectedSpeakers: rawExpectedSpeakers,
     interviewee_name: rawIntervieweeName,
@@ -137,10 +154,12 @@ export async function POST(request: NextRequest) {
     interviewee_title: rawIntervieweeTitle,
     interviewee_entity_id: rawIntervieweeEntityId,
     interviewee_org_entity_id: rawIntervieweeOrgEntityId,
+    participants: rawParticipants,
   } = body as {
     title: string;
     project_id: string;
-    audio_url: string;
+    audio_url?: string;
+    audio_storage_path?: string;
     description?: string;
     language?: string;
     expectedSpeakers?: unknown;
@@ -149,12 +168,16 @@ export async function POST(request: NextRequest) {
     interviewee_title?: unknown;
     interviewee_entity_id?: unknown;
     interviewee_org_entity_id?: unknown;
+    participants?: unknown;
   };
 
-  // Validate required fields
-  if (!title || !project_id || !audio_url) {
+  // Validate required fields — accept either private path (new) or public URL (legacy)
+  if (!title || !project_id || (!audio_storage_path && !audio_url)) {
     return NextResponse.json(
-      { error: "Missing required fields: title, project_id, audio_url" },
+      {
+        error:
+          "Missing required fields: title, project_id, and either audio_storage_path or audio_url",
+      },
       { status: 400 }
     );
   }
@@ -239,7 +262,10 @@ export async function POST(request: NextRequest) {
       title,
       description: description ?? null,
       project_id,
-      audio_url,
+      // New uploads supply audio_storage_path (private bucket); legacy uploads
+      // supply audio_url (public bucket). Store whichever was provided.
+      audio_url: audio_storage_path ? null : (audio_url ?? null),
+      audio_storage_path: audio_storage_path ?? null,
       language: language ?? "en",
       status: "PROCESSING",
       created_by: user.id,
@@ -262,6 +288,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Write additional participant source_entities (non-fatal) ──────────
+  try {
+    const resolvedParticipants = await parseAndResolveParticipants(
+      admin, rawParticipants, project_id, tenantId
+    );
+    await writeParticipantSourceEntities({
+      supabase: admin,
+      sourceId: interview.id,
+      tenantId,
+      participants: resolvedParticipants,
+    });
+  } catch (participantError) {
+    console.error("[participants] write failed (non-fatal):", participantError);
+  }
+
   // ── Submit to AssemblyAI ───────────────────────────────────────
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
@@ -271,8 +312,31 @@ export async function POST(request: NextRequest) {
       intervieweeOrg,
     });
 
+    // Generate a short-lived signed URL for AssemblyAI when the file is in
+    // the private bucket. Legacy uploads still carry a plain public URL.
+    let audioUrlForAssemblyAI: string;
+    if (audio_storage_path) {
+      const { data: signedData, error: signedError } = await admin.storage
+        .from(AUDIO_STORAGE_BUCKET)
+        .createSignedUrl(audio_storage_path, AUDIO_ASSEMBLYAI_SIGNED_URL_TTL);
+      if (signedError || !signedData?.signedUrl) {
+        console.error("Failed to create signed URL for AssemblyAI:", signedError);
+        await admin
+          .from("sources")
+          .update({ status: "FAILED", error_message: "Failed to sign audio for transcription" })
+          .eq("id", interview.id);
+        return NextResponse.json(
+          { error: "Failed to prepare audio for transcription" },
+          { status: 500 }
+        );
+      }
+      audioUrlForAssemblyAI = signedData.signedUrl;
+    } else {
+      audioUrlForAssemblyAI = audio_url!;
+    }
+
     const { transcriptId } = await submitTranscription({
-      audioUrl: audio_url,
+      audioUrl: audioUrlForAssemblyAI,
       webhookUrl,
       webhookSecret: process.env.WEBHOOK_SECRET!,
       languageCode: language,

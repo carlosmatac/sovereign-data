@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserProjectRole } from "@/lib/auth/project-role";
+import {
+  AUDIO_STORAGE_BUCKET,
+  AUDIO_PLAYER_SIGNED_URL_TTL,
+} from "@/lib/constants";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -8,6 +13,7 @@ import {
   TranscriptReviewEditor,
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
+import { getSourceEntityItems } from "@/lib/entities/source-entity-aggregator";
 import {
   parseTextInterviewToUtterances,
   parseTranscriptFullToUtterances,
@@ -15,6 +21,7 @@ import {
 } from "@/lib/interviews/transcript-utterances-from-full";
 import type { TextStructureType } from "@/lib/ai/chunking-text-interview";
 import type {
+  InterviewStatus,
   ReviewedUtterance,
   SourceType,
   SourceUtterance,
@@ -82,7 +89,7 @@ export default async function InterviewTranscriptReviewPage({
   const { data: interview, error } = await supabase
     .from("interviews")
     .select(
-      "id, title, project_id, source_type, source_metadata, audio_url, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source"
+      "id, title, project_id, source_type, source_metadata, audio_url, audio_storage_path, transcript_full, speaker_map, audio_duration, source_utterances, reviewed_utterances, transcript_review_status, last_intel_source, status"
     )
     .eq("id", id)
     .single();
@@ -91,7 +98,21 @@ export default async function InterviewTranscriptReviewPage({
     notFound();
   }
 
+  // Resolve audio playback URL: private bucket → signed URL; legacy → public URL.
+  let audioPlaybackUrl: string | null = interview.audio_url ?? null;
+  if (interview.audio_storage_path) {
+    const admin = createAdminClient();
+    const { data: signedData } = await admin.storage
+      .from(AUDIO_STORAGE_BUCKET)
+      .createSignedUrl(interview.audio_storage_path, AUDIO_PLAYER_SIGNED_URL_TTL);
+    audioPlaybackUrl = signedData?.signedUrl ?? null;
+  }
+
   const userRole = await getUserProjectRole(interview.project_id);
+  // Non-members get 404 — same gate as the interview detail page.
+  if (userRole === null) {
+    notFound();
+  }
   const canEdit = userRole === "owner" || userRole === "editor";
 
   const sourceType = interview.source_type as SourceType;
@@ -151,6 +172,11 @@ export default async function InterviewTranscriptReviewPage({
     entity_id: r.entity_id,
   }));
 
+  // Fetch all entities related to this source (source_entities + entity_mentions,
+  // deduplicated and role-labelled). Admin client required — source_entities RLS.
+  const admin2 = createAdminClient();
+  const sourceEntities = await getSourceEntityItems(admin2, id);
+
   if (!canEdit) {
     return (
       <div className="p-6">
@@ -180,11 +206,13 @@ export default async function InterviewTranscriptReviewPage({
       speakerMap={effectiveSpeakerMap}
       initialUtterances={initialUtterances}
       reviewStatus={interview.transcript_review_status}
+      sourceStatus={interview.status as InterviewStatus}
       lastIntelSource={interview.last_intel_source}
       seeds={seeds}
+      sourceEntities={sourceEntities}
       parseWarning={parseWarning}
       sourceType={sourceType}
-      audioUrl={interview.audio_url}
+      audioUrl={audioPlaybackUrl}
     />
   );
 }

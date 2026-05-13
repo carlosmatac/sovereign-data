@@ -1,9 +1,9 @@
 ---
 id: chat-message-evidence
 title: "Phase 4a — Persisted chat message evidence"
-status: shipped
+status: done
 owner: carlos
-last_updated: 2026-05-09
+last_updated: 2026-05-10
 phase: 4a
 migrations:
   - supabase/migrations/00039_chat_message_evidence.sql

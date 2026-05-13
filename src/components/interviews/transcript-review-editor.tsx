@@ -13,17 +13,20 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   ArrowLeft,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Loader2,
   Pause,
   Play,
   Plus,
+  RefreshCcw,
   Save,
   Search,
   Trash2,
-  CheckCircle2,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +60,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -64,6 +73,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { SourceEntityList } from "@/components/interviews/source-entity-list";
+import type { SourceEntityItem } from "@/lib/entities/source-entity-aggregator";
 import {
   ENTITY_TYPE_VALUES,
   type EntityType,
@@ -75,7 +86,7 @@ import {
 import type { SpeakerMap } from "@/types/database";
 import {
   saveTranscriptReviewDraft,
-  markInterviewReviewReady,
+  saveAndReprocess,
   addReviewSeedFromEntity,
   createReviewSeedEntity,
   removeReviewSeedEntity,
@@ -263,8 +274,12 @@ type Props = {
   speakerMap: SpeakerMap;
   initialUtterances: ReviewedUtterance[];
   reviewStatus: TranscriptReviewStatus;
+  /** Current pipeline status of the source row — used to show a failure banner. */
+  sourceStatus: InterviewStatus;
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
+  /** Unified entity set for this source: source_entities + entity_mentions, deduplicated. */
+  sourceEntities: SourceEntityItem[];
   parseWarning?: string | null;
   sourceType: SourceType;
   audioUrl: string | null;
@@ -277,8 +292,10 @@ export function TranscriptReviewEditor({
   speakerMap,
   initialUtterances,
   reviewStatus,
+  sourceStatus: initialSourceStatus,
   lastIntelSource,
   seeds,
+  sourceEntities,
   parseWarning,
   sourceType,
   audioUrl,
@@ -295,7 +312,9 @@ export function TranscriptReviewEditor({
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<EntityType>("COMPANY");
-  const [reprocessStarting, setReprocessStarting] = useState(false);
+  const [lastClickedSaveType, setLastClickedSaveType] = useState<"draft" | "reprocess" | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<InterviewStatus>(initialSourceStatus);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const lastPipelineStatusRef = useRef<InterviewStatus | null>(null);
   const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
   const segmentEndRef = useRef<number>(0);
@@ -429,7 +448,22 @@ export function TranscriptReviewEditor({
 
   const reprocessing = reviewStatus === "reprocessing";
   const readyForReprocess = reviewStatus === "ready";
-  const reprocessBusy = reprocessStarting || reprocessing;
+
+  // Clear the "which button was last clicked" flag when the transition settles.
+  useEffect(() => {
+    if (!pending) setLastClickedSaveType(null);
+  }, [pending]);
+
+  // Warn before unloading the page while the pipeline is running (covers
+  // browser refresh / tab close / external navigation).
+  useEffect(() => {
+    if (!reprocessing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [reprocessing]);
 
   useEffect(() => {
     if (reprocessing) {
@@ -449,6 +483,8 @@ export function TranscriptReviewEditor({
     const applyPipelineStatus = (newStatus: InterviewStatus, err?: string | null) => {
       if (newStatus === lastPipelineStatusRef.current) return;
       lastPipelineStatusRef.current = newStatus;
+
+      setSourceStatus(newStatus);
 
       if (newStatus === "COMPLETED") {
         router.push(`/interviews/${interviewId}`);
@@ -503,49 +539,26 @@ export function TranscriptReviewEditor({
     };
   }, [reviewStatus, interviewId, router]);
 
-  useEffect(() => {
-    if (reviewStatus === "reprocessing") {
-      setReprocessStarting(false);
-    }
-  }, [reviewStatus]);
-
-  const onRunReprocess = async () => {
-    setReprocessStarting(true);
-    try {
-      const res = await fetch(`/api/interviews/${interviewId}/reprocess-review`, {
-        method: "POST",
-      });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        toast.error(json.error ?? "Could not start reprocessing");
-        setReprocessStarting(false);
-        return;
-      }
-      toast.success("Reprocessing started — pipeline runs in the background.");
-      router.refresh();
-    } catch {
-      toast.error("Could not start reprocessing");
-      setReprocessStarting(false);
-    }
-  };
-
-  const onSaveDraft = () => {
+  const onSaveAndReprocess = () => {
+    setLastClickedSaveType("reprocess");
     startTransition(async () => {
-      const r = await saveTranscriptReviewDraft(interviewId, utterances);
-      if ("error" in r && r.error) toast.error(r.error);
-      else {
-        toast.success("Draft saved");
+      const r = await saveAndReprocess(interviewId, utterances);
+      if ("error" in r && r.error) {
+        toast.error(r.error);
+      } else {
+        toast.success("Reprocessing started — knowledge pipeline is running.");
         router.refresh();
       }
     });
   };
 
-  const onMarkReady = () => {
+  const onSaveDraft = () => {
+    setLastClickedSaveType("draft");
     startTransition(async () => {
-      const r = await markInterviewReviewReady(interviewId);
+      const r = await saveTranscriptReviewDraft(interviewId, utterances);
       if ("error" in r && r.error) toast.error(r.error);
       else {
-        toast.success("Marked ready for reprocessing");
+        toast.success("Draft saved");
         router.refresh();
       }
     });
@@ -747,8 +760,126 @@ export function TranscriptReviewEditor({
 
   const emptyState = utterances.length === 0;
 
+  // Reused in both the sticky desktop sidebar and the mobile Sheet.
+  const entityPanelJSX = (
+    <div className="space-y-5">
+      {/* All entities related to this source (read-only) */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Source entities
+        </p>
+        <SourceEntityList items={sourceEntities} />
+      </div>
+
+      <div className="border-t" />
+
+      {/* Review seeds (human-confirmed entities for next pipeline run) */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Review seeds
+          </p>
+          <div className="flex gap-1">
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={reprocessing}
+                >
+                  <Search className="mr-1 h-3 w-3" />
+                  Link
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="end">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Search entities…"
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {searchLoading ? (
+                        <span className="flex items-center justify-center gap-2 py-4 text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Searching…
+                        </span>
+                      ) : searchQuery.trim().length < 2 ? (
+                        <span className="py-4 text-center text-sm text-muted-foreground">
+                          Type at least 2 characters
+                        </span>
+                      ) : (
+                        "No matches"
+                      )}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {searchResults.map((e) => (
+                        <CommandItem
+                          key={e.id}
+                          value={e.id}
+                          onSelect={() => onPickEntity(e.id)}
+                        >
+                          <span className="truncate font-medium">{e.name}</span>
+                          <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                            {e.type}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={reprocessing}
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Create
+            </Button>
+          </div>
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Strong inputs for the next reprocessing run.
+        </p>
+        {seeds.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No seed entities yet.</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {seeds.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{s.display_name}</div>
+                  <div className="text-xs text-muted-foreground">{s.entity_type}</div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  disabled={reprocessing}
+                  onClick={() => onRemoveSeed(s.id)}
+                  aria-label="Remove seed"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 px-6 py-8 lg:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 px-6 py-8 lg:px-8">
       {chunkAudioEnabled && audioUrl ? (
         <audio
           ref={sharedAudioRef}
@@ -800,14 +931,18 @@ export function TranscriptReviewEditor({
         </div>
       )}
 
-      <Card className="w-full min-w-0 shadow-sm">
-        <CardHeader className="space-y-1.5 pb-4">
-          <CardTitle className="text-xl">Reviewed utterances</CardTitle>
-          <CardDescription className="text-base leading-relaxed">
-            Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
-            unless you re-run from a future utterance editor.
-          </CardDescription>
-        </CardHeader>
+      {/* Two-column layout: transcript (left) + entity sidebar (right, xl+ only) */}
+      <div className="flex items-start gap-6">
+        {/* Main column: transcript content */}
+        <div className="min-w-0 flex-1">
+          <Card className="w-full min-w-0 shadow-sm">
+            <CardHeader className="space-y-1.5 pb-4">
+              <CardTitle className="text-xl">Reviewed utterances</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Correct ASR text per segment. Times are preserved for chunk alignment; edit text only
+                unless you re-run from a future utterance editor.
+              </CardDescription>
+            </CardHeader>
         <CardContent>
           {emptyState ? (
             <p className="text-base text-muted-foreground">
@@ -1074,140 +1209,75 @@ export function TranscriptReviewEditor({
               </div>
             </>
           )}
+          {sourceStatus === "FAILED" && !reprocessing && (
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Last reprocess failed. Correct any issues and click{" "}
+                <strong>Save &amp; Reprocess</strong> to retry.
+              </span>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap gap-2">
             <Button
+              onClick={onSaveAndReprocess}
+              disabled={pending || reprocessing || emptyState}
+            >
+              {pending && lastClickedSaveType === "reprocess" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="mr-2 h-4 w-4" />
+              )}
+              {pending && lastClickedSaveType === "reprocess"
+                ? "Saving & reprocessing…"
+                : "Save & Reprocess"}
+            </Button>
+            <Button
+              variant="secondary"
               onClick={onSaveDraft}
               disabled={pending || reprocessing || emptyState}
             >
-              {pending ? (
+              {pending && lastClickedSaveType === "draft" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              Save draft
+              {pending && lastClickedSaveType === "draft" ? "Saving…" : "Save draft"}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={onMarkReady}
-              disabled={pending || reprocessing || emptyState}
-            >
-              Mark ready for reprocess
-            </Button>
-            {(readyForReprocess || reprocessing) && (
-              <Button
-                variant="default"
-                onClick={() => void onRunReprocess()}
-                disabled={pending || emptyState || reprocessBusy}
-              >
-                {reprocessBusy ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {reprocessBusy ? "Reprocessing…" : "Run reprocessing"}
-              </Button>
-            )}
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </div>{/* end main column */}
 
-      <Card className="w-full min-w-0 shadow-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-xl">Human-confirmed entities</CardTitle>
-              <CardDescription className="text-base leading-relaxed">
-                Strong inputs for the next reprocessing run: mention recovery and relationships.
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={reprocessing}>
-                    <Search className="mr-2 h-4 w-4" />
-                    Link existing
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search entities…"
-                      value={searchQuery}
-                      onValueChange={setSearchQuery}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        {searchLoading ? (
-                          <span className="flex items-center justify-center gap-2 py-4 text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Searching…
-                          </span>
-                        ) : searchQuery.trim().length < 2 ? (
-                          <span className="py-4 text-center text-sm text-muted-foreground">
-                            Type at least 2 characters
-                          </span>
-                        ) : (
-                          "No matches"
-                        )}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {searchResults.map((e) => (
-                          <CommandItem
-                            key={e.id}
-                            value={e.id}
-                            onSelect={() => onPickEntity(e.id)}
-                          >
-                            <span className="truncate font-medium">{e.name}</span>
-                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                              {e.type}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <Button
-                variant="default"
-                size="sm"
-                disabled={reprocessing}
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Create &amp; add
-              </Button>
-            </div>
+        {/* Entity sidebar — visible on xl+ screens (≥1280 px) */}
+        <aside className="hidden xl:block xl:w-80 xl:shrink-0">
+          <div className="sticky top-6 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold">Entities</h2>
+            {entityPanelJSX}
           </div>
-        </CardHeader>
-        <CardContent>
-          {seeds.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No seed entities yet.</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {seeds.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{s.display_name}</div>
-                    <div className="text-xs text-muted-foreground">{s.entity_type}</div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    disabled={reprocessing}
-                    onClick={() => onRemoveSeed(s.id)}
-                    aria-label="Remove seed"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+        </aside>
+      </div>{/* end two-column flex */}
+
+      {/* Mobile: floating button opens entity Sheet on screens narrower than xl */}
+      <div className="fixed bottom-6 right-6 z-30 xl:hidden">
+        <Button size="sm" className="shadow-lg" onClick={() => setSidebarOpen(true)}>
+          <Users className="mr-2 h-4 w-4" />
+          Entities
+          {seeds.length + sourceEntities.length > 0 && (
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {seeds.length + sourceEntities.length}
+            </Badge>
           )}
-        </CardContent>
-      </Card>
+        </Button>
+      </div>
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="right" className="w-80 overflow-y-auto p-0">
+          <SheetHeader className="px-4 pb-2 pt-4">
+            <SheetTitle>Entities</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-6">{entityPanelJSX}</div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
