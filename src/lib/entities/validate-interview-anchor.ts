@@ -3,6 +3,7 @@ import {
   isOrgLikeEntityType,
   type Database,
   type EntityType,
+  type SourceEntityLinkType,
 } from "@/types/database";
 import { matchOrCreateEntity } from "@/lib/entities/match";
 
@@ -137,4 +138,160 @@ export async function ensureUploadAnchorEntity(
   }
 
   return { ok: true, entityId, name: data.name };
+}
+
+// ── Participant anchor helpers ────────────────────────────────────────────────
+
+/**
+ * Allowed `link_type` values that a user can assign to additional participants
+ * in the upload form. Other link types are pipeline-generated.
+ */
+export const PARTICIPANT_LINK_TYPES = new Set<SourceEntityLinkType>([
+  "participant",
+  "interviewer",
+  "author",
+  "primary_subject",
+]);
+
+/**
+ * Entity types available in the participant form row.
+ * Covers the most common person and org-like types; other types are
+ * pipeline-assigned and not expected from manual form input.
+ */
+export const PARTICIPANT_ENTITY_TYPES = new Set<EntityType>([
+  "PERSON",
+  "COMPANY",
+  "ORGANIZATION",
+  "GOVERNMENT",
+  "PUBLIC_INSTITUTION",
+]);
+
+/**
+ * Resolve one participant row (from the upload form's "Additional known
+ * entities" section) into a deterministic entity ID.
+ *
+ * Works identically to `ensureUploadAnchorEntity` but accepts any EntityType
+ * rather than the limited "person" | "organization" role.
+ */
+export async function ensureParticipantAnchorEntity(
+  admin: SupabaseClient<Database>,
+  params: {
+    entityId: string | null;
+    name: string | null;
+    entityType: EntityType;
+    projectId: string;
+    tenantId: string;
+  }
+): Promise<EnsureUploadAnchorResult> {
+  const trimmedName = params.name?.trim() || null;
+
+  if (params.entityId) {
+    const { data, error } = await admin
+      .from("entities")
+      .select("id, name, type, project_id, canonical_entity_id")
+      .eq("id", params.entityId)
+      .maybeSingle();
+
+    if (error || !data) return { ok: false, reason: "invalid_entity_id" };
+    if (data.canonical_entity_id != null) return { ok: false, reason: "invalid_entity_id" };
+    if (data.project_id != null && data.project_id !== params.projectId) {
+      return { ok: false, reason: "invalid_entity_id" };
+    }
+    return { ok: true, entityId: params.entityId, name: data.name };
+  }
+
+  if (!trimmedName) {
+    return { ok: true, entityId: null, name: null };
+  }
+
+  const { entityId } = await matchOrCreateEntity({
+    projectId: params.projectId,
+    tenantId: params.tenantId,
+    nameRaw: trimmedName,
+    type: params.entityType,
+    supabaseClient: admin,
+    mode: "create_or_match",
+  });
+
+  const { data } = await admin
+    .from("entities")
+    .select("name")
+    .eq("id", entityId)
+    .maybeSingle<{ name: string }>();
+
+  return { ok: true, entityId, name: data?.name ?? trimmedName };
+}
+
+// ── Shared participant resolution (used by all upload API routes) ─────────────
+
+/** Raw participant row as received from the upload form. */
+export type RawParticipant = {
+  name?: string | null;
+  entity_id?: string | null;
+  entity_type?: string | null;
+  link_type?: string | null;
+  title?: string | null;
+};
+
+/** Resolved participant row ready for `writeParticipantSourceEntities`. */
+export type ResolvedParticipant = {
+  entityId: string;
+  linkType: SourceEntityLinkType;
+  context: string | null;
+};
+
+/**
+ * Parse, validate, and resolve an array of raw participant rows from the
+ * upload form into `ResolvedParticipant[]`.
+ *
+ * - Skips rows that have neither a name nor an entity_id (empty rows).
+ * - Skips rows with an invalid / disallowed link_type or entity_type.
+ * - Logs and skips rows where entity resolution fails.
+ *
+ * Called from all three upload API routes after source creation.
+ */
+export async function parseAndResolveParticipants(
+  admin: SupabaseClient<Database>,
+  rawParticipants: unknown,
+  projectId: string,
+  tenantId: string
+): Promise<ResolvedParticipant[]> {
+  if (!Array.isArray(rawParticipants) || rawParticipants.length === 0) {
+    return [];
+  }
+
+  const resolved: ResolvedParticipant[] = [];
+
+  for (const raw of rawParticipants as RawParticipant[]) {
+    const name = raw.name?.trim() || null;
+    const entityId = raw.entity_id?.trim() || null;
+    if (!name && !entityId) continue; // empty row
+
+    const linkType = raw.link_type as SourceEntityLinkType | undefined;
+    if (!linkType || !PARTICIPANT_LINK_TYPES.has(linkType)) continue;
+
+    const entityType = raw.entity_type as EntityType | undefined;
+    if (!entityType || !PARTICIPANT_ENTITY_TYPES.has(entityType)) continue;
+
+    const result = await ensureParticipantAnchorEntity(admin, {
+      entityId,
+      name,
+      entityType,
+      projectId,
+      tenantId,
+    });
+
+    if (!result.ok || !result.entityId) {
+      console.warn("[participants] entity resolution failed, skipping:", { name, entityId });
+      continue;
+    }
+
+    resolved.push({
+      entityId: result.entityId,
+      linkType,
+      context: raw.title?.trim() || null,
+    });
+  }
+
+  return resolved;
 }

@@ -7,7 +7,11 @@ import {
   AUDIO_STORAGE_BUCKET,
   AUDIO_ASSEMBLYAI_SIGNED_URL_TTL,
 } from "@/lib/constants";
-import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
+import {
+  ensureUploadAnchorEntity,
+  parseAndResolveParticipants,
+} from "@/lib/entities/validate-interview-anchor";
+import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 const MAX_ANCHOR_LENGTH = 120;
@@ -150,6 +154,7 @@ export async function POST(request: NextRequest) {
     interviewee_title: rawIntervieweeTitle,
     interviewee_entity_id: rawIntervieweeEntityId,
     interviewee_org_entity_id: rawIntervieweeOrgEntityId,
+    participants: rawParticipants,
   } = body as {
     title: string;
     project_id: string;
@@ -163,6 +168,7 @@ export async function POST(request: NextRequest) {
     interviewee_title?: unknown;
     interviewee_entity_id?: unknown;
     interviewee_org_entity_id?: unknown;
+    participants?: unknown;
   };
 
   // Validate required fields — accept either private path (new) or public URL (legacy)
@@ -280,6 +286,21 @@ export async function POST(request: NextRequest) {
       { error: "Failed to create interview" },
       { status: 500 }
     );
+  }
+
+  // ── Write additional participant source_entities (non-fatal) ──────────
+  try {
+    const resolvedParticipants = await parseAndResolveParticipants(
+      admin, rawParticipants, project_id, tenantId
+    );
+    await writeParticipantSourceEntities({
+      supabase: admin,
+      sourceId: interview.id,
+      tenantId,
+      participants: resolvedParticipants,
+    });
+  } catch (participantError) {
+    console.error("[participants] write failed (non-fatal):", participantError);
   }
 
   // ── Submit to AssemblyAI ───────────────────────────────────────

@@ -34,6 +34,17 @@ type Props = {
   disabled?: boolean;
   placeholder?: string;
   "aria-label"?: string;
+  /**
+   * When set, overrides the `kind`-based type filter in the entity search URL.
+   * Pass the raw query-string fragment, e.g. `"type=PERSON"` or
+   * `"types=COMPANY,ORGANIZATION"`. Pass `""` to search across all types.
+   */
+  typeFilter?: string;
+  /**
+   * Label used in "no existing match" hint text when `typeFilter` is set.
+   * Defaults to the `kind` label when omitted.
+   */
+  entityLabel?: string;
 };
 
 /**
@@ -58,6 +69,8 @@ export function InterviewAnchorEntityInput({
   disabled,
   placeholder,
   "aria-label": ariaLabel,
+  typeFilter,
+  entityLabel,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<EntityResult[]>([]);
@@ -101,11 +114,14 @@ export function InterviewAnchorEntityInput({
       setLoading(true);
       try {
         const typeQuery =
-          kind === "person"
-            ? "type=PERSON"
-            : `types=${encodeURIComponent(ORG_ENTITY_TYPES_PARAM)}`;
+          typeFilter !== undefined
+            ? typeFilter
+            : kind === "person"
+              ? "type=PERSON"
+              : `types=${encodeURIComponent(ORG_ENTITY_TYPES_PARAM)}`;
+        const separator = typeQuery ? "&" : "";
         const res = await fetch(
-          `/api/projects/${encodeURIComponent(projectId)}/entities/search?q=${encodeURIComponent(value.trim())}&${typeQuery}`
+          `/api/projects/${encodeURIComponent(projectId)}/entities/search?q=${encodeURIComponent(value.trim())}${separator}${typeQuery}`
         );
         const json = (await res.json()) as {
           entities?: Array<{ id: string; name: string; scope?: "project" | "global" }>;
@@ -130,7 +146,7 @@ export function InterviewAnchorEntityInput({
     }, 300);
 
     return () => clearTimeout(handle);
-  }, [value, projectId, kind, canSearch, refetchNonce]);
+  }, [value, projectId, kind, typeFilter, canSearch, refetchNonce]);
 
   return (
     <div>
@@ -206,7 +222,7 @@ export function InterviewAnchorEntityInput({
                 aria-disabled={true}
               >
                 No existing match — submitting will create a new{" "}
-                {kind === "person" ? "person" : "organization"}{" "}
+                {entityLabel ?? (kind === "person" ? "person" : "organization")}{" "}
                 <span className="font-medium text-foreground">
                   &ldquo;{value}&rdquo;
                 </span>{" "}

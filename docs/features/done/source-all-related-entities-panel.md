@@ -1,6 +1,6 @@
 ---
 title: "Source entities panel — unified related-entity set on both detail and review pages"
-status: on-going
+status: done
 owner: team
 priority: medium
 last_updated: 2026-05-13

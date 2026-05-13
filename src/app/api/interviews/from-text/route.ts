@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureUploadAnchorEntity } from "@/lib/entities/validate-interview-anchor";
+import {
+  ensureUploadAnchorEntity,
+  parseAndResolveParticipants,
+} from "@/lib/entities/validate-interview-anchor";
+import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 import type { TextStructureType } from "@/lib/ai/chunking-text-interview";
 
@@ -86,6 +90,7 @@ export async function POST(request: NextRequest) {
     interviewee_title,
     interviewee_entity_id,
     interviewee_org_entity_id,
+    participants: rawParticipants,
   } = body as Record<string, unknown>;
 
   // 3. Validate required fields
@@ -214,6 +219,21 @@ export async function POST(request: NextRequest) {
       { error: "Failed to create interview" },
       { status: 500 }
     );
+  }
+
+  // Write additional participant source_entities (non-fatal)
+  try {
+    const resolvedParticipants = await parseAndResolveParticipants(
+      admin, rawParticipants, projectIdTrim, tenantId
+    );
+    await writeParticipantSourceEntities({
+      supabase: admin,
+      sourceId: interview.id,
+      tenantId,
+      participants: resolvedParticipants,
+    });
+  } catch (participantError) {
+    console.error("[participants] write failed (non-fatal):", participantError);
   }
 
   // 9. Fire-and-forget: run text intelligence pipeline
