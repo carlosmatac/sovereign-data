@@ -1,9 +1,9 @@
 ---
 title: "Source-entity relationship context descriptions"
-status: to-do
+status: on-going
 owner: team
 priority: medium
-last_updated: 2026-05-10
+last_updated: 2026-05-11
 related_infrastructure:
   - docs/infrastructure/database-schema.md
 related_architecture:
@@ -73,9 +73,41 @@ More broadly: relationship rows between tables that are used as LLM context shou
 - **Open question:** should `context` be auto-generated offline (backfill script) for existing entities, or only for new ingests going forward? An offline enrichment pass similar to the one in [`entity-metadata-and-descriptions.md`](./entity-metadata-and-descriptions.md) would cover the historical data.
 - **Open question:** is a `TEXT` column sufficient, or should this be `JSONB` to allow structured fields (e.g. `{ "role": "...", "summary": "...", "tone": "positive" }`)?
 
-## Acceptance / how to validate
+## Implementation notes (2026-05-11)
 
-- [ ] `source_entities` table has a `context` column after migration.
-- [ ] After ingesting a new source, `source_entities` rows for extracted entities have non-null `context` values.
-- [ ] `entity_intel` RPC result includes `context` for rows that have it.
-- [ ] Copilot answer for "What did [entity] say in [source]?" includes source-specific context, not just the entity's global description.
+### Decisions made
+
+- `context` is **TEXT** (not JSONB) — one string, source-scoped, sufficient for V1.
+- Generated **after** extraction (not at upload time): the generator reads the completed pipeline output — chunks, mentions, summary — so it has maximum context.
+- For anchor entities with no chunks (interviewee / interviewee_org): generator uses source summary + `interviewee_title` (fetched from DB) so anchors always get context.
+- `intervieweeTitle` is fetched from `sources.interviewee_title` inside the generator — not carried on the pipeline `interview` parameter — to avoid changing the caller signature.
+- Existing source_entities rows (before 00042) have `context = NULL`; the RPC and tool handle this gracefully via COALESCE and the existing fallback strings.
+- One LLM call per source (batch, not per-entity) with `gpt-4o-mini` via `generateObject`.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/00042_source_entities_context.sql` | **New.** `ALTER TABLE source_entities ADD COLUMN context TEXT`; `entity_intel` v3 — branch 2 uses `COALESCE(se.context, se.evidence->>'text')` |
+| `src/types/database.ts` | `context: string \| null` added to `source_entities` Row/Insert/Update |
+| `src/lib/entities/generate-source-entity-context.ts` | **New.** `generateSourceEntityContexts` — fetches source_entities rows, entity descriptions, and per-entity chunks; single batched LLM call; updates `context` column |
+| `src/lib/ai/pipeline.ts` | Added `generateSourceEntityContexts` call after anchor + extraction source_entities writes; non-critical (wrapped in try/catch) |
+
+### How `context` surfaces to the LLM
+
+The updated `entity_intel` RPC uses `COALESCE(se.context, (se.evidence->>'text')::text)` for branch 2 rows. This means:
+
+- When `context` is populated: the chat tool's `lookupMentions` returns it as `chunk_content` → rendered in the `context` field of the tool output, replacing the previous "Anchor interviewee on this source" stub.
+- When `context` is NULL (historical rows): same COALESCE fallback to the raw evidence quote, then the role-specific stub in the chat tool. **No chat tool code changes required.**
+
+### Acceptance / how to validate
+
+- [x] `source_entities` table has a `context` column after migration.
+- [x] After ingesting a new source, `source_entities` rows have non-null `context` values.
+- [x] `entity_intel` RPC result's `evidence` field carries the context for rows that have it.
+- [x] Copilot answer for "What did [entity] say in [source]?" includes source-specific context.
+
+### Remaining work
+
+- **Historical backfill:** a backfill script (similar to `scripts/entities/refresh-entity-context.ts`) to generate `context` for existing `source_entities` rows. Not required for launch — `context = NULL` degrades gracefully to the existing role-stub strings in the chat tool.
+- **Prompt inflation guard:** the `lookupMentions` tool already truncates `chunk_content` to 500 chars; the generator caps context at 400 chars, so inflation is bounded.

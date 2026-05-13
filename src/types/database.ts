@@ -804,6 +804,8 @@ export interface Database {
           speaker_label: string | null;
           source_metadata: Record<string, unknown> | null;
           evidence: Record<string, unknown> | null;
+          /** LLM-generated 1–2 sentence source-scoped context (migration 00042). */
+          context: string | null;
           confidence: number | null;
           created_by: string | null;
           created_at: string;
@@ -820,6 +822,7 @@ export interface Database {
           speaker_label?: string | null;
           source_metadata?: Record<string, unknown> | null;
           evidence?: Record<string, unknown> | null;
+          context?: string | null;
           confidence?: number | null;
           created_by?: string | null;
           created_at?: string;
@@ -836,6 +839,7 @@ export interface Database {
           speaker_label?: string | null;
           source_metadata?: Record<string, unknown> | null;
           evidence?: Record<string, unknown> | null;
+          context?: string | null;
           confidence?: number | null;
           created_by?: string | null;
           created_at?: string;

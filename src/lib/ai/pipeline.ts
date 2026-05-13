@@ -34,6 +34,7 @@ import {
   writeExtractionSourceEntities,
 } from "@/lib/entities/source-entities-writer";
 import { enrichNewEntityContexts } from "@/lib/entities/generate-entity-context";
+import { generateSourceEntityContexts } from "@/lib/entities/generate-source-entity-context";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatUtterancesToTranscriptFull } from "@/lib/interviews/transcript-utterances-from-full";
@@ -725,6 +726,22 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     associations: extraction.source_associations ?? [],
     entityIdMap,
   });
+
+  // ── Source-entity context (why/how each entity relates to this source) ─────
+  // Runs after source_entities rows are written so it can read them.
+  // Single batched LLM call per source; errors are non-critical.
+  try {
+    await generateSourceEntityContexts({
+      supabase,
+      sourceId: interviewId,
+      sourceSummary: extraction.summary,
+      sourceTitle: interview.title,
+      intervieweeName: interview.interviewee_name ?? null,
+      intervieweeOrg: interview.interviewee_org ?? null,
+    });
+  } catch (srcCtxErr) {
+    console.error(`[pipeline] source-entity context generation failed (non-critical):`, srcCtxErr);
+  }
 
   // ── Entity context enrichment (description + metadata_v1) ────────────────
   // Best-effort: runs after all pipeline writes so chunks and mentions are
