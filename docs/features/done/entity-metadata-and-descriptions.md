@@ -1,9 +1,9 @@
 ---
 title: "Entity metadata and richer descriptions for retrieval"
-status: on-going
+status: done
 owner: team
 priority: medium
-last_updated: 2026-05-11
+last_updated: 2026-05-13
 related_architecture:
   - docs/audits/database-retrieval-architecture-audit.md
   - docs/architecture/ingestion-pipeline.md

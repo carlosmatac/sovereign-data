@@ -78,7 +78,24 @@ async function getKeytermsPrompt(
 
   const out: string[] = [];
   const seen = new Set<string>();
-  const MAX_KEYTERMS = 220;
+  // AssemblyAI universal-2 hard limit: 200 *words* across all terms (not 200 terms).
+  // Use 190 as the budget to leave a safe margin.
+  const MAX_WORDS = 190;
+  let wordCount = 0;
+
+  function countWords(term: string): number {
+    return term.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function tryAdd(term: string): boolean {
+    if (!term || seen.has(term)) return true; // skip, continue
+    const w = countWords(term);
+    if (wordCount + w > MAX_WORDS) return false; // budget exhausted
+    seen.add(term);
+    out.push(term);
+    wordCount += w;
+    return true;
+  }
 
   const anchorCandidates = [
     ...(anchors.intervieweeName ? buildAnchorKeyterms(anchors.intervieweeName) : []),
@@ -86,24 +103,15 @@ async function getKeytermsPrompt(
   ];
 
   for (const term of anchorCandidates) {
-    if (!term || seen.has(term)) continue;
-    seen.add(term);
-    out.push(term);
-    if (out.length >= MAX_KEYTERMS) return out;
+    if (!tryAdd(term)) return out;
   }
 
   for (const alias of projectAliasesRes.data ?? []) {
-    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
-    seen.add(alias.alias_normalized);
-    out.push(alias.alias_normalized);
-    if (out.length >= MAX_KEYTERMS) return out;
+    if (!tryAdd(alias.alias_normalized)) return out;
   }
 
   for (const alias of globalAliasesRes.data ?? []) {
-    if (!alias.alias_normalized || seen.has(alias.alias_normalized)) continue;
-    seen.add(alias.alias_normalized);
-    out.push(alias.alias_normalized);
-    if (out.length >= MAX_KEYTERMS) break;
+    if (!tryAdd(alias.alias_normalized)) break;
   }
 
   return out;

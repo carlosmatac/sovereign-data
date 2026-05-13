@@ -1,9 +1,9 @@
 ---
 title: "Source-entity relationship context descriptions"
-status: on-going
+status: done
 owner: team
 priority: medium
-last_updated: 2026-05-11
+last_updated: 2026-05-13
 related_infrastructure:
   - docs/infrastructure/database-schema.md
 related_architecture:
@@ -11,7 +11,7 @@ related_architecture:
 related_features:
   - docs/features/done/source-entities-table-and-backfill.md
   - docs/features/done/source-entities-pipeline-writes.md
-  - docs/features/to-do/entity-metadata-and-descriptions.md
+  - docs/features/done/entity-metadata-and-descriptions.md
 ---
 
 # Source-entity relationship context descriptions
