@@ -27,3 +27,4 @@ You may even find ideas in different languages
 - Al hilo del punto anterior, necesitamos un sistema mas robusto por que podemos subir un source, que falle a mitad de camino y algunas cosas se hayan almacenado en la base de datos (e.g. relationships o entities ) y falten algunas. Tenemos que decidir como manejar estas situaciones, no guardamos nada, reintentamos ..etc. 
  
 - Creo que ahora es redundante la entidad del proyecto. He visto en el Network Explorer dos veces Angola.  
+- Quiero crear un dibujo en varias fases para dar la sensacion de cargando.. cuando preguntas al chat.

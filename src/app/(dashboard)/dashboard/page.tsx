@@ -80,13 +80,14 @@ export default async function DashboardPage() {
         // Entities — tenant-scoped via RLS (entities are a shared knowledge
         // graph within a tenant; no project_id column exists on this table).
         supabase.from("entities").select("id", { count: "exact", head: true }),
-        // Recent sources — scoped to user's projects
+        // Recent sources — capped at 6 for dashboard stability.
+        // The "View all knowledge" link lets users reach the full list.
         admin
           .from("interviews")
-          .select("id, title, status, created_at, projects(name, country)")
+          .select("id, title, status, source_type, created_at, projects(name, country)")
           .in("project_id", projectIds)
           .order("created_at", { ascending: false })
-          .limit(12),
+          .limit(6),
         // Active relationship count — tenant-scoped via RLS (entity_relationships
         // has no project_id column; scoping via interview_id join would require
         // a separate round-trip and is deferred to a future query optimisation).
@@ -302,7 +303,12 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              /* max-h caps the list at 6 rows (~52px each) so it never
+                 pushes the charts or right rail off-screen regardless of
+                 how many sources are loaded. overflow-y-auto adds a
+                 scrollbar only if items exceed the cap (shouldn't happen
+                 at limit=6, but keeps the layout safe if the limit grows). */
+              <div className="flex max-h-[336px] flex-col gap-1 overflow-y-auto">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -320,6 +326,7 @@ export default async function DashboardPage() {
                       title={interview.title}
                       project={project?.name ?? null}
                       country={project?.country ?? null}
+                      sourceType={interview.source_type ?? null}
                       createdAt={interview.created_at}
                       status={interview.status as InterviewStatus}
                       statusLabel={statusInfo.label}
@@ -626,11 +633,19 @@ function StatusRow({
  *   - Title 12.5px / 600 / white-92, caption 10.5px / white-50 with a
  *     subdued separator dot at white/22, status pill on the right.
  */
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  audio: "Audio",
+  document: "PDF",
+  video: "Video",
+  text: "Text",
+};
+
 function InterviewListRow({
   id,
   title,
   project,
   country,
+  sourceType,
   createdAt,
   status,
   statusLabel,
@@ -639,6 +654,7 @@ function InterviewListRow({
   title: string;
   project: string | null;
   country: string | null;
+  sourceType: string | null;
   createdAt: string;
   status: InterviewStatus;
   statusLabel: string;
@@ -648,6 +664,15 @@ function InterviewListRow({
     month: "short",
     year: "numeric",
   });
+
+  const typeLabel = sourceType ? (SOURCE_TYPE_LABELS[sourceType] ?? null) : null;
+
+  // Build subtitle tokens: [project/country, type, date]
+  const tokens: string[] = [];
+  if (project) tokens.push(project);
+  else if (country) tokens.push(country);
+  if (typeLabel) tokens.push(typeLabel);
+  tokens.push(formattedDate);
 
   return (
     <Link
@@ -663,20 +688,17 @@ function InterviewListRow({
         <p className="truncate text-[12.5px] font-semibold leading-tight text-white/92">
           {title}
         </p>
-        <p className="mt-[4px] flex flex-wrap items-center gap-x-1.5 truncate text-[10.5px] leading-snug text-white/50">
-          {project && <span className="truncate">{project}</span>}
-          {project && country && (
-            <span aria-hidden className="text-white/22">
-              ·
+        <p className="mt-[4px] flex items-center gap-x-1.5 text-[10.5px] leading-snug text-white/50">
+          {tokens.map((token, i) => (
+            <span key={i} className="flex items-center gap-x-1.5">
+              {i > 0 && (
+                <span aria-hidden className="text-white/22">·</span>
+              )}
+              <span className={i === tokens.length - 1 ? "tabular-nums text-white/38" : "truncate"}>
+                {token}
+              </span>
             </span>
-          )}
-          {country && <span className="truncate">{country}</span>}
-          {(project || country) && (
-            <span aria-hidden className="text-white/22">
-              ·
-            </span>
-          )}
-          <span className="tabular-nums text-white/38">{formattedDate}</span>
+          ))}
         </p>
       </div>
       <div className="shrink-0">
