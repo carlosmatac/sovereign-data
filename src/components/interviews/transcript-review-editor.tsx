@@ -73,6 +73,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { SourceEntityList } from "@/components/interviews/source-entity-list";
+import type { SourceEntityItem } from "@/lib/entities/source-entity-aggregator";
 import {
   ENTITY_TYPE_VALUES,
   type EntityType,
@@ -265,13 +267,6 @@ export type ReviewSeedRow = {
   entity_id: string | null;
 };
 
-/** An entity already linked to the source by the pipeline (from source_entities). */
-export type ExtractedEntity = {
-  entity_id: string;
-  link_type: string | null;
-  entity: { id: string; name: string; type: string };
-};
-
 type Props = {
   interviewId: string;
   projectId: string;
@@ -283,8 +278,8 @@ type Props = {
   sourceStatus: InterviewStatus;
   lastIntelSource: string | null;
   seeds: ReviewSeedRow[];
-  /** Entities already extracted from this source by the pipeline (read-only display). */
-  extractedEntities: ExtractedEntity[];
+  /** Unified entity set for this source: source_entities + entity_mentions, deduplicated. */
+  sourceEntities: SourceEntityItem[];
   parseWarning?: string | null;
   sourceType: SourceType;
   audioUrl: string | null;
@@ -300,7 +295,7 @@ export function TranscriptReviewEditor({
   sourceStatus: initialSourceStatus,
   lastIntelSource,
   seeds,
-  extractedEntities,
+  sourceEntities,
   parseWarning,
   sourceType,
   audioUrl,
@@ -768,34 +763,12 @@ export function TranscriptReviewEditor({
   // Reused in both the sticky desktop sidebar and the mobile Sheet.
   const entityPanelJSX = (
     <div className="space-y-5">
-      {/* Already extracted by pipeline (read-only) */}
+      {/* All entities related to this source (read-only) */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Extracted by pipeline
+          Source entities
         </p>
-        {extractedEntities.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No entities extracted yet.</p>
-        ) : (
-          <ul className="divide-y rounded-md border">
-            {extractedEntities.map((ent) => (
-              <li key={ent.entity_id} className="flex items-start gap-2 px-3 py-2 text-sm">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium leading-snug">{ent.entity.name}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                    <Badge variant="secondary" className="px-1 py-0 text-[11px]">
-                      {ent.entity.type}
-                    </Badge>
-                    {ent.link_type && (
-                      <span className="text-[11px] capitalize text-muted-foreground">
-                        {ent.link_type.toLowerCase().replace(/_/g, " ")}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <SourceEntityList items={sourceEntities} />
       </div>
 
       <div className="border-t" />
@@ -1290,9 +1263,9 @@ export function TranscriptReviewEditor({
         <Button size="sm" className="shadow-lg" onClick={() => setSidebarOpen(true)}>
           <Users className="mr-2 h-4 w-4" />
           Entities
-          {seeds.length + extractedEntities.length > 0 && (
+          {seeds.length + sourceEntities.length > 0 && (
             <Badge variant="secondary" className="ml-2 text-xs">
-              {seeds.length + extractedEntities.length}
+              {seeds.length + sourceEntities.length}
             </Badge>
           )}
         </Button>

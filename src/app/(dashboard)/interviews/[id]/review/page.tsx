@@ -11,9 +11,9 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TranscriptReviewEditor,
-  type ExtractedEntity,
   type ReviewSeedRow,
 } from "@/components/interviews/transcript-review-editor";
+import { getSourceEntityItems } from "@/lib/entities/source-entity-aggregator";
 import {
   parseTextInterviewToUtterances,
   parseTranscriptFullToUtterances,
@@ -172,30 +172,10 @@ export default async function InterviewTranscriptReviewPage({
     entity_id: r.entity_id,
   }));
 
-  // Fetch entities already extracted from this source by the pipeline.
-  // Uses admin client (RLS on source_entities requires service role for this query path).
-  // Deduplicate by entity_id — keep first occurrence per entity.
+  // Fetch all entities related to this source (source_entities + entity_mentions,
+  // deduplicated and role-labelled). Admin client required — source_entities RLS.
   const admin2 = createAdminClient();
-  const { data: rawSourceEntities } = await admin2
-    .from("source_entities")
-    .select("entity_id, link_type, entities(id, name, type)")
-    .eq("source_id", id)
-    .order("created_at", { ascending: true });
-
-  const seenEntityIds = new Set<string>();
-  const extractedEntities: ExtractedEntity[] = [];
-  for (const row of rawSourceEntities ?? []) {
-    if (seenEntityIds.has(row.entity_id)) continue;
-    seenEntityIds.add(row.entity_id);
-    const entityData = Array.isArray(row.entities) ? row.entities[0] : row.entities;
-    if (!entityData || typeof (entityData as { name?: string }).name !== "string") continue;
-    const ed = entityData as { id: string; name: string; type: string };
-    extractedEntities.push({
-      entity_id: row.entity_id,
-      link_type: (row.link_type as string | null) ?? null,
-      entity: { id: ed.id, name: ed.name, type: ed.type },
-    });
-  }
+  const sourceEntities = await getSourceEntityItems(admin2, id);
 
   if (!canEdit) {
     return (
@@ -229,7 +209,7 @@ export default async function InterviewTranscriptReviewPage({
       sourceStatus={interview.status as InterviewStatus}
       lastIntelSource={interview.last_intel_source}
       seeds={seeds}
-      extractedEntities={extractedEntities}
+      sourceEntities={sourceEntities}
       parseWarning={parseWarning}
       sourceType={sourceType}
       audioUrl={audioPlaybackUrl}

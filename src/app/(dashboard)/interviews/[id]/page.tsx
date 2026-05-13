@@ -35,7 +35,8 @@ import { InterviewStatusTracker } from "@/components/interviews/status-tracker";
 import { TranscriptViewer } from "@/components/interviews/transcript-viewer";
 import { CopyButton } from "@/components/interviews/copy-button";
 import { DeleteInterviewButton } from "@/components/interviews/delete-interview-button";
-import { EntityMentionsList } from "@/components/interviews/entity-mentions-list";
+import { SourceEntityList } from "@/components/interviews/source-entity-list";
+import { getSourceEntityItems } from "@/lib/entities/source-entity-aggregator";
 import { AudioPlayer } from "@/components/interviews/audio-player";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { resolveTranscriptTextForInterviewViewer } from "@/lib/interviews/transcript-utterances-from-full";
@@ -72,10 +73,12 @@ export default async function InterviewDetailPage({
     notFound();
   }
 
+  // Admin client: used for signed audio URLs and source-entity aggregation.
+  const admin = createAdminClient();
+
   // Resolve audio playback URL: private bucket → signed URL; legacy → public URL.
   let audioPlaybackUrl: string | null = interview.audio_url ?? null;
   if (interview.audio_storage_path) {
-    const admin = createAdminClient();
     const { data: signedData } = await admin.storage
       .from(AUDIO_STORAGE_BUCKET)
       .createSignedUrl(interview.audio_storage_path, AUDIO_PLAYER_SIGNED_URL_TTL);
@@ -100,11 +103,9 @@ export default async function InterviewDetailPage({
     interviewee_org: interview.interviewee_org,
   });
 
-  // Fetch entities for this interview
-  const { data: mentions } = await supabase
-    .from("entity_mentions")
-    .select("*, entities(*)")
-    .eq("interview_id", id);
+  // Fetch all entities related to this source (source_entities + entity_mentions,
+  // deduplicated and role-labelled). Uses admin client — source_entities RLS.
+  const sourceEntities = await getSourceEntityItems(admin, id);
 
   // Fetch entity relationships for this interview (incl. editorial state).
   const { data: relationships } = await supabase
@@ -136,45 +137,10 @@ export default async function InterviewDetailPage({
         .order("platform")
     : { data: null };
 
-  const allMentions =
-    mentions
-      ?.map((m) => {
-        const entity = m.entities as unknown as {
-          id: string;
-          name: string;
-          type: string;
-          description: string | null;
-        } | null;
-
-        if (!entity) return null;
-
-        return {
-          mentionId: m.id,
-          entityId: m.entity_id,
-          name: entity.name,
-          type: entity.type,
-          description: entity.description,
-          sentiment: m.sentiment,
-        };
-      })
-      .filter((v): v is NonNullable<typeof v> => v !== null) ?? [];
-
-  // Deduplicate: show unique entities (not repeated mention rows)
-  const entityMentions = Array.from(
-    allMentions
-      .reduce((map, m) => {
-        if (!map.has(m.entityId)) map.set(m.entityId, m);
-        return map;
-      }, new Map<string, (typeof allMentions)[number]>())
-      .values()
-  );
-
-  const totalMentionCount = allMentions.length;
-
-  // Build entity name lookup from mentions for relationship display.
+  // Build entity name lookup for the Relationships panel.
   const entityNameMap: Record<string, { name: string; type: string }> = {};
-  for (const m of entityMentions) {
-    entityNameMap[m.entityId] = { name: m.name, type: m.type };
+  for (const item of sourceEntities) {
+    entityNameMap[item.entityId] = { name: item.name, type: item.type };
   }
 
   const platformIcons: Record<string, React.ReactNode> = {
@@ -522,22 +488,18 @@ export default async function InterviewDetailPage({
              * `pr-1` reserves room for the scrollbar so rows don't
              * jitter on overflow appearance.
              */}
-            {entityMentions.length > 0 && (
+            {sourceEntities.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
-                    Entities Mentioned
+                    Related Entities
                   </CardTitle>
                   <CardDescription>
-                    {entityMentions.length} unique entit{entityMentions.length === 1 ? "y" : "ies"}{totalMentionCount > entityMentions.length ? ` · ${totalMentionCount} mentions` : ""}
+                    {sourceEntities.length} entit{sourceEntities.length === 1 ? "y" : "ies"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="sv-scroll-soft max-h-[40vh] overflow-y-auto pr-1">
-                  <EntityMentionsList
-                    mentions={entityMentions}
-                    projectId={interview.project_id}
-                    canEdit={canEdit}
-                  />
+                  <SourceEntityList items={sourceEntities} />
                 </CardContent>
               </Card>
             )}
