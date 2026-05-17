@@ -246,6 +246,137 @@
 }
 
 /* ============================================================================
+ * Light mode overrides — repoints --sv-* tokens to the light palette.
+ * The accent / chart / radius / motion / z-index / typography scales are
+ * intentionally NOT overridden (they are theme-invariant).
+ * ========================================================================== */
+
+.light {
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --sv-panel-bg:          #F0F1F6;
+  --sv-surface-bg:        #FAFBFD;
+  --sv-canvas-bg:         #F4F5F9;
+  --sv-chrome-top:        #E8E9F0;
+  --sv-chrome-bottom:     #E3E4EB;
+  --sv-chrome-gradient:   linear-gradient(to bottom, #E8E9F0, #E3E4EB);
+  --sv-panel-sheen:       linear-gradient(135deg, rgba(255,255,255,0.55) 0%, #F0F1F6 28%);
+
+  /* ── Hover card tokens (consumed by sv-hover-card utilities) ────────────── */
+  --sv-hover-card-bg:        #EBEBF1;
+  --sv-hover-card-lifted-bg: #E7E8EE;
+  --sv-hover-card-border:    rgba(10, 12, 20, 0.16);
+
+  /* ── Scrollbar tokens ────────────────────────────────────────────────────── */
+  --sv-scrollbar-thumb:        rgba(10, 12, 20, 0.10);
+  --sv-scrollbar-thumb-hover:  rgba(10, 12, 20, 0.16);
+  --sv-scrollbar-thumb-active: rgba(10, 12, 20, 0.24);
+
+  /* ── Borders & dividers ─────────────────────────────────────────────────── */
+  --sv-border-divider:         rgba(10,12,20,0.07);
+  --sv-border-divider-muted:   rgba(10,12,20,0.08);
+  --sv-border-divider-soft:    rgba(10,12,20,0.09);
+  --sv-border-divider-strong:  rgba(10,12,20,0.10);
+  --sv-border-card:            rgba(10,12,20,0.10);
+  --sv-border-panel:           rgba(10,12,20,0.11);
+  --sv-border-surface-strong:  rgba(10,12,20,0.13);
+  --sv-border-control:         rgba(10,12,20,0.16);
+  --sv-border-card-hover:      rgba(10,12,20,0.22);
+  --sv-border-control-hover:   rgba(10,12,20,0.24);
+  --sv-border-control-hover-strong: rgba(10,12,20,0.30);
+
+  --sv-highlight:         rgba(255,255,255,0.70);
+  --sv-highlight-strong:  rgba(255,255,255,0.90);
+
+  /* ── Text — dark-navy alpha scale (mirrors white-alpha in dark mode) ───── */
+  --sv-text-white:        #0A0C14;
+  --sv-text-primary:      rgba(10,12,20,0.88);
+  --sv-text-primary-alt:  rgba(10,12,20,0.85);
+  --sv-text-strong:       rgba(10,12,20,0.75);
+  --sv-text-body:         rgba(10,12,20,0.72);
+  --sv-text-medium:       rgba(10,12,20,0.70);
+  --sv-text-secondary:    rgba(10,12,20,0.65);
+  --sv-text-paragraph:    rgba(10,12,20,0.62);
+  --sv-text-soft:         rgba(10,12,20,0.58);
+  --sv-text-subtle:       rgba(10,12,20,0.55);
+  --sv-text-muted:        rgba(10,12,20,0.52);
+  --sv-text-dim:          rgba(10,12,20,0.45);
+  --sv-text-placeholder:  rgba(10,12,20,0.40);
+  --sv-text-meta:         rgba(10,12,20,0.32);
+  --sv-text-eyebrow:      rgba(10,12,20,0.28);
+  --sv-text-ghost:        rgba(10,12,20,0.22);
+  --sv-text-faint:        rgba(10,12,20,0.18);
+  --sv-text-ghost-faint:  rgba(10,12,20,0.15);
+  --sv-text-trace:        rgba(10,12,20,0.10);
+
+  /* ── Text — gray scale ─────────────────────────────────────────────────── */
+  --sv-gray-caption:      #5A6272;
+  --sv-gray-caption-soft: #6A7284;
+  --sv-gray-caption-weak: #7A8294;
+  --sv-gray-chart-eyebrow:#777;
+  --sv-gray-mono:         #666;
+  --sv-gray-mono-dim:     #777;
+  --sv-gray-axis:         #888;
+  --sv-gray-trailing:     #8a8a8a;
+  --sv-gray-divider:      #C4C8D0;
+
+  /* ── Tonal accent backgrounds — slightly stronger on light ─────────────── */
+  --sv-accent-green-bright-bg:     rgba(74,222,128,0.10);
+  --sv-accent-green-bright-border: rgba(74,222,128,0.28);
+  --sv-accent-blue-bg:             rgba(91,156,246,0.08);
+  --sv-accent-blue-bg-tag:         rgba(91,156,246,0.13);
+  --sv-accent-blue-border:         rgba(91,156,246,0.22);
+  --sv-accent-amber-bg:            rgba(251,191,36,0.10);
+  --sv-accent-amber-border:        rgba(251,191,36,0.28);
+  --sv-accent-red-bg:              rgba(239,68,68,0.10);
+  --sv-accent-red-border:          rgba(239,68,68,0.24);
+  --sv-accent-indigo-well-bg:      rgba(78,92,210,0.10);
+  --sv-accent-indigo-well-border:  rgba(78,92,210,0.22);
+  --sv-accent-indigo-well-fg:      #5c6dbe;
+
+  /* ── Shadows — lighter, softer on light backgrounds ────────────────────── */
+  --sv-shadow-hero:
+    0 0 0 1px rgba(10,12,20,0.06),
+    0 32px 80px -12px rgba(0,0,0,0.12),
+    0 8px 32px -4px rgba(0,0,0,0.07);
+
+  --sv-shadow-copilot:
+    0 0 0 1px rgba(10,12,20,0.05),
+    0 36px 80px -16px rgba(0,0,0,0.10),
+    0 8px 24px -6px rgba(0,0,0,0.07);
+
+  --sv-shadow-report:
+    0 0 0 1px rgba(10,12,20,0.05),
+    0 48px 120px -24px rgba(0,0,0,0.12),
+    0 8px 24px -6px rgba(0,0,0,0.07);
+
+  --sv-shadow-compact:
+    0 0 0 1px rgba(10,12,20,0.05),
+    0 24px 60px -12px rgba(0,0,0,0.10),
+    0 6px 20px -4px rgba(0,0,0,0.06);
+
+  /* ── Bar-chart gradient ─────────────────────────────────────────────────── */
+  --sv-gradient-bar: linear-gradient(90deg, #4C7EC0 0%, #5B9CF6 100%);
+
+  /* ── sv-card hover fill ─────────────────────────────────────────────────── */
+  --sv-card-hover-fill: rgba(10, 12, 20, 0.02);
+}
+
+/* ============================================================================
+ * Dark-mode overrides for hover-card and scrollbar tokens
+ * (already correct from :root, but explicit here for clarity).
+ * ========================================================================== */
+
+.dark {
+  --sv-hover-card-bg:        #0E1119;
+  --sv-hover-card-lifted-bg: #11141C;
+  --sv-hover-card-border:    rgba(147, 147, 147, 0.30);
+
+  --sv-scrollbar-thumb:        rgba(255, 255, 255, 0.08);
+  --sv-scrollbar-thumb-hover:  rgba(255, 255, 255, 0.14);
+  --sv-scrollbar-thumb-active: rgba(255, 255, 255, 0.22);
+}
+
+/* ============================================================================
  * Convenience utility classes (optional, pure CSS fallback for non-Tailwind
  * projects). If you already use Tailwind v4, you can ignore this block and
  * reach for the variables directly via `bg-[var(--sv-panel-bg)]`.
@@ -277,7 +408,7 @@
 }
 .sv-card:hover {
   border-color: var(--sv-border-card-hover);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--sv-card-hover-fill, rgba(255, 255, 255, 0.03));
 }
 
 .sv-status-pill {

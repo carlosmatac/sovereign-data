@@ -37,7 +37,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { IntelligenceChatNavThreads } from "@/components/dashboard/intelligence-chat-nav-threads";
@@ -94,7 +96,15 @@ export function AppSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { state, isMobile } = useSidebar();
+  const { resolvedTheme } = useTheme();
   const inChatSection = pathname.startsWith("/chat");
+
+  // Avoid SSR/client hydration mismatch: next-themes reads localStorage only
+  // on the client, so resolvedTheme is undefined on the server. Always render
+  // the dark logo on both passes, then switch after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const isLight = mounted && resolvedTheme === "light";
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -151,20 +161,23 @@ export function AppSidebar({
               <div className="flex items-center justify-between gap-2">
                 <Link
                   href="/projects"
-                  className="-ml-0.5 flex min-w-0 items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.04]"
+                  className="-ml-0.5 flex min-w-0 items-center rounded-[4px] px-2 py-2 transition-colors duration-150 hover:bg-[var(--sv-accent,rgba(255,255,255,0.04))]"
                 >
                   <Image
-                    src="/aksum.svg"
+                    src={isLight ? "/aksum_black.svg" : "/aksum.svg"}
                     alt="Aksum — Knowledge Platform"
                     width={2186}
                     height={885}
-                    className="h-8 w-auto object-contain opacity-90"
+                    className="h-10 w-auto object-contain opacity-90"
                     priority
                   />
                 </Link>
                 <SidebarTrigger
                   aria-label="Collapse sidebar"
-                  className="size-7 shrink-0 rounded-[5px] border border-transparent text-white/45 transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/85"
+                  className="size-7 shrink-0 rounded-[5px] border border-transparent transition-colors duration-150"
+                  style={{
+                    color: "var(--sv-text-muted)",
+                  }}
                 />
               </div>
             ) : (
@@ -179,11 +192,11 @@ export function AppSidebar({
                   className="flex w-full items-center justify-center"
                 >
                   <Image
-                    src="/ak.svg"
+                    src={isLight ? "/ak_black.svg" : "/ak.svg"}
                     alt=""
                     width={32}
                     height={32}
-                    className="size-7 object-contain opacity-90"
+                    className="size-8 object-contain opacity-90"
                   />
                 </Link>
               </SidebarMenuButton>
@@ -193,7 +206,8 @@ export function AppSidebar({
             <SidebarMenuItem className="hidden md:list-item">
               <SidebarTrigger
                 aria-label="Expand sidebar"
-                className="!h-9 !w-full rounded-[5px] border border-transparent text-white/45 transition-colors duration-150 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/85"
+                className="!h-9 !w-full rounded-[5px] border border-transparent transition-colors duration-150"
+                style={{ color: "var(--sv-text-muted)" }}
               />
             </SidebarMenuItem>
           ) : null}
@@ -206,7 +220,7 @@ export function AppSidebar({
             className="mb-1 px-2 text-[10.5px] font-semibold uppercase"
             style={{
               letterSpacing: "0.10em",
-              color: "rgba(255,255,255,0.42)",
+              color: "var(--sv-text-placeholder)",
             }}
           >
             Platform
@@ -221,7 +235,7 @@ export function AppSidebar({
                         asChild
                         isActive={inChatSection}
                         tooltip="Copilot"
-                        className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
+                        className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                       >
                         <Link href="/chat">
                           <item.icon className="size-[14px]" strokeWidth={1.5} />
@@ -241,7 +255,7 @@ export function AppSidebar({
                       asChild
                       isActive={pathname.startsWith(item.href)}
                       tooltip={item.title}
-                      className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
+                      className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
                       <Link href={item.href}>
                         <item.icon className="size-[14px]" strokeWidth={1.5} />
@@ -260,7 +274,7 @@ export function AppSidebar({
             className="mb-1 px-2 text-[10.5px] font-semibold uppercase"
             style={{
               letterSpacing: "0.10em",
-              color: "rgba(255,255,255,0.42)",
+              color: "var(--sv-text-placeholder)",
             }}
           >
             System
@@ -273,7 +287,7 @@ export function AppSidebar({
                     asChild
                     isActive={pathname.startsWith(item.href)}
                     tooltip={item.title}
-                    className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-white/72 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
+                    className="h-9 gap-2.5 rounded-[5px] px-2.5 text-[12.5px] font-medium text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                   >
                     <Link href={item.href}>
                       <item.icon className="size-[14px]" strokeWidth={1.5} />
@@ -300,7 +314,7 @@ export function AppSidebar({
       */}
       <SidebarFooter
         className="px-2 pb-3 pt-2.5 group-data-[collapsible=icon]:px-1.5"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ borderTop: "1px solid var(--sv-border-divider)" }}
       >
         <SidebarMenu>
           <SidebarMenuItem>
@@ -308,7 +322,7 @@ export function AppSidebar({
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-auto items-center gap-2.5 rounded-[6px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.05] data-[state=open]:bg-white/[0.06] group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!w-9 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
+                  className="h-auto items-center gap-2.5 rounded-[6px] px-2 py-2 transition-colors duration-150 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent group-data-[collapsible=icon]:!h-9 group-data-[collapsible=icon]:!w-9 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                   title={
                     state === "collapsed" && !isMobile
                       ? (user.name ?? user.email ?? "Account menu")
@@ -320,7 +334,7 @@ export function AppSidebar({
                       className="text-[10.5px] font-semibold"
                       style={{
                         background: "rgba(91,156,246,0.12)",
-                        color: "#9CC2F8",
+                        color: "#5B9CF6",
                         letterSpacing: "0.02em",
                       }}
                     >
@@ -328,17 +342,26 @@ export function AppSidebar({
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex min-w-0 flex-1 flex-col leading-none">
-                    <span className="truncate text-[12px] font-semibold text-white/92">
+                    <span
+                      className="truncate text-[12px] font-semibold"
+                      style={{ color: "var(--sv-text-primary)" }}
+                    >
                       {user.name ?? "User"}
                     </span>
                     <span
-                      className="mt-[3px] truncate text-[10.5px] text-white/45"
-                      style={{ letterSpacing: "-0.005em" }}
+                      className="mt-[3px] truncate text-[10.5px]"
+                      style={{
+                        letterSpacing: "-0.005em",
+                        color: "var(--sv-text-muted)",
+                      }}
                     >
                       {user.email}
                     </span>
                   </div>
-                  <ChevronUp className="ml-auto size-3.5 shrink-0 text-white/35 transition-colors duration-150 group-hover/menu-item:text-white/60" />
+                  <ChevronUp
+                    className="ml-auto size-3.5 shrink-0 transition-colors duration-150"
+                    style={{ color: "var(--sv-text-ghost)" }}
+                  />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

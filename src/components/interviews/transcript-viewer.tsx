@@ -29,29 +29,28 @@ const SPEAKER_VARIANTS = [
   {
     // Soft blue — primary speaker
     block: cn(
-      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-[rgba(91,156,246,0.055)]",
+      "rounded-[10px] border border-[rgba(91,156,246,0.18)] bg-[rgba(91,156,246,0.055)]",
       "border-l-2 border-l-[rgba(91,156,246,0.45)]",
       "py-3 pl-4 pr-4"
     ),
-    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#8EB6F3]",
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#5B9CF6]",
   },
   {
     // Soft slate — neutral secondary speaker
     block: cn(
-      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-white/[0.028]",
-      "border-l-2 border-l-white/25",
-      "py-3 pl-4 pr-4"
+      "rounded-[10px] border py-3 pl-4 pr-4 border-l-2",
+      "[border-color:var(--sv-border-divider-soft)] [border-left-color:var(--sv-border-control)] [background:var(--sv-accent,rgba(255,255,255,0.028))]"
     ),
-    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-white/70",
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-muted-foreground",
   },
   {
     // Soft mauve — third speaker / host
     block: cn(
-      "rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-[rgba(167,139,250,0.045)]",
+      "rounded-[10px] border border-[rgba(167,139,250,0.18)] bg-[rgba(167,139,250,0.045)]",
       "border-l-2 border-l-[rgba(167,139,250,0.40)]",
       "py-3 pl-4 pr-4"
     ),
-    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#B8A5F6]",
+    label: "text-[11.5px] font-semibold tracking-[-0.005em] text-[#A78BFA]",
   },
 ] as const;
 
@@ -180,7 +179,7 @@ export function TranscriptViewer({
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[500px] rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-transparent p-4">
+        <ScrollArea className="h-[500px] rounded-[10px] border border-border/40 bg-transparent p-4">
           <div className="space-y-2.5">
             {filteredSegments.map((seg, i) => {
               const variant = seg.speaker
@@ -193,13 +192,14 @@ export function TranscriptViewer({
                   className={
                     variant
                       ? cn("group", variant.block)
-                      : "group rounded-[10px] border border-[rgba(147,147,147,0.08)] bg-white/[0.018] px-4 py-3"
+                      : "group rounded-[10px] border px-4 py-3"
                   }
+                  style={!variant ? { borderColor: "var(--sv-border-divider)", background: "var(--sv-accent,rgba(255,255,255,0.018))" } : undefined}
                 >
                   {seg.speaker && variant && (
                     <p className={cn("mb-1.5", variant.label)}>{seg.speaker}</p>
                   )}
-                  <p className="text-[13.5px] leading-[1.65] text-white/78">
+                  <p className="text-[13.5px] leading-[1.65] text-foreground/78">
                     {searchQuery ? (
                       <HighlightText
                         text={seg.text}
@@ -213,7 +213,7 @@ export function TranscriptViewer({
               );
             })}
             {filteredSegments.length === 0 && searchQuery && (
-              <p className="py-8 text-center text-sm text-white/40">
+              <p className="py-8 text-center text-sm text-muted-foreground">
                 No matches found for &ldquo;{searchQuery}&rdquo;
               </p>
             )}

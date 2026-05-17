@@ -45,16 +45,16 @@ const TONE_STYLES: Record<
   { background: string; borderColor: string }
 > = {
   default: {
-    background: "#0B0E14",
-    borderColor: "rgba(147,147,147,0.13)",
+    background: "var(--sv-surface-bg)",
+    borderColor: "var(--sv-border-divider-soft)",
   },
   lifted: {
-    background: "#0E1119",
-    borderColor: "rgba(147,147,147,0.16)",
+    background: "var(--sv-surface-bg)",
+    borderColor: "var(--sv-border-panel)",
   },
   well: {
-    background: "#07080C",
-    borderColor: "rgba(147,147,147,0.10)",
+    background: "var(--sv-canvas-bg)",
+    borderColor: "var(--sv-border-divider-muted)",
   },
 };
 

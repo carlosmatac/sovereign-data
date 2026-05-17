@@ -2,20 +2,16 @@
 
 import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 /**
  * Aksum workspace top bar.
  *
- * Shows the current section name derived from the pathname instead of
- * a static "AKSUM · KNOWLEDGE PLATFORM" label, giving the user instant
- * orientation context without redundant branding noise.
- *
- * On mobile (<md) a hamburger trigger is included since the sidebar is
- * rendered as a Sheet with no visible edge to expand from.
+ * Shows the current section name derived from the pathname.
+ * Hosts the theme toggle (dark ↔ light) on the right edge.
  */
 
 const SECTION_TITLES: Array<[string, string]> = [
-  // More-specific paths first
   ["/interviews/upload", "Add Source"],
   ["/interviews/", "Knowledge"],
   ["/interviews", "Knowledge"],
@@ -47,13 +43,16 @@ export function DashboardInsetHeader() {
       role="banner"
       className="flex h-11 shrink-0 items-center gap-2 px-4 md:px-5"
       style={{
-        background: "linear-gradient(to bottom, #0E1118, #0B0D12)",
-        borderBottom: "1px solid rgba(147,147,147,0.08)",
+        background: "var(--sv-chrome-gradient)",
+        borderBottom: "1px solid var(--sv-border-divider)",
       }}
     >
       <SidebarTrigger
         aria-label="Open navigation"
-        className="-ml-1 size-7 shrink-0 text-white/55 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 md:hidden"
+        className="-ml-1 size-7 shrink-0 transition-colors duration-150 md:hidden"
+        style={{
+          color: "var(--sv-text-muted)",
+        }}
       />
 
       <span
@@ -61,11 +60,15 @@ export function DashboardInsetHeader() {
         style={{
           fontSize: "10px",
           letterSpacing: "0.07em",
-          color: "rgba(255,255,255,0.32)",
+          color: "var(--sv-text-eyebrow)",
         }}
       >
         {sectionTitle}
       </span>
+
+      <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

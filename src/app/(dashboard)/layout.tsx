@@ -114,7 +114,12 @@ export default async function DashboardLayout({
         showPlatformAdministration={showPlatformAdministration}
       />
       <SidebarInset
-        className="flex min-w-0 flex-col overflow-hidden bg-[#0B0E14] md:rounded-[6px] md:border md:border-[rgba(147,147,147,0.07)] md:shadow-[0_0_0_1px_rgba(255,255,255,0.010),0_24px_48px_-32px_rgba(0,0,0,0.65)]"
+        className="flex min-w-0 flex-col overflow-hidden md:rounded-[6px]"
+        style={{
+          backgroundColor: "var(--sv-surface-bg)",
+          border: "1px solid var(--sv-border-divider-muted)",
+          boxShadow: "var(--sv-shadow-compact)",
+        }}
       >
         <DashboardInsetHeader />
         <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto">

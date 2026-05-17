@@ -4,6 +4,7 @@
 @import "../styles/design-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
 
 @theme inline {
   --color-background: var(--background);
@@ -129,6 +130,62 @@
   --sidebar-ring: rgba(91, 156, 246, 0.55);
 }
 
+/*
+ * Light theme — premium editorial, not clinical SaaS-white.
+ * Surfaces: cool off-white family (slightly blue-gray, not warm cream).
+ * Text: dark-navy alpha scale mirroring the white-alpha scale in dark mode.
+ * Accents: identical to dark — they read well on both backgrounds.
+ */
+.light {
+  --background: #F0F1F6;
+  --foreground: rgba(10, 12, 20, 0.88);
+
+  --card: #FAFBFD;
+  --card-foreground: rgba(10, 12, 20, 0.88);
+
+  --popover: #FFFFFF;
+  --popover-foreground: rgba(10, 12, 20, 0.88);
+
+  /* Primary CTA = near-black fill, white foreground */
+  --primary: rgba(10, 12, 20, 0.90);
+  --primary-foreground: #FFFFFF;
+
+  --secondary: rgba(10, 12, 20, 0.06);
+  --secondary-foreground: rgba(10, 12, 20, 0.85);
+
+  --muted: rgba(10, 12, 20, 0.05);
+  --muted-foreground: rgba(10, 12, 20, 0.52);
+
+  --accent: rgba(10, 12, 20, 0.06);
+  --accent-foreground: rgba(10, 12, 20, 0.90);
+
+  --destructive: #DC2626;
+
+  --border: rgba(10, 12, 20, 0.12);
+  --input: rgba(10, 12, 20, 0.16);
+  --ring: rgba(91, 156, 246, 0.55);
+
+  /* Charts — same fixed brand palette, works on both backgrounds */
+  --chart-1: #5B9CF6;
+  --chart-2: #34D399;
+  --chart-3: #A78BFA;
+  --chart-4: #FBBF24;
+  --chart-5: #7DD3FC;
+
+  /*
+   * Sidebar = slightly recessed cool-gray — one tonal step below the card
+   * surface, mirroring the dark-mode depth relationship.
+   */
+  --sidebar: #E6E7EE;
+  --sidebar-foreground: rgba(10, 12, 20, 0.72);
+  --sidebar-primary: rgba(10, 12, 20, 0.90);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(10, 12, 20, 0.06);
+  --sidebar-accent-foreground: rgba(10, 12, 20, 0.90);
+  --sidebar-border: rgba(10, 12, 20, 0.08);
+  --sidebar-ring: rgba(91, 156, 246, 0.55);
+}
+
 /* html.dark (next-themes forces `dark`): mirror for override predictability. */
 .dark {
   --background: #08090F;
@@ -210,8 +267,8 @@
     transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
   .sv-hover-card:hover {
-    background-color: #0E1119;
-    border-color: rgba(147, 147, 147, 0.30);
+    background-color: var(--sv-hover-card-bg, #0E1119);
+    border-color: var(--sv-hover-card-border, rgba(147, 147, 147, 0.30));
   }
 
   /*
@@ -227,18 +284,17 @@
     transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
   .sv-hover-card-lifted:hover {
-    background-color: #11141C;
-    border-color: rgba(147, 147, 147, 0.30);
+    background-color: var(--sv-hover-card-lifted-bg, #11141C);
+    border-color: var(--sv-hover-card-border, rgba(147, 147, 147, 0.30));
   }
 
   /*
-   * Thin, restrained scrollbar for in-panel scroll regions
-   * (e.g. dashboard Recent Interviews, chat history). Stays out of
-   * the way until the user is actively scrolling near the edge.
+   * Thin, restrained scrollbar for in-panel scroll regions.
+   * Uses theme-aware variables so it reads correctly in both modes.
    */
   .sv-scroll-soft {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.10) transparent;
+    scrollbar-color: var(--sv-scrollbar-thumb, rgba(255, 255, 255, 0.10)) transparent;
   }
   .sv-scroll-soft::-webkit-scrollbar {
     width: 6px;
@@ -248,17 +304,17 @@
     background: transparent;
   }
   .sv-scroll-soft::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--sv-scrollbar-thumb, rgba(255, 255, 255, 0.08));
     border-radius: 999px;
     border: 1px solid transparent;
     background-clip: padding-box;
   }
   .sv-scroll-soft:hover::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
+    background: var(--sv-scrollbar-thumb-hover, rgba(255, 255, 255, 0.14));
     background-clip: padding-box;
   }
   .sv-scroll-soft::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: var(--sv-scrollbar-thumb-active, rgba(255, 255, 255, 0.22));
     background-clip: padding-box;
   }
 }

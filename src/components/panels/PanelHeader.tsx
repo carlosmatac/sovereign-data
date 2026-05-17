@@ -35,17 +35,23 @@ export function PanelHeader({
       className="px-4 py-3"
       style={{
         borderBottom: `1px solid ${
-          thin ? "rgba(147,147,147,0.10)" : "rgba(147,147,147,0.14)"
+          thin ? "var(--sv-border-divider-muted)" : "var(--sv-border-divider-strong)"
         }`,
       }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12.5px] font-semibold leading-tight text-white">
+          <p
+            className="text-[12.5px] font-semibold leading-tight"
+            style={{ color: "var(--sv-text-primary)" }}
+          >
             {title}
           </p>
           {subtitle && (
-            <p className="mt-[3px] text-[10.5px] leading-snug text-[#8a8a8a]">
+            <p
+              className="mt-[3px] text-[10.5px] leading-snug"
+              style={{ color: "var(--sv-gray-caption)" }}
+            >
               {subtitle}
             </p>
           )}
