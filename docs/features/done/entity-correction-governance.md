@@ -1,9 +1,9 @@
 ---
 title: "Entity correction governance (post-extraction)"
-status: to-do
+status: done
 owner: team
 priority: medium
-last_updated: 2026-05-06
+last_updated: 2026-05-17
 related_architecture:
   - docs/audits/database-retrieval-architecture-audit.md
   - docs/architecture/ingestion-pipeline.md

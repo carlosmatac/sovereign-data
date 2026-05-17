@@ -1,7 +1,7 @@
 ---
 title: "Network Explorer V2"
-status: on-going
-last_updated: 2026-05-15
+status: done
+last_updated: 2026-05-17
 ---
 
 # Network Explorer V2

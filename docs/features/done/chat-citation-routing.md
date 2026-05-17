@@ -1,9 +1,9 @@
 ---
 title: "Chat citation routing — internal interview links"
-status: to-do
+status: done
 owner: team
 priority: medium
-last_updated: 2026-05-06
+last_updated: 2026-05-17
 related_architecture:
   - docs/architecture/agentic-rag.md
   - docs/architecture/chat-persistence.md

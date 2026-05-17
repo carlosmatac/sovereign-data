@@ -1,9 +1,9 @@
 ---
 title: "Entity cross-type deduplication"
-status: to-do
+status: done
 owner: team
 priority: high
-last_updated: 2026-05-06
+last_updated: 2026-05-17
 related_architecture:
   - docs/audits/database-retrieval-architecture-audit.md
 related_infrastructure:

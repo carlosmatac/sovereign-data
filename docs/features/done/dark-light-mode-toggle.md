@@ -1,9 +1,9 @@
 ---
 title: "Dark / light mode toggle"
-status: on-going
+status: done
 owner: team
 priority: low
-last_updated: 2026-05-15
+last_updated: 2026-05-17
 ---
 
 # Dark / light mode toggle
