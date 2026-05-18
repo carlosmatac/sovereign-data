@@ -60,6 +60,10 @@ type ParticipantRow = {
   entityType: string;
   linkType: string;
   title: string;
+  // anchor-derived relationship fields (person rows only)
+  relationshipTypes: string[];
+  affiliatedOrgName: string;
+  affiliatedOrgEntityId: string | null;
 };
 
 const PARTICIPANT_ENTITY_TYPES = [
@@ -77,6 +81,27 @@ const PARTICIPANT_LINK_TYPES = [
   { value: "primary_subject", label: "Primary subject" },
 ] as const;
 
+/**
+ * Relationship types available in the upload form for person → org anchors.
+ * Filtered to sensible directional types; no deprecated or legacy values.
+ */
+const PERSON_ORG_RELATION_TYPES = [
+  { value: "works_at", label: "Works at" },
+  { value: "leads", label: "Leads" },
+  { value: "is_ceo_of", label: "CEO" },
+  { value: "is_cfo_of", label: "CFO" },
+  { value: "is_cto_of", label: "CTO" },
+  { value: "is_coo_of", label: "COO" },
+  { value: "is_cmo_of", label: "CMO" },
+  { value: "is_cso_of", label: "CSO" },
+  { value: "is_board_member_of", label: "Board member" },
+  { value: "is_member_of", label: "Member" },
+  { value: "founded", label: "Founder" },
+  { value: "advisor", label: "Advisor" },
+  { value: "represents", label: "Represents" },
+  { value: "affiliated_with", label: "Affiliated with" },
+] as const;
+
 function makeParticipantRow(): ParticipantRow {
   return {
     id: Math.random().toString(36).slice(2),
@@ -85,7 +110,19 @@ function makeParticipantRow(): ParticipantRow {
     entityType: "PERSON",
     linkType: "participant",
     title: "",
+    relationshipTypes: [],
+    affiliatedOrgName: "",
+    affiliatedOrgEntityId: null,
   };
+}
+
+function toggleRelType(
+  current: string[],
+  type: string
+): string[] {
+  return current.includes(type)
+    ? current.filter((t) => t !== type)
+    : [...current, type];
 }
 
 /** Map entity type → search typeFilter query string for InterviewAnchorEntityInput. */
@@ -113,12 +150,9 @@ export default function UploadInterviewPage() {
   const [intervieweeName, setIntervieweeName] = useState("");
   const [intervieweeOrg, setIntervieweeOrg] = useState("");
   const [intervieweeTitle, setIntervieweeTitle] = useState("");
-  const [intervieweeEntityId, setIntervieweeEntityId] = useState<string | null>(
-    null
-  );
-  const [intervieweeOrgEntityId, setIntervieweeOrgEntityId] = useState<
-    string | null
-  >(null);
+  const [intervieweeEntityId, setIntervieweeEntityId] = useState<string | null>(null);
+  const [intervieweeOrgEntityId, setIntervieweeOrgEntityId] = useState<string | null>(null);
+  const [intervieweeRelationshipTypes, setIntervieweeRelationshipTypes] = useState<string[]>([]);
 
   // Additional participants (optional)
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
@@ -160,6 +194,9 @@ export default function UploadInterviewPage() {
         entity_type: p.entityType,
         link_type: p.linkType,
         title: p.title.trim() || undefined,
+        relationship_types: p.relationshipTypes.length > 0 ? p.relationshipTypes : undefined,
+        affiliated_org_name: p.affiliatedOrgName.trim() || undefined,
+        affiliated_org_entity_id: p.affiliatedOrgEntityId || undefined,
       }));
   }
 
@@ -203,6 +240,7 @@ export default function UploadInterviewPage() {
   useEffect(() => {
     setIntervieweeEntityId(null);
     setIntervieweeOrgEntityId(null);
+    setIntervieweeRelationshipTypes([]);
   }, [projectId]);
 
   // Clear the file when switching source types
@@ -360,6 +398,9 @@ export default function UploadInterviewPage() {
           ...(intervieweeOrgEntityId
             ? { interviewee_org_entity_id: intervieweeOrgEntityId }
             : {}),
+          ...(intervieweeRelationshipTypes.length > 0
+            ? { interviewee_relationship_types: intervieweeRelationshipTypes }
+            : {}),
           participants: participantsPayload(),
         }),
       });
@@ -410,6 +451,8 @@ export default function UploadInterviewPage() {
         formData.append("interviewee_entity_id", intervieweeEntityId);
       if (intervieweeOrgEntityId)
         formData.append("interviewee_org_entity_id", intervieweeOrgEntityId);
+      if (intervieweeRelationshipTypes.length > 0)
+        formData.append("interviewee_relationship_types", JSON.stringify(intervieweeRelationshipTypes));
       const pdfParticipants = participantsPayload();
       if (pdfParticipants.length > 0)
         formData.append("participants", JSON.stringify(pdfParticipants));
@@ -462,6 +505,8 @@ export default function UploadInterviewPage() {
       if (intervieweeEntityId) body.interviewee_entity_id = intervieweeEntityId;
       if (intervieweeOrgEntityId)
         body.interviewee_org_entity_id = intervieweeOrgEntityId;
+      if (intervieweeRelationshipTypes.length > 0)
+        body.interviewee_relationship_types = intervieweeRelationshipTypes;
       const textParticipants = participantsPayload();
       if (textParticipants.length > 0) body.participants = textParticipants;
 
@@ -911,16 +956,60 @@ export default function UploadInterviewPage() {
                     aria-label="Organization or company"
                   />
                 </div>
+                {/* Relationship type selector — only relevant when both person and org are set */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label>
+                    Relationship to organization{" "}
+                    <span className="font-normal text-muted-foreground">(optional)</span>
+                  </Label>
+                  <div
+                    className={`flex flex-wrap gap-1.5 rounded-md border p-2 transition-colors ${
+                      !intervieweeOrg.trim() && !intervieweeOrgEntityId
+                        ? "opacity-40"
+                        : ""
+                    }`}
+                  >
+                    {PERSON_ORG_RELATION_TYPES.map(({ value, label }) => {
+                      const selected = intervieweeRelationshipTypes.includes(value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() =>
+                            setIntervieweeRelationshipTypes((prev) =>
+                              toggleRelType(prev, value)
+                            )
+                          }
+                          disabled={loading || (!intervieweeOrg.trim() && !intervieweeOrgEntityId)}
+                          className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                            selected
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:bg-muted/70"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {intervieweeRelationshipTypes.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {intervieweeRelationshipTypes.length} type
+                      {intervieweeRelationshipTypes.length > 1 ? "s" : ""} selected
+                      — each will create a separate anchor relationship.
+                    </p>
+                  )}
+                </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="interviewee-title">
-                    Primary person role / title{" "}
+                    Exact title / role text{" "}
                     <span className="font-normal text-muted-foreground">
-                      (optional)
+                      (optional — used as evidence text)
                     </span>
                   </Label>
                   <Input
                     id="interviewee-title"
-                    placeholder="e.g., CEO"
+                    placeholder="e.g., Chief Executive Officer"
                     value={intervieweeTitle}
                     onChange={(e) => setIntervieweeTitle(e.target.value)}
                     disabled={loading}
@@ -1038,6 +1127,65 @@ export default function UploadInterviewPage() {
                             disabled={loading || !projectId}
                           />
                         </div>
+
+                        {/* Affiliated org + relationship types — only for PERSON rows */}
+                        {p.entityType === "PERSON" && (
+                          <>
+                            <div className="space-y-1">
+                              <Label className="text-[11px]">
+                                Affiliated organization{" "}
+                                <span className="font-normal text-muted-foreground">(optional)</span>
+                              </Label>
+                              <InterviewAnchorEntityInput
+                                id={`participant-org-${p.id}`}
+                                projectId={projectId}
+                                kind="organization"
+                                typeFilter={typeFilterForEntityType("COMPANY")}
+                                entityLabel="organization"
+                                placeholder="Search or type an org…"
+                                value={p.affiliatedOrgName}
+                                onChange={(v) => updateParticipant(p.id, { affiliatedOrgName: v })}
+                                onSelectedEntityIdChange={(id) =>
+                                  updateParticipant(p.id, { affiliatedOrgEntityId: id })
+                                }
+                                selectedEntityId={p.affiliatedOrgEntityId}
+                                disabled={loading || !projectId}
+                              />
+                            </div>
+                            {(p.affiliatedOrgName.trim() || p.affiliatedOrgEntityId) && (
+                              <div className="space-y-1">
+                                <Label className="text-[11px]">
+                                  Relationship to organization{" "}
+                                  <span className="font-normal text-muted-foreground">(optional)</span>
+                                </Label>
+                                <div className="flex flex-wrap gap-1">
+                                  {PERSON_ORG_RELATION_TYPES.map(({ value, label }) => {
+                                    const selected = p.relationshipTypes.includes(value);
+                                    return (
+                                      <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() =>
+                                          updateParticipant(p.id, {
+                                            relationshipTypes: toggleRelType(p.relationshipTypes, value),
+                                          })
+                                        }
+                                        disabled={loading}
+                                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                                          selected
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted text-muted-foreground hover:bg-muted/70"
+                                        }`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
 
                         {/* Optional title */}
                         <div className="space-y-1">

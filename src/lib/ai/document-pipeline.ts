@@ -85,6 +85,8 @@ export async function processTextInterview(
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
         interviewee_org_entity_id: interview.interviewee_org_entity_id,
+        interviewee_title: interview.interviewee_title,
+        interviewee_relationship_types: interview.interviewee_relationship_types as string[] | null,
       },
       country,
       speakerMap: {},
@@ -124,7 +126,7 @@ export async function processDocument(
     const { data: interview } = await supabase
       .from("interviews")
       .select(
-        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -172,6 +174,8 @@ export async function processDocument(
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
         interviewee_org_entity_id: interview.interviewee_org_entity_id,
+        interviewee_title: interview.interviewee_title,
+        interviewee_relationship_types: interview.interviewee_relationship_types as string[] | null,
       },
       country,
       speakerMap: {},

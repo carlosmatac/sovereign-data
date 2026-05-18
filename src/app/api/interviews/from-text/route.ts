@@ -4,8 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ensureUploadAnchorEntity,
   parseAndResolveParticipants,
+  parseRelationshipTypes,
 } from "@/lib/entities/validate-interview-anchor";
-import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
+import {
+  writeParticipantSourceEntities,
+  writeAnchorDerivedRelationships,
+} from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 import type { TextStructureType } from "@/lib/ai/chunking-text-interview";
 
@@ -90,6 +94,7 @@ export async function POST(request: NextRequest) {
     interviewee_title,
     interviewee_entity_id,
     interviewee_org_entity_id,
+    interviewee_relationship_types: rawIntervieweeRelationshipTypes,
     participants: rawParticipants,
   } = body as Record<string, unknown>;
 
@@ -127,6 +132,7 @@ export async function POST(request: NextRequest) {
   let intervieweeName = sanitizeOptionalAnchor(interviewee_name);
   let intervieweeOrg = sanitizeOptionalAnchor(interviewee_org);
   const intervieweeTitle = sanitizeIntervieweeTitle(interviewee_title);
+  const intervieweeRelationshipTypes = parseRelationshipTypes(rawIntervieweeRelationshipTypes);
   const rawIntervieweeEntityIdParsed = parseOptionalUuid(interviewee_entity_id);
   const rawIntervieweeOrgEntityIdParsed = parseOptionalUuid(
     interviewee_org_entity_id
@@ -209,6 +215,8 @@ export async function POST(request: NextRequest) {
       interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
+      interviewee_relationship_types:
+        intervieweeRelationshipTypes.length > 0 ? intervieweeRelationshipTypes : null,
     })
     .select()
     .single();
@@ -221,7 +229,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Write additional participant source_entities (non-fatal)
+  // Write additional participant source_entities + anchor-derived relationships (non-fatal)
   try {
     const resolvedParticipants = await parseAndResolveParticipants(
       admin, rawParticipants, projectIdTrim, tenantId
@@ -232,6 +240,37 @@ export async function POST(request: NextRequest) {
       tenantId,
       participants: resolvedParticipants,
     });
+
+    const relationshipPairs: Parameters<typeof writeAnchorDerivedRelationships>[0]["pairs"] = [];
+
+    if (intervieweeEntityId && intervieweeOrgEntityId && intervieweeRelationshipTypes.length > 0) {
+      relationshipPairs.push({
+        personEntityId: intervieweeEntityId,
+        orgEntityId: intervieweeOrgEntityId,
+        relationshipTypes: intervieweeRelationshipTypes,
+        evidenceText: intervieweeTitle ?? null,
+      });
+    }
+
+    for (const p of resolvedParticipants) {
+      if (p.affiliatedOrgEntityId && p.relationshipTypes.length > 0) {
+        relationshipPairs.push({
+          personEntityId: p.entityId,
+          orgEntityId: p.affiliatedOrgEntityId,
+          relationshipTypes: p.relationshipTypes,
+          evidenceText: p.context,
+        });
+      }
+    }
+
+    if (relationshipPairs.length > 0) {
+      await writeAnchorDerivedRelationships({
+        supabase: admin,
+        sourceId: interview.id,
+        tenantId,
+        pairs: relationshipPairs,
+      });
+    }
   } catch (participantError) {
     console.error("[participants] write failed (non-fatal):", participantError);
   }

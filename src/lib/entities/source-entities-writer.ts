@@ -19,6 +19,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Database,
+  RelationType,
   SourceEntityLinkType,
   SourceEntityOrigin,
 } from "@/types/database";
@@ -147,6 +148,76 @@ export async function writeParticipantSourceEntities(args: {
   if (error) {
     console.error(
       `[source-entities] participant write failed for source ${sourceId}:`,
+      error
+    );
+  }
+}
+
+// ── Anchor-derived relationship writer ───────────────────────────────────────
+
+type EntityRelationshipsInsert =
+  Database["public"]["Tables"]["entity_relationships"]["Insert"];
+
+/**
+ * Write `origin='anchor_derived'` rows to `entity_relationships` for
+ * person→org pairs explicitly provided at upload time.
+ *
+ * Covers two cases:
+ *   1. Primary anchor: interviewee + org + selected relationship types
+ *      (from sources.interviewee_relationship_types or title inference).
+ *   2. Participants: each PERSON row that includes affiliated org +
+ *      relationship types from the "Additional known entities" form section.
+ *
+ * Idempotent — upserts with ignoreDuplicates on the unique key
+ * (source_entity_id, target_entity_id, relation_type, interview_id).
+ *
+ * anchor_derived rows are human-asserted: confidence=1.0, review_status=approved.
+ */
+export async function writeAnchorDerivedRelationships(args: {
+  supabase: SupabaseClient<Database>;
+  sourceId: string;
+  tenantId: string;
+  pairs: Array<{
+    personEntityId: string;
+    orgEntityId: string;
+    relationshipTypes: RelationType[];
+    evidenceText?: string | null;
+  }>;
+}): Promise<void> {
+  const { supabase, sourceId, tenantId, pairs } = args;
+  if (pairs.length === 0) return;
+
+  const rows: EntityRelationshipsInsert[] = [];
+
+  for (const pair of pairs) {
+    if (!pair.personEntityId || !pair.orgEntityId) continue;
+    for (const relType of pair.relationshipTypes) {
+      rows.push({
+        source_entity_id: pair.personEntityId,
+        target_entity_id: pair.orgEntityId,
+        relation_type: relType,
+        confidence: 1.0,
+        evidence_text: pair.evidenceText ?? null,
+        interview_id: sourceId,
+        tenant_id: tenantId,
+        origin: "anchor_derived",
+        review_status: "approved",
+      });
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from("entity_relationships")
+    .upsert(rows, {
+      onConflict: "source_entity_id,target_entity_id,relation_type,interview_id",
+      ignoreDuplicates: true,
+    });
+
+  if (error) {
+    console.error(
+      `[anchor-relationships] write failed for source ${sourceId}:`,
       error
     );
   }
