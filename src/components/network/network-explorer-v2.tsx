@@ -138,7 +138,15 @@ function buildGraph(
     if (!neighborhood) return;
 
     const exploredLayoutPos = layoutPositions.get(exploredId) ?? { x: 0, y: 0 };
-    const unplaced = neighborhood.neighbors.filter((n) => !exploredSet.has(n.id) && !nodeMap.has(n.id));
+    const neighborIdsFromSemantic = new Set(neighborhood.neighbors.map((n) => n.id));
+    const contextualNeighbors = (neighborhood.contextualAssociations ?? [])
+      .map((a) => a.entity)
+      .filter((n) => !neighborIdsFromSemantic.has(n.id));
+
+    const unplaced = [
+      ...neighborhood.neighbors.filter((n) => !exploredSet.has(n.id) && !nodeMap.has(n.id)),
+      ...contextualNeighbors.filter((n) => !exploredSet.has(n.id) && !nodeMap.has(n.id)),
+    ];
 
     unplaced.forEach((neighbor, nIdx) => {
       const layoutPos = neighborPosition(exploredLayoutPos, nIdx, unplaced.length);
@@ -158,8 +166,47 @@ function buildGraph(
         source: rel.source,
         target: rel.target,
         type: "animated",
-        data: { relationType: rel.relationType, direction: deriveDirection(rel.source, rel.target, exploredSet) } satisfies AnimatedEdgeData,
+        data: {
+          relationType: rel.relationType,
+          direction: deriveDirection(rel.source, rel.target, exploredSet),
+          variant: "semantic",
+        } satisfies AnimatedEdgeData,
         markerEnd: { type: "arrowclosed" as const, color: "#ffffff33", width: 12, height: 12 },
+      });
+    }
+
+    // Contextual co-occurrence edges — one per entity pair, merged source titles
+    const ctxByPair = new Map<
+      string,
+      { targetId: string; sourceTitles: Set<string>; linkTypes: Set<string> }
+    >();
+    for (const assoc of neighborhood.contextualAssociations ?? []) {
+      const pairKey = `${exploredId}::${assoc.entity.id}`;
+      const bucket = ctxByPair.get(pairKey) ?? {
+        targetId: assoc.entity.id,
+        sourceTitles: new Set<string>(),
+        linkTypes: new Set<string>(),
+      };
+      bucket.sourceTitles.add(assoc.sourceTitle);
+      for (const lt of assoc.linkTypes) bucket.linkTypes.add(lt);
+      ctxByPair.set(pairKey, bucket);
+    }
+
+    for (const [pairKey, bucket] of ctxByPair) {
+      const edgeId = `ctx:${pairKey}`;
+      if (edgeMap.has(edgeId)) continue;
+      const linkLabel = [...bucket.linkTypes].slice(0, 2).join(", ");
+      edgeMap.set(edgeId, {
+        id: edgeId,
+        source: exploredId,
+        target: bucket.targetId,
+        type: "animated",
+        data: {
+          relationType: linkLabel ? `same source (${linkLabel})` : "same source",
+          direction: deriveDirection(exploredId, bucket.targetId, exploredSet),
+          variant: "contextual",
+          sourceTitles: [...bucket.sourceTitles],
+        } satisfies AnimatedEdgeData,
       });
     }
   });
@@ -184,10 +231,15 @@ function applyFilters(
   filters: GraphFilters,
   exploredSet: Set<string>
 ): { nodes: EntityNodeType[]; edges: AnimatedEdgeType[] } {
-  // 1. Edge direction filter
-  let visibleEdges = edges;
+  // 1. Split semantic vs contextual edges
+  let semanticEdges = edges.filter((e) => e.data?.variant !== "contextual");
+  const contextualEdges = filters.showContextualAssociations
+    ? edges.filter((e) => e.data?.variant === "contextual")
+    : [];
+
+  // Direction filter — semantic edges only
   if (filters.direction !== "all") {
-    visibleEdges = visibleEdges.filter((e) => {
+    semanticEdges = semanticEdges.filter((e) => {
       const dir = e.data?.direction;
       return filters.direction === "incoming"
         ? dir === "incoming" || dir === "bidirectional"
@@ -195,11 +247,13 @@ function applyFilters(
     });
   }
 
-  // 2. Relationship type filter
+  // 2. Relationship type filter — semantic only
   if (filters.relationshipTypes.length > 0) {
     const relSet = new Set(filters.relationshipTypes);
-    visibleEdges = visibleEdges.filter((e) => relSet.has(e.data?.relationType ?? ""));
+    semanticEdges = semanticEdges.filter((e) => relSet.has(e.data?.relationType ?? ""));
   }
+
+  let visibleEdges = [...semanticEdges, ...contextualEdges];
 
   // 3. Node visibility from active edge filter
   const hasEdgeFilter = filters.direction !== "all" || filters.relationshipTypes.length > 0;
@@ -368,6 +422,7 @@ function NetworkExplorerInner() {
     entityTypes: [],
     relationshipTypes: [],
     nodeSearch: "",
+    showContextualAssociations: true,
   });
 
   const { settle, cancel: cancelSettle } = useForceSettle(setRfNodes);
@@ -444,6 +499,7 @@ function NetworkExplorerInner() {
   const availableRelationshipTypes = useMemo(() => {
     const types = new Set<string>();
     for (const e of rfEdges) {
+      if (e.data?.variant === "contextual") continue;
       if (e.data?.relationType) types.add(e.data.relationType);
     }
     return Array.from(types).sort();
@@ -461,7 +517,15 @@ function NetworkExplorerInner() {
     if (!state.selectedId) return null;
     const cached = state.cache[state.selectedId];
     if (cached) {
-      return { id: state.selectedId, name: cached.entity.name, type: cached.entity.type, description: cached.entity.description, metadata: cached.entity.metadata, relationshipCount: cached.relationships.length };
+      return {
+        id: state.selectedId,
+        name: cached.entity.name,
+        type: cached.entity.type,
+        description: cached.entity.description,
+        metadata: cached.entity.metadata,
+        relationshipCount:
+          cached.relationships.length + (cached.contextualAssociations?.length ?? 0),
+      };
     }
     const node = rfNodes.find((n) => n.id === state.selectedId);
     if (!node) return null;

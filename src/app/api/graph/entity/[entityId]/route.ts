@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GraphNode, GraphEdge } from "@/app/api/graph/[projectId]/route";
+import {
+  fetchContextualAssociations,
+  type ContextualAssociation,
+} from "@/lib/entities/contextual-associations";
+
+export type { ContextualAssociation };
 
 export interface EntityWithMeta extends GraphNode {
   metadata?: unknown;
@@ -11,6 +17,7 @@ export interface NeighborhoodData {
   entity: EntityWithMeta;
   relationships: GraphEdge[];
   neighbors: GraphNode[];
+  contextualAssociations: ContextualAssociation[];
 }
 
 /**
@@ -102,11 +109,19 @@ export async function GET(
     confidence: r.confidence,
   }));
 
-  // Collect neighbour IDs
+  // Collect neighbour IDs (semantic + contextual)
   const neighbourIds = new Set<string>();
   for (const r of relationships) {
     if (r.source !== entityId) neighbourIds.add(r.source);
     if (r.target !== entityId) neighbourIds.add(r.target);
+  }
+
+  const contextualAssociations = await fetchContextualAssociations(admin, entityId, {
+    projectId: entityRow.project_id,
+  });
+
+  for (const assoc of contextualAssociations) {
+    neighbourIds.add(assoc.entity.id);
   }
 
   // Fetch neighbour entities
@@ -135,5 +150,10 @@ export async function GET(
     metadata: entityRow.metadata,
   };
 
-  return NextResponse.json({ entity, relationships, neighbors } satisfies NeighborhoodData);
+  return NextResponse.json({
+    entity,
+    relationships,
+    neighbors,
+    contextualAssociations,
+  } satisfies NeighborhoodData);
 }

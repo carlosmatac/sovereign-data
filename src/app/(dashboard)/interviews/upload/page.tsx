@@ -149,7 +149,6 @@ export default function UploadInterviewPage() {
   const [language, setLanguage] = useState("en");
   const [intervieweeName, setIntervieweeName] = useState("");
   const [intervieweeOrg, setIntervieweeOrg] = useState("");
-  const [intervieweeTitle, setIntervieweeTitle] = useState("");
   const [intervieweeEntityId, setIntervieweeEntityId] = useState<string | null>(null);
   const [intervieweeOrgEntityId, setIntervieweeOrgEntityId] = useState<string | null>(null);
   const [intervieweeRelationshipTypes, setIntervieweeRelationshipTypes] = useState<string[]>([]);
@@ -391,7 +390,6 @@ export default function UploadInterviewPage() {
               : parseInt(expectedSpeakers, 10),
           interviewee_name: intervieweeName.trim() || undefined,
           interviewee_org: intervieweeOrg.trim() || undefined,
-          interviewee_title: intervieweeTitle.trim() || undefined,
           ...(intervieweeEntityId
             ? { interviewee_entity_id: intervieweeEntityId }
             : {}),
@@ -445,8 +443,6 @@ export default function UploadInterviewPage() {
         formData.append("interviewee_name", intervieweeName.trim());
       if (intervieweeOrg.trim())
         formData.append("interviewee_org", intervieweeOrg.trim());
-      if (intervieweeTitle.trim())
-        formData.append("interviewee_title", intervieweeTitle.trim());
       if (intervieweeEntityId)
         formData.append("interviewee_entity_id", intervieweeEntityId);
       if (intervieweeOrgEntityId)
@@ -501,7 +497,6 @@ export default function UploadInterviewPage() {
         body.structure_hint = structureHint;
       if (intervieweeName.trim()) body.interviewee_name = intervieweeName.trim();
       if (intervieweeOrg.trim()) body.interviewee_org = intervieweeOrg.trim();
-      if (intervieweeTitle.trim()) body.interviewee_title = intervieweeTitle.trim();
       if (intervieweeEntityId) body.interviewee_entity_id = intervieweeEntityId;
       if (intervieweeOrgEntityId)
         body.interviewee_org_entity_id = intervieweeOrgEntityId;
@@ -999,22 +994,6 @@ export default function UploadInterviewPage() {
                       — each will create a separate anchor relationship.
                     </p>
                   )}
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="interviewee-title">
-                    Exact title / role text{" "}
-                    <span className="font-normal text-muted-foreground">
-                      (optional — used as evidence text)
-                    </span>
-                  </Label>
-                  <Input
-                    id="interviewee-title"
-                    placeholder="e.g., Chief Executive Officer"
-                    value={intervieweeTitle}
-                    onChange={(e) => setIntervieweeTitle(e.target.value)}
-                    disabled={loading}
-                    autoComplete="off"
-                  />
                 </div>
               </div>
 

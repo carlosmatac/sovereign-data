@@ -12,6 +12,8 @@ export interface GraphFilters {
   entityTypes: string[];       // empty = all
   relationshipTypes: string[]; // empty = all
   nodeSearch: string;
+  /** Show dashed same-source co-occurrence edges (Phase 4). */
+  showContextualAssociations: boolean;
 }
 
 interface GraphToolbarProps {
@@ -103,6 +105,25 @@ export function GraphToolbar({ filters, availableRelationshipTypes, onChange }: 
           </button>
         ))}
       </div>
+
+      {/* Contextual co-occurrence toggle */}
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            ...filters,
+            showContextualAssociations: !filters.showContextualAssociations,
+          })
+        }
+        className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium backdrop-blur-sm transition-colors ${
+          filters.showContextualAssociations
+            ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+            : "border-white/10 bg-black/55 text-white/40 hover:text-white/70"
+        }`}
+        title="Toggle same-source co-occurrence edges"
+      >
+        Same source
+      </button>
 
       {/* Entity type dropdown */}
       <div className="relative" ref={entityRef}>

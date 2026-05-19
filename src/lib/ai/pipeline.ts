@@ -29,6 +29,7 @@ import {
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
 import { applyPersistenceGate, relationshipKey } from "@/lib/ai/persistence-gate";
+import { validateExtractedRelationships } from "@/lib/ai/validate-extracted-relationships";
 import {
   writeAnchorSourceEntities,
   writeExtractionSourceEntities,
@@ -604,6 +605,17 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     console.warn("[pipeline] Failed to fetch upload_anchor source_entities for gate bypass:", anchorSeErr);
   }
 
+  // Phase 3c: validate LLM relationships before the persistence gate.
+  const { relationships: validatedRelationships, stats: relValidationStats } =
+    validateExtractedRelationships(extraction.relationships, { sourceId: interviewId });
+  if (relValidationStats.input > 0 && relValidationStats.kept < relValidationStats.input) {
+    console.log(
+      `[pipeline] relationship validation for ${interviewId}: kept=${relValidationStats.kept}/${relValidationStats.input} ` +
+        `dropped_unknown=${relValidationStats.droppedUnknownType} self=${relValidationStats.droppedSelfRelationship} ` +
+        `floor=${relValidationStats.droppedConfidenceFloor} downgraded_no_evidence=${relValidationStats.downgradedHighConfidenceNoEvidence}`
+    );
+  }
+
   // Persistence gate: only `exact`/`alias` grounded mentions are written,
   // and only relationships whose endpoints survived the gate are written.
   // Silent `chunk_id = null` fallback is intentionally gone.
@@ -612,7 +624,7 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     interviewId,
     entitiesForGrounding,
     groundedMap,
-    relationships: extraction.relationships,
+    relationships: validatedRelationships,
     entityIdMap,
     rejectedRelationshipKeys,
     anchorEntityIds: anchorEntityIds.size > 0 ? anchorEntityIds : undefined,
@@ -959,13 +971,19 @@ export async function processTranscription(
         .join("\n\n");
     }
 
-    const { data: interview } = await supabase
-      .from("interviews")
+    const { data: interview, error: interviewFetchError } = await supabase
+      .from("sources")
       .select(
         "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, projects(country)"
       )
       .eq("id", interviewId)
       .single();
+
+    if (interviewFetchError) {
+      throw new Error(
+        `Failed to load source ${interviewId}: ${interviewFetchError.message}`
+      );
+    }
 
     const country = (interview?.projects as Record<string, unknown>)?.country as
       | string
@@ -1059,7 +1077,7 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
 
   try {
     const { data: interview, error: fetchError } = await supabase
-      .from("interviews")
+      .from("sources")
       .select(
         "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
       )

@@ -12,6 +12,10 @@ import {
   getMentions,
 } from "@/lib/ai/entity-lookup";
 import {
+  fetchContextualAssociations,
+  formatSourceCoOccurrenceContext,
+} from "@/lib/entities/contextual-associations";
+import {
   buildProjectIntelBrief,
   buildWorkspaceIntelBriefForUser,
 } from "@/lib/chat/intel-brief";
@@ -410,6 +414,15 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
             };
           }
           const metaSummary = formatEntityMetadata(entity.metadata);
+          const coOccurrences = await fetchContextualAssociations(
+            admin,
+            entity.id,
+            { projectId }
+          );
+          const coOccurrenceBlock = formatSourceCoOccurrenceContext(
+            entity.name,
+            coOccurrences
+          );
           return {
             found: true,
             entity_id: entity.id,
@@ -417,6 +430,9 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
             type: entity.type,
             description: entity.description,
             ...(metaSummary ? { metadata: metaSummary } : {}),
+            ...(coOccurrenceBlock
+              ? { source_co_occurrence_context: coOccurrenceBlock }
+              : {}),
           };
         },
       }),
@@ -433,10 +449,29 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
             sortByInterviewRecency:
               temporalClassification.temporal_intent !== "general_background",
           });
+
+          const { data: entityRow } = await admin
+            .from("entities")
+            .select("name")
+            .eq("id", entityId)
+            .maybeSingle();
+
+          const coOccurrences = await fetchContextualAssociations(
+            admin,
+            entityId,
+            { projectId }
+          );
+          const coOccurrenceBlock = entityRow?.name
+            ? formatSourceCoOccurrenceContext(entityRow.name, coOccurrences)
+            : null;
+
           if (edges.length === 0) {
             return {
               found: false,
               message: "No relationships found for this entity in our database.",
+              ...(coOccurrenceBlock
+                ? { source_co_occurrence_context: coOccurrenceBlock }
+                : {}),
             };
           }
           return {
@@ -450,6 +485,9 @@ None pre-loaded. After \`lookupEntity\` resolves a PERSON, call \`lookupPosition
               evidence: e.evidence_text,
               interview_id: e.interview_id,
             })),
+            ...(coOccurrenceBlock
+              ? { source_co_occurrence_context: coOccurrenceBlock }
+              : {}),
           };
         },
       }),

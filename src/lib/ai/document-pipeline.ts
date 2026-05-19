@@ -41,9 +41,9 @@ export async function processTextInterview(
 
   try {
     const { data: interview } = await supabase
-      .from("interviews")
+      .from("sources")
       .select(
-        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -124,7 +124,7 @@ export async function processDocument(
 
   try {
     const { data: interview } = await supabase
-      .from("interviews")
+      .from("sources")
       .select(
         "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, projects(country)"
       )

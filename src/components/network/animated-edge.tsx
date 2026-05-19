@@ -15,6 +15,10 @@ export type EdgeDirection = "outgoing" | "incoming" | "bidirectional" | "unrelat
 export interface AnimatedEdgeData extends Record<string, unknown> {
   relationType: string;
   direction: EdgeDirection;
+  /** semantic = entity_relationships row; contextual = same-source co-occurrence */
+  variant?: "semantic" | "contextual";
+  /** Source title(s) for contextual edge tooltips */
+  sourceTitles?: string[];
 }
 
 // ── Colour map ───────────────────────────────────────────────────
@@ -43,7 +47,9 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 }: EdgeProps<AnimatedEdgeType>) {
   const direction: EdgeDirection = data?.direction ?? "unrelated";
   const relationType = data?.relationType ?? "";
-  const color = EDGE_COLORS[direction];
+  const variant = data?.variant ?? "semantic";
+  const isContextual = variant === "contextual";
+  const color = isContextual ? "rgba(245, 158, 11, 0.55)" : EDGE_COLORS[direction];
 
   const [edgePath] = getBezierPath({
     sourceX,
@@ -54,21 +60,30 @@ export const AnimatedEdge = memo(function AnimatedEdge({
     targetPosition,
   });
 
-  const isActive = direction !== "unrelated";
+  const isActive = !isContextual && direction !== "unrelated";
   // Calm, unhurried particles — faster for bidirectional just to distinguish the two directions
   const animDuration = direction === "bidirectional" ? "5s" : "3.5s";
+  const tooltip =
+    isContextual && data?.sourceTitles?.length
+      ? `Same source: ${data.sourceTitles.join("; ")}`
+      : relationType;
 
   return (
     <>
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={markerEnd}
-        style={{ stroke: color, strokeWidth: isActive ? 1.5 : 1, opacity: isActive ? 0.8 : 0.4 }}
+        markerEnd={isContextual ? undefined : markerEnd}
+        style={{
+          stroke: color,
+          strokeWidth: isContextual ? 1 : isActive ? 1.5 : 1,
+          opacity: isContextual ? 0.45 : isActive ? 0.8 : 0.4,
+          strokeDasharray: isContextual ? "6 4" : undefined,
+        }}
       />
 
       {/* SVG title for hover tooltip */}
-      <title>{relationType}</title>
+      <title>{tooltip}</title>
 
       {/* Animated particle along edge */}
       {isActive && (

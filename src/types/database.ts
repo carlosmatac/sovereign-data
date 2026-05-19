@@ -681,6 +681,8 @@ export interface Database {
           interviewee_title: string | null;
           interviewee_entity_id: string | null;
           interviewee_org_entity_id: string | null;
+          interviewee_relationship_types: RelationType[] | null;
+          participant_anchor_relationships: Record<string, unknown> | null;
           source_type: SourceType;
           semantic_source_type: string | null;
           source_metadata: Record<string, unknown> | null;
@@ -718,6 +720,8 @@ export interface Database {
           interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
+          interviewee_relationship_types?: RelationType[] | null;
+          participant_anchor_relationships?: Record<string, unknown> | null;
           source_type?: SourceType;
           semantic_source_type?: string | null;
           source_metadata?: Record<string, unknown> | null;
@@ -755,6 +759,8 @@ export interface Database {
           interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
+          interviewee_relationship_types?: RelationType[] | null;
+          participant_anchor_relationships?: Record<string, unknown> | null;
           source_type?: SourceType;
           semantic_source_type?: string | null;
           source_metadata?: Record<string, unknown> | null;
