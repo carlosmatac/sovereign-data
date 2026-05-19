@@ -10,10 +10,47 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { AI_CONFIG } from "@/lib/constants";
-import { ENTITY_TYPE_VALUES, type EntityType } from "@/types/database";
+import {
+  ACTIVE_RELATION_TYPE_VALUES,
+  ENTITY_TYPE_VALUES,
+  type EntityType,
+  type RelationType,
+} from "@/types/database";
 import { withRetry } from "./retry";
 
 export const EntityTypeSchema = z.enum(ENTITY_TYPE_VALUES);
+
+/** Active canonical relation types for LLM structured output (no deprecated/legacy). */
+const ACTIVE_RELATION_TYPES = ACTIVE_RELATION_TYPE_VALUES as unknown as [
+  RelationType,
+  ...RelationType[],
+];
+
+/** Prompt block for relationship extraction (Phase 3b). */
+const RELATIONSHIP_EXTRACTION_GUIDANCE = `
+RELATIONSHIPS — extract typed, directional edges between entities using canonical_name values from your entities array.
+
+COMPLETENESS RULE: For every PERSON–ORG pair and every ORG–LOCATION pair that appear together in this source, you MUST extract a relationship. Omitting an obvious connection is a critical extraction error. If evidence is ambiguous, use works_at (person↔org) or has_presence_in (org↔location) with low confidence rather than omitting the relationship.
+
+DIRECTION RULE: Relationships are directional. source_name is the entity that holds the role or takes the action; target_name is the entity the role/action is directed at.
+Examples: Person → is_ceo_of → Company (person holds the CEO role); Company → has_presence_in → Country (company has presence in country). Do not reverse these directions.
+
+EVIDENCE RULE: evidence_text must be a direct quote or paraphrase from the source for any relationship with confidence ≥ 0.7. For confidence < 0.7, null is acceptable. Inferred relationships with no textual support must have confidence < 0.5.
+
+TYPE SELECTION (use the most specific type that fits):
+- Employment/role: works_at, leads, is_ceo_of, is_cfo_of, is_cto_of, is_coo_of, is_cmo_of, is_cso_of, is_board_member_of, is_member_of, founded, advisor, represents
+- Ownership/control: is_direct_parent_of, is_ultimate_parent_of, invested_in, is_beneficial_owner_of, is_controlled_person_of
+- Geography: has_headquarters_in, has_presence_in, is_registered_in, located_in, within, has_nationality, native_to
+- Governance/regulation: has_jurisdiction, operates_in_industry
+- Events/activities: spoke_at, participates_in_corporate_event, studied_at, featured_in
+- Markets/finance: listed_on, traded_on
+- Products/works: manufactured_by, published_by, created_by, designed_by, operated_by
+- Commercial: supplier, customer_of, competitor, acquirer, critic
+- Generic fallback: affiliated_with (person↔org when no specific employment/role type fits)
+
+DO NOT use business_partner or ally — they are legacy types not available for new extraction.
+DO NOT use operates_in — use has_presence_in (org in location/country) or operates_in_industry (org in sector) instead.
+DO NOT extract a relationship based solely on two entities being mentioned in the same paragraph — there must be explicit interaction or association in the text.`;
 
 const ExtractionSchema = z.object({
   summary: z
@@ -91,33 +128,11 @@ const ExtractionSchema = z.object({
           "canonical_name of the target entity (must match a canonical_name in the entities array)"
         ),
       relation_type: z
-        .enum([
-          // ── Preferred taxonomy (v2) ─────────────────────────────────
-          "supplier",
-          "competitor",
-          "investor",
-          "subsidiary",
-          "acquirer",
-          "critic",
-          "advisor",
-          "regulator",
-          "affiliated_with",
-          "operates_in",
-          "governs",
-          "customer_of",
-          // ── Legacy (kept compatible; prefer values above) ───────────
-          "business_partner",
-          "ally",
-        ])
+        .enum(ACTIVE_RELATION_TYPES)
         .describe(
-          "Type of relationship between source and target. Prefer the v2 taxonomy. Selection guidance:\n" +
-            "- affiliated_with: PERSON ↔ ORG/COMPANY/GOVERNMENT/PUBLIC_INSTITUTION/STATE_OWNED_ENTERPRISE/MEDIA_OR_PUBLICATION generic association (employee, director, manager, ministry official, spokesperson, marketing lead, senior staff). Use this — NOT business_partner — for almost every person↔org-like link.\n" +
-            "- operates_in: COMPANY/ORGANIZATION/PUBLIC_INSTITUTION/STATE_OWNED_ENTERPRISE/MEDIA_OR_PUBLICATION ↔ LOCATION/COUNTRY where the org has operational presence, offices, projects or activity. Use this — NOT business_partner / ally — for org↔country.\n" +
-            "- governs: GOVERNMENT/PUBLIC_INSTITUTION/regulator ↔ COMPANY/ORGANIZATION/STATE_OWNED_ENTERPRISE/COUNTRY institutional control or oversight.\n" +
-            "- customer_of: source buys goods/services from target. Pair with `supplier` (target sells to source).\n" +
-            "- supplier: source sells goods/services to target.\n" +
-            "- competitor / investor / subsidiary / acquirer / critic / advisor / regulator: only when the transcript clearly establishes that specific dynamic.\n" +
-            "- business_partner / ally: legacy generic types; only emit when no other type fits and the transcript explicitly frames it as a partnership/alliance."
+          "Canonical directed relationship type from the active taxonomy. " +
+            "source_name holds the role or takes the action; target_name is the object. " +
+            "Prefer specific types (is_ceo_of, has_presence_in) over generic affiliated_with."
         ),
       confidence: z
         .number()
@@ -333,7 +348,7 @@ ${reviewerSeedEntities
   * Emit RISK entities for named specific risks (e.g. "Regulatory Uncertainty in Angola"). Limit to the 3–4 most prominent risks.
   * Emit OPPORTUNITY entities for named specific opportunities (e.g. "LNG Export Corridor to Europe"). Limit to the 3–4 most prominent.
   * Emit PROJECT entities for named real-world projects/initiatives (e.g. "Trans-Saharan Gas Pipeline"). Only emit when a project is named and substantively discussed.
-  * For TOPIC/RISK/OPPORTUNITY/PROJECT entities: relationships should use "affiliated_with" (entity ↔ person/org that drives it) or "operates_in" (project ↔ country/location).
+  * For TOPIC/RISK/OPPORTUNITY/PROJECT entities: link to people/orgs with works_at or affiliated_with; link projects to countries/locations with has_presence_in or located_in.
   * Keep descriptions informative: what this topic/risk/opportunity/project is, in the context of this source.`
     : "";
 
@@ -366,13 +381,8 @@ INSTRUCTIONS:
 - topics[]: lowercase, single-word or hyphenated tags useful for database filtering (e.g. "energy", "regulation"). Keep this array as short filter tags; do not put full sentences here.
 - risks[]: short actionable risk descriptions (2–10 words each). Keep as string tags; named risks are also captured as RISK entities when topicEntitiesEnabled.
 - opportunities[]: short actionable opportunity descriptions (2–10 words each). Keep as string tags; named opportunities also captured as OPPORTUNITY entities when enabled.
-- RELATIONSHIPS: Identify how entities are connected to each other. Use canonical_name values from the entities array. Include the direct quote that establishes the relationship when possible.
-- RELATIONSHIP TYPE SELECTION (important — avoid generic catch-all labels):
-  * For PERSON ↔ COMPANY / ORGANIZATION / GOVERNMENT / PUBLIC_INSTITUTION / STATE_OWNED_ENTERPRISE / MEDIA_OR_PUBLICATION: prefer "affiliated_with" (covers executives, directors, managers, ministry officials, spokespersons, marketing leads, senior staff). Do NOT use "business_partner" for a person-to-organisation tie.
-  * For COMPANY / ORGANIZATION / PUBLIC_INSTITUTION / STATE_OWNED_ENTERPRISE / MEDIA_OR_PUBLICATION ↔ LOCATION / COUNTRY: prefer "operates_in" when the org has operational presence, offices, projects, or activity in that location. Do NOT use "business_partner" or "ally" for an organisation-to-country tie.
-  * For GOVERNMENT / PUBLIC_INSTITUTION / regulator ↔ COMPANY / ORGANIZATION / STATE_OWNED_ENTERPRISE / COUNTRY: use "governs" when the relationship is institutional control or oversight; use "regulator" when the transcript specifically frames it as a regulatory body.
-  * For commercial sales: pair "supplier" (seller → buyer) and "customer_of" (buyer → seller).
-  * Only use "business_partner" or "ally" when no other type fits AND the transcript explicitly frames the link as a partnership or alliance.
+- RELATIONSHIPS: Identify how entities are connected. Use canonical_name values from the entities array.
+${RELATIONSHIP_EXTRACTION_GUIDANCE}
 - If HUMAN-CONFIRMED ENTITIES were listed above, you must not omit them from the entities output when they are discussed in the transcript, and you must actively look for relationships involving them.${thematicEntitiesBlock}
 - SOURCE-LEVEL ASSOCIATIONS (source_associations):
   * Distinct from entities/relationships: these describe the SOURCE itself, not links between entities.

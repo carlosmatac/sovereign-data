@@ -40,3 +40,12 @@ New completed features: add a row here when you move a spec into this folder.
 | [source-entity-relationship-context.md](./source-entity-relationship-context.md) | `source_entities.context` column; `generateSourceEntityContexts` batched LLM call per source; `entity_intel` v3 COALESCE surfaces context in chat |
 | [source-all-related-entities-panel.md](./source-all-related-entities-panel.md) | Unified entity set (source_entities + entity_mentions) on Source Detail and Transcript Review; shared aggregator + SourceEntityList component |
 | [project-entity-linking.md](./project-entity-linking.md) | `project_entities` join table (migration 00043); project-entity direct links with RLS; "Link to project" panel on entity governance page; linked entities card on project detail page |
+| [chat-source-citation-cards.md](./chat-source-citation-cards.md) | Source citation cards below assistant messages; right-side drawer on click; source type badges; cited vs context visual distinction |
+| [multi-participant-source-entities.md](./multi-participant-source-entities.md) | Multi-participant entity tagging in source upload; anchor entity input supports multiple interviewees/participants |
+| [network-explorer-v2.md](./network-explorer-v2.md) | Full-screen React Flow graph canvas; entity cards; explored-entities panel; directional relationship filters; read-only entity detail page at `/network/entities/[id]`; session persistence |
+| [dark-light-mode-toggle.md](./dark-light-mode-toggle.md) | Light mode with semantic CSS tokens; ThemeToggle in header; logo switching; audit of major pages for hardcoded dark-only classes |
+| [anchor-row-context-enrichment.md](./anchor-row-context-enrichment.md) | `source_entities.context` surfaced via `entity_intel` RPC fallback; anchor rows receive richer context for chat retrieval |
+| [chat-citation-routing.md](./chat-citation-routing.md) | Citation `[N]` markers route to internal source detail drawer; unified citation interaction model |
+| [source-detail-entity-cards.md](./source-detail-entity-cards.md) | Primary-entity cards visible on source detail page; `source_entities` aggregator drives the right-panel entity list |
+| [entity-correction-governance.md](./entity-correction-governance.md) | Post-extraction correction tools; alias learning, merge workflow, review status on entity governance page |
+| [entity-cross-type-deduplication.md](./entity-cross-type-deduplication.md) | Cross-type deduplication logic; prevents duplicate entities of different `entity_type` for the same real-world subject |

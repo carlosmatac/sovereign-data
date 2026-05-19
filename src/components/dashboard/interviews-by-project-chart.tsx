@@ -31,20 +31,27 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
     <div
       className="rounded-[5px] px-2.5 py-2"
       style={{
-        background: "#0E1119",
-        border: "1px solid rgba(147,147,147,0.18)",
-        boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.025), 0 8px 24px -6px rgba(0,0,0,0.55)",
+        background: "var(--sv-surface-bg)",
+        border: "1px solid var(--sv-border-surface-strong)",
+        boxShadow: "var(--sv-shadow-compact)",
       }}
     >
-      <p className="mb-1 max-w-[220px] truncate text-[12px] font-semibold text-white/95">
+      <p
+        className="mb-1 max-w-[220px] truncate text-[12px] font-semibold"
+        style={{ color: "var(--sv-text-primary)" }}
+      >
         {label}
       </p>
       {d.country && (
-        <p className="mb-1 text-[11px] text-white/40">{d.country}</p>
+        <p className="mb-1 text-[11px]" style={{ color: "var(--sv-text-dim)" }}>
+          {d.country}
+        </p>
       )}
-      <p className="text-[11.5px] text-white/65">
-        <span className="font-semibold tabular-nums text-white/95">
+      <p className="text-[11.5px]" style={{ color: "var(--sv-text-secondary)" }}>
+        <span
+          className="font-semibold tabular-nums"
+          style={{ color: "var(--sv-text-primary)" }}
+        >
           {d.total}
         </span>{" "}
         sources
@@ -67,8 +74,6 @@ export function InterviewsByProjectChart({ data }: Props) {
     displayName: d.name.length > 22 ? d.name.slice(0, 21) + "…" : d.name,
   }));
 
-  // Fill rule mirrors the donut chart: calm ramp by rank when nothing is
-  // hovered, single bar emphasised with the rest dimmed on hover.
   const fillFor = (index: number) => {
     const rankAlpha = Math.max(0.42, 1 - index * 0.08);
     if (hoveredIndex === null) return `rgba(78,120,207,${rankAlpha})`;
@@ -90,7 +95,7 @@ export function InterviewsByProjectChart({ data }: Props) {
       >
         <XAxis
           type="number"
-          tick={{ fill: "rgba(255,255,255,0.42)", fontSize: 11 }}
+          tick={{ fill: "var(--sv-text-placeholder)", fontSize: 11 }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
@@ -117,13 +122,12 @@ export function InterviewsByProjectChart({ data }: Props) {
                 textAnchor="end"
                 style={{
                   fill: isActive
-                    ? "rgba(255,255,255,0.95)"
+                    ? "var(--sv-text-primary)"
                     : isDimmed
-                      ? "rgba(255,255,255,0.38)"
-                      : "rgba(255,255,255,0.78)",
+                      ? "var(--sv-text-dim)"
+                      : "var(--sv-text-body)",
                   fontSize: 12,
-                  transition:
-                    "fill 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  transition: "fill 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
                 {payload.value}
@@ -135,7 +139,7 @@ export function InterviewsByProjectChart({ data }: Props) {
         />
         <Tooltip
           content={<CustomTooltip />}
-          cursor={{ fill: "rgba(255,255,255,0.025)" }}
+          cursor={{ fill: "var(--sv-accent,rgba(255,255,255,0.025))" }}
           isAnimationActive={false}
         />
         <Bar
@@ -149,8 +153,7 @@ export function InterviewsByProjectChart({ data }: Props) {
               key={entry.name}
               fill={fillFor(index)}
               style={{
-                transition:
-                  "fill 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                transition: "fill 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                 cursor: "pointer",
                 outline: "none",
               }}

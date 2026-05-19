@@ -126,54 +126,55 @@ export function RelationshipsList({
         return (
           <li
             key={rel.id}
-            className={`rounded-[10px] border border-[rgba(147,147,147,0.10)] bg-white/[0.022] px-3.5 py-3 ${
+            className={`rounded-[10px] border px-3.5 py-3 ${
               isRejected ? "opacity-55" : ""
             }`}
+            style={{ borderColor: "var(--sv-border-divider)", background: "var(--sv-accent,rgba(255,255,255,0.022))" }}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-[13px] tracking-[-0.005em] text-white/88">
+                <div className="flex items-center gap-2 text-[13px] tracking-[-0.005em] text-foreground/88">
                   <span className="truncate font-medium">{source.name}</span>
-                  <ArrowRight className="h-3 w-3 shrink-0 text-white/30" />
+                  <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/50" />
                   <span className="truncate font-medium">{target.name}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span
                     className={`inline-flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.06em] ${
                       isRejected
-                        ? "text-white/40 line-through"
-                        : "text-[#8EB6F3]/85"
+                        ? "text-muted-foreground/60 line-through"
+                        : "text-[#5B9CF6]/85"
                     }`}
                   >
                     <span
                       className={`h-1 w-1 rounded-full ${
-                        isRejected ? "bg-white/30" : "bg-[#8EB6F3]/70"
+                        isRejected ? "bg-muted-foreground/40" : "bg-[#5B9CF6]/70"
                       }`}
                     />
                     {humanizeRelationType(rel.relation_type)}
                   </span>
-                  <span className="text-[10.5px] tabular-nums text-white/35">
+                  <span className="text-[10.5px] tabular-nums text-muted-foreground">
                     {Math.round(rel.confidence * 100)}% confidence
                   </span>
                   <span
                     className={`text-[10.5px] uppercase tracking-[0.06em] ${
                       isApproved
-                        ? "text-emerald-300/80"
+                        ? "text-emerald-500/80 dark:text-emerald-300/80"
                         : isRejected
-                          ? "text-rose-300/70"
-                          : "text-white/35"
+                          ? "text-rose-500/70 dark:text-rose-300/70"
+                          : "text-muted-foreground"
                     }`}
                   >
                     {statusLabel(rel.review_status)}
                   </span>
                   {originHint && (
-                    <span className="text-[10.5px] uppercase tracking-[0.06em] text-amber-200/70">
+                    <span className="text-[10.5px] uppercase tracking-[0.06em] text-amber-600/70 dark:text-amber-200/70">
                       {originHint}
                     </span>
                   )}
                 </div>
                 {rel.evidence_text && (
-                  <p className="mt-2 border-l border-white/10 pl-3 text-[12px] leading-[1.55] italic text-white/50">
+                  <p className="mt-2 border-l border-border/50 pl-3 text-[12px] leading-[1.55] italic text-muted-foreground">
                     &ldquo;{rel.evidence_text}&rdquo;
                   </p>
                 )}
@@ -185,7 +186,7 @@ export function RelationshipsList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0 text-white/40 hover:text-white/80"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
                       disabled={isBusy}
                       aria-label="Relationship actions"
                     >

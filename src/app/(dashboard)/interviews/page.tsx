@@ -100,12 +100,12 @@ export default async function InterviewsPage({
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1
-            className="text-[28px] font-semibold text-white"
+            className="text-[28px] font-semibold text-foreground"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
             Knowledge Library
           </h1>
-          <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-white/62">
+          <p className="mt-1.5 max-w-xl text-[13px] leading-[1.6] text-muted-foreground">
             Cross-project source library for uploaded audio, documents, and
             text-based company knowledge. For day-to-day workflow, start in Projects
             and manage sources in project context.
@@ -137,7 +137,7 @@ export default async function InterviewsPage({
       {/* Source List */}
       {error ? (
         <SectionSurface>
-          <p className="py-10 text-center text-[13px] text-white/60">
+          <p className="py-10 text-center text-[13px] text-muted-foreground">
             Failed to load knowledge sources. Please try again.
           </p>
         </SectionSurface>
@@ -150,10 +150,10 @@ export default async function InterviewsPage({
               strokeWidth={1.5}
             />
           </IconWell>
-          <h3 className="mt-3 text-[14px] font-semibold text-white/92">
+          <h3 className="mt-3 text-[14px] font-semibold text-foreground/92">
             No sources yet
           </h3>
-          <p className="mt-1.5 text-[12.5px] text-white/60">
+          <p className="mt-1.5 text-[12.5px] text-muted-foreground">
             Add your first source to start extracting knowledge.
           </p>
           {canUpload && (
@@ -204,7 +204,7 @@ export default async function InterviewsPage({
               return (
                 <div
                   key={interview.id}
-                  className="group flex items-center gap-3 rounded-[5px] px-2.5 py-2.5 transition-colors duration-150 hover:bg-white/[0.025]"
+                  className="group flex items-center gap-3 rounded-[5px] px-2.5 py-2.5 transition-colors duration-150 hover:bg-accent"
                 >
                   <Link
                     href={`/interviews/${interview.id}`}
@@ -218,10 +218,10 @@ export default async function InterviewsPage({
                       />
                     </IconWell>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold leading-tight text-white/92">
+                      <p className="truncate text-[13px] font-semibold leading-tight text-foreground/92">
                         {interview.title}
                       </p>
-                      <p className="mt-[4px] truncate text-[11.5px] text-white/50">
+                      <p className="mt-[4px] truncate text-[11.5px] text-muted-foreground">
                         {project?.name ?? "Unknown project"}
                       </p>
                     </div>
@@ -230,7 +230,7 @@ export default async function InterviewsPage({
                         {source.label}
                       </SectionChip>
                       {hasDuration && (
-                        <span className="flex items-center gap-1 text-[11.5px] tabular-nums text-white/55">
+                        <span className="flex items-center gap-1 text-[11.5px] tabular-nums text-muted-foreground">
                           <Clock
                             className="h-[11px] w-[11px]"
                             strokeWidth={1.5}

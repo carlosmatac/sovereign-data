@@ -215,7 +215,7 @@ function HighlightedTranscriptTextarea({
     <div className="relative w-full min-w-0">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <div
-          className="break-words px-0 py-0 text-[14px] leading-[1.65] whitespace-pre-wrap text-white/72"
+          className="break-words px-0 py-0 text-[14px] leading-[1.65] whitespace-pre-wrap text-foreground/72"
           style={{ transform: `translateY(-${scrollTop}px)` }}
         >
           {segments.map((seg, idx) =>
@@ -953,8 +953,8 @@ export function TranscriptReviewEditor({
             <>
               <div className="mb-5 space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[rgba(147,147,147,0.12)] bg-white/[0.035] px-3 py-1.5 transition-colors focus-within:border-[rgba(147,147,147,0.22)] focus-within:bg-white/[0.05]">
-                    <Search className="h-3.5 w-3.5 shrink-0 text-white/35" aria-hidden />
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border/40 bg-accent px-3 py-1.5 transition-colors focus-within:border-border/70">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                     <Input
                       id="tr-find"
                       value={transcriptFind}
@@ -962,7 +962,7 @@ export function TranscriptReviewEditor({
                       placeholder="Find in transcript…"
                       disabled={reprocessing}
                       autoComplete="off"
-                      className="h-7 border-0 bg-transparent px-0 text-sm text-white/85 shadow-none placeholder:text-white/30 focus-visible:ring-0 md:text-sm"
+                      className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 md:text-sm"
                       aria-label="Find in reviewed transcript (case-insensitive)"
                     />
                   </div>
@@ -982,7 +982,7 @@ export function TranscriptReviewEditor({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-white/45 hover:bg-white/[0.05] hover:text-white/80"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           disabled={reprocessing}
                           aria-label="Previous match"
                           onClick={goPrevMatch}
@@ -993,7 +993,7 @@ export function TranscriptReviewEditor({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-white/45 hover:bg-white/[0.05] hover:text-white/80"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           disabled={reprocessing}
                           aria-label="Next match"
                           onClick={goNextMatch}
@@ -1002,7 +1002,7 @@ export function TranscriptReviewEditor({
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-xs text-white/45">No matches</span>
+                      <span className="text-xs text-muted-foreground">No matches</span>
                     )
                   ) : null}
                 </div>
@@ -1014,13 +1014,13 @@ export function TranscriptReviewEditor({
                     placeholder="Replace with…"
                     disabled={reprocessing}
                     autoComplete="off"
-                    className="h-9 min-w-0 flex-1 rounded-lg border-[rgba(147,147,147,0.12)] bg-white/[0.025] text-sm shadow-none placeholder:text-white/30 focus-visible:border-[rgba(147,147,147,0.22)] focus-visible:ring-0 sm:max-w-xl"
+                    className="h-9 min-w-0 flex-1 rounded-lg border-border/40 bg-accent text-sm shadow-none focus-visible:border-border focus-visible:ring-0 sm:max-w-xl"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-9 shrink-0 rounded-lg border-[rgba(147,147,147,0.14)] bg-transparent text-xs font-medium text-white/70 shadow-none hover:bg-white/[0.04] hover:text-white/90"
+                    className="h-9 shrink-0 rounded-lg border-border/40 bg-transparent text-xs font-medium text-foreground/70 shadow-none hover:bg-accent hover:text-foreground"
                     disabled={
                       reprocessing || !transcriptFind || findReplaceMatchCount === 0
                     }
@@ -1081,8 +1081,8 @@ export function TranscriptReviewEditor({
                             playingChunkIndex === rowIndex && !audioPaused
                               ? "border-[rgba(91,156,246,0.28)] bg-[rgba(91,156,246,0.05)]"
                               : playingChunkIndex === rowIndex && audioPaused
-                                ? "border-[rgba(147,147,147,0.22)] bg-[rgba(255,255,255,0.03)]"
-                                : "border-[rgba(147,147,147,0.13)] bg-[rgba(255,255,255,0.025)]"
+                                ? "border-border/30 bg-accent"
+                                : "border-border/20 bg-accent/60"
                           )}
                         >
                           <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1091,13 +1091,13 @@ export function TranscriptReviewEditor({
                                 "text-[13px] font-semibold tracking-[-0.011em]",
                                 playingChunkIndex === rowIndex && !audioPaused
                                   ? "text-[#5B9CF6]"
-                                  : "text-white/88"
+                                  : "text-foreground/88"
                               )}
                             >
                               {speakerLabel(u.speaker)}
                             </p>
                             {chunkAudioEnabled ? (
-                              <span className="text-[11.5px] tabular-nums text-white/38">
+                              <span className="text-[11.5px] tabular-nums text-muted-foreground">
                                 {formatTime(u.start)} – {formatTime(u.end)}
                               </span>
                             ) : null}
@@ -1108,8 +1108,8 @@ export function TranscriptReviewEditor({
                                 type="button"
                                 className={cn(
                                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors",
-                                  "border-[rgba(147,147,147,0.20)] bg-white/[0.04] text-white/70",
-                                  "hover:border-[rgba(147,147,147,0.32)] hover:bg-white/[0.08] hover:text-white/90",
+                                  "border-border/40 bg-accent text-muted-foreground",
+                                  "hover:border-border hover:bg-muted hover:text-foreground",
                                   "disabled:cursor-not-allowed disabled:opacity-40"
                                 )}
                                 disabled={reprocessing}
@@ -1133,7 +1133,8 @@ export function TranscriptReviewEditor({
                               <div className="relative flex min-w-0 flex-1 items-center">
                                 <div
                                   aria-hidden
-                                  className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/[0.08]"
+                                  className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full"
+                                  style={{ background: "var(--sv-border-control)" }}
                                 />
                                 <div
                                   aria-hidden
@@ -1157,9 +1158,9 @@ export function TranscriptReviewEditor({
                                   className={cn(
                                     "relative z-10 h-3 w-full cursor-pointer appearance-none bg-transparent",
                                     "[&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent",
-                                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#FBBF24] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0B0E14] [&::-webkit-slider-thumb]:-mt-[3.5px] [&::-webkit-slider-thumb]:shadow-none",
+                                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#FBBF24] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--sv-surface-bg)] [&::-webkit-slider-thumb]:-mt-[3.5px] [&::-webkit-slider-thumb]:shadow-none",
                                     "[&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent",
-                                    "[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0B0E14] [&::-moz-range-thumb]:bg-[#FBBF24]",
+                                    "[&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[var(--sv-surface-bg)] [&::-moz-range-thumb]:bg-[#FBBF24]",
                                     "focus-visible:outline-none",
                                     "disabled:cursor-not-allowed disabled:opacity-50"
                                   )}
@@ -1198,7 +1199,7 @@ export function TranscriptReviewEditor({
                               onChange={(e) => updateText(rowIndex, e.target.value)}
                               disabled={reprocessing}
                               rows={4}
-                              className="min-h-[5.5rem] resize-y rounded-md border-0 bg-transparent px-0 py-0 text-[14px] leading-[1.65] text-white/72 shadow-none placeholder:text-white/25 focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+                              className="min-h-[5.5rem] resize-y rounded-md border-0 bg-transparent px-0 py-0 text-[14px] leading-[1.65] text-foreground/72 shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:outline-none"
                             />
                           )}
                         </div>

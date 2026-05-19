@@ -29,10 +29,13 @@ import {
   type RawExtractedEntity,
 } from "@/lib/entities/resolve";
 import { applyPersistenceGate, relationshipKey } from "@/lib/ai/persistence-gate";
+import { validateExtractedRelationships } from "@/lib/ai/validate-extracted-relationships";
 import {
   writeAnchorSourceEntities,
   writeExtractionSourceEntities,
+  writeAnchorDerivedRelationships,
 } from "@/lib/entities/source-entities-writer";
+import { inferRelationTypeFromTitle } from "@/lib/interviews/upload-metadata";
 import { enrichNewEntityContexts } from "@/lib/entities/generate-entity-context";
 import { generateSourceEntityContexts } from "@/lib/entities/generate-source-entity-context";
 import { writeProjectEntityLinks } from "@/lib/entities/project-entity-links-writer";
@@ -352,6 +355,15 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     interviewee_org: string | null;
     interviewee_entity_id?: string | null;
     interviewee_org_entity_id?: string | null;
+    /** Free-text job title entered at upload — used as evidence_text on anchor relationships. */
+    interviewee_title?: string | null;
+    /**
+     * Relationship types explicitly selected in the upload form for the
+     * primary person→org anchor. When non-empty the API route already wrote
+     * `anchor_derived` rows at upload time; this field is used here only to
+     * skip the title-inference fallback (it would be a no-op upsert either way).
+     */
+    interviewee_relationship_types?: string[] | null;
   };
   country?: string;
   speakerMap: SpeakerMap;
@@ -573,16 +585,49 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     supabaseClient: supabase,
   });
 
+  // Build anchor entity ID set: interviewee + org from source row, plus any
+  // additional participant anchors stored in source_entities (origin=upload_anchor).
+  // These IDs bypass the persistence gate so their LLM-extracted relationships
+  // are not dropped because the anchor entity had sparse textual grounding.
+  const anchorEntityIds = new Set<string>();
+  if (interview.interviewee_entity_id) anchorEntityIds.add(interview.interviewee_entity_id);
+  if (interview.interviewee_org_entity_id) anchorEntityIds.add(interview.interviewee_org_entity_id);
+  try {
+    const { data: seAnchorRows } = await supabase
+      .from("source_entities")
+      .select("entity_id")
+      .eq("source_id", interviewId)
+      .eq("origin", "upload_anchor");
+    for (const row of seAnchorRows ?? []) {
+      if (row.entity_id) anchorEntityIds.add(row.entity_id);
+    }
+  } catch (anchorSeErr) {
+    console.warn("[pipeline] Failed to fetch upload_anchor source_entities for gate bypass:", anchorSeErr);
+  }
+
+  // Phase 3c: validate LLM relationships before the persistence gate.
+  const { relationships: validatedRelationships, stats: relValidationStats } =
+    validateExtractedRelationships(extraction.relationships, { sourceId: interviewId });
+  if (relValidationStats.input > 0 && relValidationStats.kept < relValidationStats.input) {
+    console.log(
+      `[pipeline] relationship validation for ${interviewId}: kept=${relValidationStats.kept}/${relValidationStats.input} ` +
+        `dropped_unknown=${relValidationStats.droppedUnknownType} self=${relValidationStats.droppedSelfRelationship} ` +
+        `floor=${relValidationStats.droppedConfidenceFloor} downgraded_no_evidence=${relValidationStats.downgradedHighConfidenceNoEvidence}`
+    );
+  }
+
   // Persistence gate: only `exact`/`alias` grounded mentions are written,
   // and only relationships whose endpoints survived the gate are written.
   // Silent `chunk_id = null` fallback is intentionally gone.
+  // Anchor entities bypass the standard grounding requirement (see spec Phase 2a).
   const gated = applyPersistenceGate({
     interviewId,
     entitiesForGrounding,
     groundedMap,
-    relationships: extraction.relationships,
+    relationships: validatedRelationships,
     entityIdMap,
     rejectedRelationshipKeys,
+    anchorEntityIds: anchorEntityIds.size > 0 ? anchorEntityIds : undefined,
   });
 
   // ── Anchor entity backfill into chunk metadata ───────────────────────
@@ -716,6 +761,37 @@ export async function runIntelPipelineFromCanonicalSource(params: {
     intervieweeEntityId: interview.interviewee_entity_id ?? null,
     intervieweeOrgEntityId: interview.interviewee_org_entity_id ?? null,
   });
+
+  // ── Anchor-derived relationship fallback (Phase 2b) ───────────────────────
+  // When the uploader set person + org anchors but did NOT select explicit
+  // relationship types in the form, create a deterministic anchor relationship
+  // using title inference → works_at fallback.
+  //
+  // When types WERE selected, the API route already wrote them at upload time;
+  // this call is a safe no-op (upsert with ignoreDuplicates on the same key).
+  if (interview.interviewee_entity_id && interview.interviewee_org_entity_id) {
+    const explicitTypes = (interview.interviewee_relationship_types ?? []).filter(Boolean);
+    if (explicitTypes.length === 0) {
+      // Fallback: infer from title text, then default to works_at
+      const inferred = inferRelationTypeFromTitle(interview.interviewee_title);
+      const fallbackType = inferred ?? "works_at";
+      try {
+        await writeAnchorDerivedRelationships({
+          supabase,
+          sourceId: interviewId,
+          tenantId,
+          pairs: [{
+            personEntityId: interview.interviewee_entity_id,
+            orgEntityId: interview.interviewee_org_entity_id,
+            relationshipTypes: [fallbackType],
+            evidenceText: interview.interviewee_title ?? null,
+          }],
+        });
+      } catch (anchorRelErr) {
+        console.warn("[pipeline] anchor-derived fallback relationship write failed (non-fatal):", anchorRelErr);
+      }
+    }
+  }
 
   // Extraction rows describe source-level facts the LLM was confident
   // about (≥ 0.9). On reprocess the clear RPC has already removed
@@ -895,13 +971,19 @@ export async function processTranscription(
         .join("\n\n");
     }
 
-    const { data: interview } = await supabase
-      .from("interviews")
+    const { data: interview, error: interviewFetchError } = await supabase
+      .from("sources")
       .select(
-        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, projects(country)"
       )
       .eq("id", interviewId)
       .single();
+
+    if (interviewFetchError) {
+      throw new Error(
+        `Failed to load source ${interviewId}: ${interviewFetchError.message}`
+      );
+    }
 
     const country = (interview?.projects as Record<string, unknown>)?.country as
       | string
@@ -964,6 +1046,8 @@ export async function processTranscription(
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
         interviewee_org_entity_id: interview.interviewee_org_entity_id,
+        interviewee_title: interview.interviewee_title,
+        interviewee_relationship_types: interview.interviewee_relationship_types as string[] | null,
       },
       country,
       speakerMap,
@@ -993,9 +1077,9 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
 
   try {
     const { data: interview, error: fetchError } = await supabase
-      .from("interviews")
+      .from("sources")
       .select(
-        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
+        "title, project_id, tenant_id, interviewee_name, interviewee_org, interviewee_entity_id, interviewee_org_entity_id, interviewee_title, interviewee_relationship_types, speaker_map, reviewed_utterances, transcript_review_status, audio_duration, projects(country)"
       )
       .eq("id", interviewId)
       .single();
@@ -1070,6 +1154,8 @@ export async function reprocessInterviewFromReview(interviewId: string): Promise
         interviewee_org: interview.interviewee_org,
         interviewee_entity_id: interview.interviewee_entity_id,
         interviewee_org_entity_id: interview.interviewee_org_entity_id,
+        interviewee_title: interview.interviewee_title,
+        interviewee_relationship_types: interview.interviewee_relationship_types as string[] | null,
       },
       country,
       speakerMap: (interview.speaker_map as SpeakerMap) ?? {},

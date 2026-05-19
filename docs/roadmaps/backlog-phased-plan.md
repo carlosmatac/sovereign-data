@@ -74,6 +74,20 @@ last_updated: 2026-05-10
 
 ---
 
+## Phase 3.5 — Network Explorer V2
+
+**Goal:** replace the current Cytoscape-based Network Explorer with a full-screen, React Flow-based V2 that treats the graph canvas as the primary UI — entity cards instead of circle nodes, an explored-entity stack model, directional animated edges, and floating contextual panels.
+
+| Spec | What it adds |
+|------|-------------|
+| [`network-explorer-v2.md`](../features/on-going/network-explorer-v2.md) | Full-screen React Flow canvas, EntityNode cards, AnimatedEdge with directional particle animation, ExploredPanel (search + stack), EntityPreviewPanel, GraphControls. New API routes: `/api/graph/entity/[entityId]` and `/api/entities/search`. |
+
+**Why here:** independent of the knowledge-model improvements in Phase 2/3 — it reads the same entity and relationship data that already exists. Can ship alongside Phase 3 without blocking it.
+
+**Dependencies:** none on other backlog items. Preserves all existing `/api/graph/[projectId]` routes and RLS.
+
+---
+
 ## Phase 4 — Product polish / later architecture
 
 **Goal:** add the features that improve the experience broadly but are either low-risk additions or require more architectural thought before committing.

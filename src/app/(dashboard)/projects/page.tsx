@@ -22,12 +22,12 @@ export default async function ProjectsPage() {
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1
-            className="text-[28px] font-semibold text-white"
+            className="text-[28px] font-semibold text-foreground"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
             Projects
           </h1>
-          <p className="mt-1.5 text-[13px] text-white/62">
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
             Manage your market knowledge projects by country or region.
           </p>
         </div>
@@ -42,7 +42,7 @@ export default async function ProjectsPage() {
       {/* Project Grid */}
       {error ? (
         <SectionSurface header={{ title: "Projects" }}>
-          <p className="py-10 text-center text-[13px] text-white/60">
+          <p className="py-10 text-center text-[13px] text-muted-foreground">
             Failed to load projects. Please try again.
           </p>
         </SectionSurface>
@@ -61,10 +61,10 @@ export default async function ProjectsPage() {
               strokeWidth={1.5}
             />
           </div>
-          <h3 className="text-[14px] font-semibold text-white/92">
+          <h3 className="text-[14px] font-semibold text-foreground/92">
             No projects yet
           </h3>
-          <p className="mt-1.5 text-[12.5px] text-white/58">
+          <p className="mt-1.5 text-[12.5px] text-muted-foreground">
             Create your first project to start ingesting interviews.
           </p>
           <div className="mt-5">
@@ -82,10 +82,14 @@ export default async function ProjectsPage() {
             <Link
               key={project.id}
               href={`/projects/${project.id}`}
-              className="sv-hover-card group block rounded-[6px] border border-[rgba(147,147,147,0.14)] bg-[#0B0E14] px-4 py-4"
+              className="sv-hover-card group block rounded-[6px] border px-4 py-4"
+              style={{
+                backgroundColor: "var(--sv-surface-bg)",
+                borderColor: "var(--sv-border-card)",
+              }}
             >
               <div className="mb-2.5 flex items-start justify-between gap-2">
-                <p className="truncate text-[14px] font-semibold leading-snug text-white/92">
+                <p className="truncate text-[14px] font-semibold leading-snug text-foreground/92">
                   {project.name}
                 </p>
                 {project.region && (
@@ -98,10 +102,10 @@ export default async function ProjectsPage() {
                   </SectionChip>
                 )}
               </div>
-              <p className="mb-3.5 line-clamp-2 text-[12px] leading-[1.55] text-white/58">
+              <p className="mb-3.5 line-clamp-2 text-[12px] leading-[1.55] text-muted-foreground">
                 {project.description || "No description"}
               </p>
-              <div className="flex items-center gap-3 text-[11px] text-white/45">
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground/80">
                 {project.country && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-[11px] w-[11px]" strokeWidth={1.5} />

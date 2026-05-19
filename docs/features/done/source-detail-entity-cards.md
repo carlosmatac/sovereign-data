@@ -1,9 +1,9 @@
 ---
 title: "Source detail page: visible primary-entity cards"
-status: to-do
+status: done
 owner: unassigned
 priority: medium
-last_updated: 2026-05-07
+last_updated: 2026-05-17
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_features:

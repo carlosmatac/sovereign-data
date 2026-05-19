@@ -107,7 +107,7 @@ export function SpeakerPersonNameInput({
           aria-autocomplete="list"
           aria-expanded={showPopover}
           role="combobox"
-          className="h-8 border-[rgba(147,147,147,0.10)] bg-white/[0.025] text-sm text-white/85 shadow-none placeholder:text-white/30 focus-visible:border-[rgba(147,147,147,0.24)] focus-visible:ring-0"
+          className="h-8 border-border/30 bg-accent/50 text-sm shadow-none focus-visible:border-border/70 focus-visible:ring-0"
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => {
             clearBlurTimer();

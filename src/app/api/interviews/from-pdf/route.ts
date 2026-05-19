@@ -12,8 +12,12 @@ import { MAX_PDF_SIZE_BYTES, MIN_PDF_TEXT_LENGTH } from "@/lib/constants";
 import {
   ensureUploadAnchorEntity,
   parseAndResolveParticipants,
+  parseRelationshipTypes,
 } from "@/lib/entities/validate-interview-anchor";
-import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
+import {
+  writeParticipantSourceEntities,
+  writeAnchorDerivedRelationships,
+} from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 // Force Node.js runtime — pdf-parse requires Node APIs (not Edge compatible)
@@ -93,6 +97,11 @@ export async function POST(request: NextRequest) {
   if (typeof rawParticipantsJson === "string" && rawParticipantsJson.trim()) {
     try { rawParticipants = JSON.parse(rawParticipantsJson); } catch { /* ignore */ }
   }
+  const rawRelTypesJson = formData.get("interviewee_relationship_types");
+  let rawIntervieweeRelationshipTypes: unknown = undefined;
+  if (typeof rawRelTypesJson === "string" && rawRelTypesJson.trim()) {
+    try { rawIntervieweeRelationshipTypes = JSON.parse(rawRelTypesJson); } catch { /* ignore */ }
+  }
 
   // Validate required fields
   if (!pdfFile || !(pdfFile instanceof File)) {
@@ -124,6 +133,7 @@ export async function POST(request: NextRequest) {
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
   const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
+  const intervieweeRelationshipTypes = parseRelationshipTypes(rawIntervieweeRelationshipTypes);
   const rawIntervieweeEntityIdParsed = parseOptionalUuid(rawIntervieweeEntityId);
   const rawIntervieweeOrgEntityIdParsed = parseOptionalUuid(
     rawIntervieweeOrgEntityId
@@ -231,6 +241,8 @@ export async function POST(request: NextRequest) {
       interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
+      interviewee_relationship_types:
+        intervieweeRelationshipTypes.length > 0 ? intervieweeRelationshipTypes : null,
     })
     .select()
     .single();
@@ -243,7 +255,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Write additional participant source_entities (non-fatal)
+  // Write additional participant source_entities + anchor-derived relationships (non-fatal)
   try {
     const resolvedParticipants = await parseAndResolveParticipants(
       admin, rawParticipants, projectIdTrim, tenantId
@@ -254,6 +266,37 @@ export async function POST(request: NextRequest) {
       tenantId,
       participants: resolvedParticipants,
     });
+
+    const relationshipPairs: Parameters<typeof writeAnchorDerivedRelationships>[0]["pairs"] = [];
+
+    if (intervieweeEntityId && intervieweeOrgEntityId && intervieweeRelationshipTypes.length > 0) {
+      relationshipPairs.push({
+        personEntityId: intervieweeEntityId,
+        orgEntityId: intervieweeOrgEntityId,
+        relationshipTypes: intervieweeRelationshipTypes,
+        evidenceText: intervieweeTitle ?? null,
+      });
+    }
+
+    for (const p of resolvedParticipants) {
+      if (p.affiliatedOrgEntityId && p.relationshipTypes.length > 0) {
+        relationshipPairs.push({
+          personEntityId: p.entityId,
+          orgEntityId: p.affiliatedOrgEntityId,
+          relationshipTypes: p.relationshipTypes,
+          evidenceText: p.context,
+        });
+      }
+    }
+
+    if (relationshipPairs.length > 0) {
+      await writeAnchorDerivedRelationships({
+        supabase: admin,
+        sourceId: interview.id,
+        tenantId,
+        pairs: relationshipPairs,
+      });
+    }
   } catch (participantError) {
     console.error("[participants] write failed (non-fatal):", participantError);
   }

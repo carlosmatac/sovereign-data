@@ -78,6 +78,20 @@ export interface PersistenceGateInput {
    * See docs/features/on-going/editable-relationship-governance.md
    */
   rejectedRelationshipKeys?: ReadonlySet<string>;
+  /**
+   * Entity IDs that are upload-anchor entities for this source (interviewee,
+   * interviewee org, additional participants). These are unconditionally
+   * promoted into `persistedEntityIds` **before** the standard grounding
+   * gate runs, so that:
+   *   1. LLM-extracted relationships between anchor entities are not dropped
+   *      because the anchors failed the grounding gate.
+   *   2. Anchor entities appear in the network graph even when the transcript
+   *      does not contain enough textual mention evidence.
+   *
+   * This bypass is strictly scoped to these IDs. It does NOT loosen the gate
+   * for any LLM-extracted entity that is not in this set.
+   */
+  anchorEntityIds?: ReadonlySet<string>;
 }
 
 /** Canonical key for an interview-scoped relationship triple. */
@@ -136,10 +150,21 @@ export function applyPersistenceGate(
     relationships,
     entityIdMap,
     rejectedRelationshipKeys,
+    anchorEntityIds,
   } = input;
 
   const persistedEntityIds = new Set<string>();
   const mentionRows: MentionRow[] = [];
+
+  // Promote upload-anchor entities unconditionally — humans explicitly tagged them
+  // at upload time. Their relationships must not be silently dropped because the
+  // anchor happens to appear infrequently in the transcript text.
+  // This bypass is targeted: only IDs in anchorEntityIds are promoted.
+  if (anchorEntityIds) {
+    for (const id of anchorEntityIds) {
+      persistedEntityIds.add(id);
+    }
+  }
 
   let ungrounded = 0;
   let droppedByPolicy = 0;

@@ -234,7 +234,7 @@ export default async function InterviewDetailPage({
             {interview.last_intel_source === "human_review" && (
               <Badge
                 variant="outline"
-                className="gap-1 border-[rgba(74,222,128,0.28)] bg-[rgba(74,222,128,0.06)] text-[rgba(167,243,208,0.92)]"
+                className="gap-1 border-emerald-500/28 bg-emerald-500/6 text-emerald-600 dark:text-emerald-200/92"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 Human-reviewed knowledge

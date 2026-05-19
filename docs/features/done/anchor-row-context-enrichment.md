@@ -1,9 +1,9 @@
 ---
 title: "Anchor row context enrichment for entity_intel"
-status: to-do
+status: done
 owner: unassigned
 priority: medium
-last_updated: 2026-05-08
+last_updated: 2026-05-17
 related_features:
   - docs/features/on-going/entity-intel-rpc-source-entities.md
   - docs/features/done/chat-entity-retrieval-rpc.md

@@ -26,17 +26,19 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
     <div
       className="rounded-[5px] px-2.5 py-2"
       style={{
-        background: "#0E1119",
-        border: "1px solid rgba(147,147,147,0.18)",
-        boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.025), 0 8px 24px -6px rgba(0,0,0,0.55)",
+        background: "var(--sv-surface-bg)",
+        border: "1px solid var(--sv-border-surface-strong)",
+        boxShadow: "var(--sv-shadow-compact)",
       }}
     >
-      <p className="max-w-[220px] truncate text-[12px] font-semibold text-white/95">
+      <p
+        className="max-w-[220px] truncate text-[12px] font-semibold"
+        style={{ color: "var(--sv-text-primary)" }}
+      >
         {d.topic}
       </p>
-      <p className="mt-0.5 text-[11.5px] text-white/65">
-        <span className="font-semibold tabular-nums text-white/95">
+      <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--sv-text-secondary)" }}>
+        <span className="font-semibold tabular-nums" style={{ color: "var(--sv-text-primary)" }}>
           {d.count}
         </span>{" "}
         mention{d.count !== 1 ? "s" : ""}
@@ -68,9 +70,6 @@ export function TopicDistributionChart({ data }: Props) {
 
   const displayData = data.slice(0, 8);
 
-  // Opacity rule: when nothing is hovered, everything at full brightness.
-  // When one slice/legend row is hovered, that one stays at 1 and the rest
-  // fade to 0.22 — a calm dim/highlight treatment matching the landing.
   const opacityFor = (index: number) =>
     hoveredIndex === null ? 1 : hoveredIndex === index ? 1 : 0.22;
 
@@ -106,8 +105,7 @@ export function TopicDistributionChart({ data }: Props) {
                   fill={PALETTE[index % PALETTE.length]}
                   fillOpacity={opacityFor(index)}
                   style={{
-                    transition:
-                      "fill-opacity 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    transition: "fill-opacity 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                     cursor: "pointer",
                     outline: "none",
                   }}
@@ -141,7 +139,7 @@ export function TopicDistributionChart({ data }: Props) {
                   "opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), background-color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 opacity: isDimmed ? 0.38 : 1,
                 backgroundColor: isActive
-                  ? "rgba(255,255,255,0.035)"
+                  ? "var(--sv-accent,rgba(255,255,255,0.035))"
                   : "transparent",
               }}
             >
@@ -157,8 +155,8 @@ export function TopicDistributionChart({ data }: Props) {
                 className="flex-1 truncate text-[12px]"
                 style={{
                   color: isActive
-                    ? "rgba(255,255,255,0.95)"
-                    : "rgba(255,255,255,0.78)",
+                    ? "var(--sv-text-primary)"
+                    : "var(--sv-text-body)",
                   transition: "color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
@@ -168,8 +166,8 @@ export function TopicDistributionChart({ data }: Props) {
                 className="shrink-0 text-[11.5px] font-medium tabular-nums"
                 style={{
                   color: isActive
-                    ? "rgba(255,255,255,0.92)"
-                    : "rgba(255,255,255,0.50)",
+                    ? "var(--sv-text-primary)"
+                    : "var(--sv-text-muted)",
                   transition: "color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >

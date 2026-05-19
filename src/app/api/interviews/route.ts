@@ -10,8 +10,12 @@ import {
 import {
   ensureUploadAnchorEntity,
   parseAndResolveParticipants,
+  parseRelationshipTypes,
 } from "@/lib/entities/validate-interview-anchor";
-import { writeParticipantSourceEntities } from "@/lib/entities/source-entities-writer";
+import {
+  writeParticipantSourceEntities,
+  writeAnchorDerivedRelationships,
+} from "@/lib/entities/source-entities-writer";
 import { sanitizeIntervieweeTitle } from "@/lib/interviews/upload-metadata";
 
 const MAX_ANCHOR_LENGTH = 120;
@@ -154,6 +158,7 @@ export async function POST(request: NextRequest) {
     interviewee_title: rawIntervieweeTitle,
     interviewee_entity_id: rawIntervieweeEntityId,
     interviewee_org_entity_id: rawIntervieweeOrgEntityId,
+    interviewee_relationship_types: rawIntervieweeRelationshipTypes,
     participants: rawParticipants,
   } = body as {
     title: string;
@@ -168,6 +173,7 @@ export async function POST(request: NextRequest) {
     interviewee_title?: unknown;
     interviewee_entity_id?: unknown;
     interviewee_org_entity_id?: unknown;
+    interviewee_relationship_types?: unknown;
     participants?: unknown;
   };
 
@@ -196,6 +202,7 @@ export async function POST(request: NextRequest) {
   let intervieweeName = sanitizeOptionalAnchor(rawIntervieweeName);
   let intervieweeOrg = sanitizeOptionalAnchor(rawIntervieweeOrg);
   const intervieweeTitle = sanitizeIntervieweeTitle(rawIntervieweeTitle);
+  const intervieweeRelationshipTypes = parseRelationshipTypes(rawIntervieweeRelationshipTypes);
   const rawIntervieweeEntityIdParsed = parseOptionalUuid(rawIntervieweeEntityId);
   const rawIntervieweeOrgEntityIdParsed = parseOptionalUuid(
     rawIntervieweeOrgEntityId
@@ -275,6 +282,8 @@ export async function POST(request: NextRequest) {
       interviewee_title: intervieweeTitle,
       interviewee_entity_id: intervieweeEntityId,
       interviewee_org_entity_id: intervieweeOrgEntityId,
+      interviewee_relationship_types:
+        intervieweeRelationshipTypes.length > 0 ? intervieweeRelationshipTypes : null,
       semantic_source_type: "interview",
     })
     .select()
@@ -299,6 +308,39 @@ export async function POST(request: NextRequest) {
       tenantId,
       participants: resolvedParticipants,
     });
+
+    // Write anchor_derived entity_relationships for primary anchor and
+    // participants that carry relationship types + affiliated org.
+    const relationshipPairs: Parameters<typeof writeAnchorDerivedRelationships>[0]["pairs"] = [];
+
+    if (intervieweeEntityId && intervieweeOrgEntityId && intervieweeRelationshipTypes.length > 0) {
+      relationshipPairs.push({
+        personEntityId: intervieweeEntityId,
+        orgEntityId: intervieweeOrgEntityId,
+        relationshipTypes: intervieweeRelationshipTypes,
+        evidenceText: intervieweeTitle ?? null,
+      });
+    }
+
+    for (const p of resolvedParticipants) {
+      if (p.affiliatedOrgEntityId && p.relationshipTypes.length > 0) {
+        relationshipPairs.push({
+          personEntityId: p.entityId,
+          orgEntityId: p.affiliatedOrgEntityId,
+          relationshipTypes: p.relationshipTypes,
+          evidenceText: p.context,
+        });
+      }
+    }
+
+    if (relationshipPairs.length > 0) {
+      await writeAnchorDerivedRelationships({
+        supabase: admin,
+        sourceId: interview.id,
+        tenantId,
+        pairs: relationshipPairs,
+      });
+    }
   } catch (participantError) {
     console.error("[participants] write failed (non-fatal):", participantError);
   }

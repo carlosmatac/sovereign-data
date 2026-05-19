@@ -116,7 +116,13 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
 
   if (error) {
     return (
-      <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#0B0E14] px-4 py-3 text-[12.5px] text-white/55">
+      <div
+        className="rounded-[6px] border px-4 py-3 text-[12.5px] text-muted-foreground"
+        style={{
+          background: "var(--sv-surface-bg)",
+          borderColor: "var(--sv-border-panel)",
+        }}
+      >
         Audio file unavailable.
       </div>
     );
@@ -125,7 +131,13 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="rounded-[6px] border border-[rgba(147,147,147,0.16)] bg-[#0B0E14] px-4 py-3">
+    <div
+      className="rounded-[6px] border px-4 py-3"
+      style={{
+        background: "var(--sv-surface-bg)",
+        borderColor: "var(--sv-border-panel)",
+      }}
+    >
       {/* Hidden native audio element */}
       <audio ref={audioRef} src={src} preload="metadata" />
 
@@ -160,7 +172,10 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
         </button>
 
         {/* Current time */}
-        <span className="w-10 shrink-0 text-right text-[11.5px] tabular-nums text-white/55">
+        <span
+          className="w-10 shrink-0 text-right text-[11.5px] tabular-nums"
+          style={{ color: "var(--sv-text-muted)" }}
+        >
           {formatTime(currentTime)}
         </span>
 
@@ -174,10 +189,16 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
          */}
         <div className="relative flex h-8 flex-1 items-center">
           {loading ? (
-            <div className="h-[3px] w-full animate-pulse rounded-full bg-white/8" />
+            <div
+              className="h-[3px] w-full animate-pulse rounded-full"
+              style={{ background: "var(--sv-border-control)" }}
+            />
           ) : (
             <>
-              <div className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
+              <div
+                className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full"
+                style={{ background: "var(--sv-border-control)" }}
+              />
               <div
                 className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full"
                 style={{ width: `${progressPct}%`, background: ACCENT }}
@@ -195,18 +216,18 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
                 aria-valuenow={currentTime}
                 className="
                   relative z-[1] h-8 w-full cursor-pointer appearance-none bg-transparent outline-none
-                  focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0E14]
+                  focus-visible:ring-2 focus-visible:ring-[rgba(251,191,36,0.55)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sv-surface-bg)]
                   [&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full
                   [&::-webkit-slider-runnable-track]:bg-transparent
                   [&::-webkit-slider-thumb]:mt-[calc((3px-10px)/2)]
                   [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:w-[10px]
                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:border-[2px] [&::-webkit-slider-thumb]:border-[#0B0E14]
+                  [&::-webkit-slider-thumb]:border-[2px] [&::-webkit-slider-thumb]:border-[var(--sv-surface-bg)]
                   [&::-webkit-slider-thumb]:bg-[#FBBF24]
                   [&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent
                   [&::-moz-range-thumb]:h-[10px] [&::-moz-range-thumb]:w-[10px]
                   [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[2px]
-                  [&::-moz-range-thumb]:border-[#0B0E14] [&::-moz-range-thumb]:bg-[#FBBF24]
+                  [&::-moz-range-thumb]:border-[var(--sv-surface-bg)] [&::-moz-range-thumb]:bg-[#FBBF24]
                 "
               />
             </>
@@ -214,7 +235,10 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
         </div>
 
         {/* Duration */}
-        <span className="w-10 shrink-0 text-[11.5px] tabular-nums text-white/55">
+        <span
+          className="w-10 shrink-0 text-[11.5px] tabular-nums"
+          style={{ color: "var(--sv-text-muted)" }}
+        >
           {duration > 0 ? formatTime(duration) : "—"}
         </span>
 
@@ -227,7 +251,11 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
           type="button"
           onClick={toggleMute}
           aria-label={muted ? "Unmute" : "Mute"}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(147,147,147,0.18)] bg-white/[0.03] text-white/55 transition-colors duration-150 hover:border-[rgba(147,147,147,0.30)] hover:bg-white/[0.06] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(147,147,147,0.40)]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(147,147,147,0.40)]"
+          style={{
+            borderColor: "var(--sv-border-surface-strong)",
+            color: "var(--sv-text-muted)",
+          }}
         >
           {muted ? (
             <VolumeX className="h-3.5 w-3.5" strokeWidth={1.6} />

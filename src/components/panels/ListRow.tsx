@@ -42,19 +42,22 @@ export function ListRow({
   return (
     <div
       onClick={onClick}
-      className="group flex cursor-pointer items-center gap-3 rounded-[6px] border px-3.5 transition-colors duration-150 hover:border-[rgba(147,147,147,0.26)] hover:bg-white/[0.02]"
+      className="group flex cursor-pointer items-center gap-3 rounded-[6px] border px-3.5 transition-colors duration-150 hover:bg-accent"
       style={{
         minHeight: 52,
-        borderColor: "rgba(147,147,147,0.15)",
+        borderColor: "var(--sv-border-card)",
       }}
     >
       {leading && <div className="shrink-0">{leading}</div>}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[12.5px] font-semibold leading-tight text-white/92">
+        <p
+          className="truncate text-[12.5px] font-semibold leading-tight"
+          style={{ color: "var(--sv-text-primary)" }}
+        >
           {title}
         </p>
         {caption && (
-          <p className="mt-[4px] truncate text-[10.5px] leading-snug text-white/45">
+          <p className="mt-[4px] truncate text-[10.5px] leading-snug text-muted-foreground">
             {caption}
           </p>
         )}

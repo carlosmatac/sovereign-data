@@ -1,39 +1,58 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 /**
- * Aksum workspace top bar — chrome label.
+ * Aksum workspace top bar.
  *
- * On desktop, the sidebar collapse/expand control lives inside the
- * sidebar itself (see `AppSidebar`), where it spatially belongs — this
- * strip carries only the application identity label.
- *
- * On mobile (`<md`) the sidebar is rendered as a Sheet drawer that has
- * no visible edge to expand from, so we keep a hamburger trigger here
- * gated by `md:hidden`. Desktop never shows it.
- *
- * Anatomy (left → right):
- *   [≡ on mobile]   AKSUM · KNOWLEDGE PLATFORM
- *
- * The strip uses a desaturated graphite/navy gradient so it reads as a
- * subtle structural band rather than a saturated blue chrome. Header
- * height kept at ≈ 44px so the SidebarInset body layout / scroll
- * region calculations stay intact.
+ * Shows the current section name derived from the pathname.
+ * Hosts the theme toggle (dark ↔ light) on the right edge.
  */
+
+const SECTION_TITLES: Array<[string, string]> = [
+  ["/interviews/upload", "Add Source"],
+  ["/interviews/", "Knowledge"],
+  ["/interviews", "Knowledge"],
+  ["/projects/new", "New Project"],
+  ["/projects/", "Projects"],
+  ["/projects", "Projects"],
+  ["/chat/new", "Copilot"],
+  ["/chat", "Copilot"],
+  ["/network", "Network Explorer"],
+  ["/reports", "Reports"],
+  ["/settings", "Settings"],
+  ["/admin", "Admin"],
+  ["/dashboard", "Dashboard"],
+];
+
+function getSectionTitle(pathname: string): string {
+  for (const [prefix, title] of SECTION_TITLES) {
+    if (pathname === prefix || pathname.startsWith(prefix)) return title;
+  }
+  return "Aksum";
+}
+
 export function DashboardInsetHeader() {
+  const pathname = usePathname();
+  const sectionTitle = getSectionTitle(pathname);
+
   return (
     <header
       role="banner"
       className="flex h-11 shrink-0 items-center gap-2 px-4 md:px-5"
       style={{
-        background: "linear-gradient(to bottom, #0E1118, #0B0D12)",
-        borderBottom: "1px solid rgba(147,147,147,0.08)",
+        background: "var(--sv-chrome-gradient)",
+        borderBottom: "1px solid var(--sv-border-divider)",
       }}
     >
       <SidebarTrigger
         aria-label="Open navigation"
-        className="-ml-1 size-7 shrink-0 text-white/55 transition-colors duration-150 hover:bg-white/[0.06] hover:text-white/95 md:hidden"
+        className="-ml-1 size-7 shrink-0 transition-colors duration-150 md:hidden"
+        style={{
+          color: "var(--sv-text-muted)",
+        }}
       />
 
       <span
@@ -41,11 +60,15 @@ export function DashboardInsetHeader() {
         style={{
           fontSize: "10px",
           letterSpacing: "0.07em",
-          color: "rgba(255,255,255,0.32)",
+          color: "var(--sv-text-eyebrow)",
         }}
       >
-        Aksum · Knowledge Platform
+        {sectionTitle}
       </span>
+
+      <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

@@ -80,13 +80,14 @@ export default async function DashboardPage() {
         // Entities — tenant-scoped via RLS (entities are a shared knowledge
         // graph within a tenant; no project_id column exists on this table).
         supabase.from("entities").select("id", { count: "exact", head: true }),
-        // Recent sources — scoped to user's projects
+        // Recent sources — capped at 6 for dashboard stability.
+        // The "View all knowledge" link lets users reach the full list.
         admin
           .from("interviews")
-          .select("id, title, status, created_at, projects(name, country)")
+          .select("id, title, status, source_type, created_at, projects(name, country)")
           .in("project_id", projectIds)
           .order("created_at", { ascending: false })
-          .limit(12),
+          .limit(6),
         // Active relationship count — tenant-scoped via RLS (entity_relationships
         // has no project_id column; scoping via interview_id join would require
         // a separate round-trip and is deferred to a future query optimisation).
@@ -181,17 +182,17 @@ export default async function DashboardPage() {
       <div className="mb-5 flex items-end justify-between gap-4">
         <div className="min-w-0">
           <h1
-            className="text-[28px] font-semibold text-white"
+            className="text-[28px] font-semibold text-foreground"
             style={{ letterSpacing: "-0.020em", lineHeight: 1.05 }}
           >
             Dashboard
           </h1>
           <p
-            className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-white/45"
+            className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-muted-foreground"
             style={{ letterSpacing: "-0.005em" }}
           >
             <span>Snapshot · {snapshotDate}</span>
-            <span aria-hidden className="text-white/22">
+            <span aria-hidden style={{ color: "var(--sv-text-ghost)" }}>
               ·
             </span>
             <span className="tabular-nums">{snapshotScope}</span>
@@ -276,7 +277,7 @@ export default async function DashboardPage() {
               right: (
                 <Link
                   href="/interviews"
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55 transition-colors duration-150 hover:text-white"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
                 >
                   View all knowledge
                   <ArrowUpRight className="h-[11px] w-[11px]" />
@@ -288,21 +289,27 @@ export default async function DashboardPage() {
             {recentInterviews.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
                 <BookOpen
-                  className="mb-3 h-7 w-7 text-white/22"
+                  className="mb-3 h-7 w-7 text-muted-foreground/40"
                   strokeWidth={1.5}
                 />
-                <p className="text-[12.5px] text-white/55">
+                <p className="text-[12.5px] text-muted-foreground">
                   No sources yet.{" "}
                   <Link
                     href="/interviews/upload"
-                    className="text-white/85 underline decoration-white/30 underline-offset-2 transition-colors duration-150 hover:text-white"
+                    className="text-foreground/85 underline underline-offset-2 transition-colors duration-150 hover:text-foreground"
+                    style={{ textDecorationColor: "var(--sv-border-control)" }}
                   >
                     Add your first source.
                   </Link>
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              /* max-h caps the list at 6 rows (~52px each) so it never
+                 pushes the charts or right rail off-screen regardless of
+                 how many sources are loaded. overflow-y-auto adds a
+                 scrollbar only if items exceed the cap (shouldn't happen
+                 at limit=6, but keeps the layout safe if the limit grows). */
+              <div className="flex max-h-[336px] flex-col gap-1 overflow-y-auto">
                 {recentInterviews.map((interview) => {
                   const project = interview.projects as unknown as {
                     name: string;
@@ -320,6 +327,7 @@ export default async function DashboardPage() {
                       title={interview.title}
                       project={project?.name ?? null}
                       country={project?.country ?? null}
+                      sourceType={interview.source_type ?? null}
                       createdAt={interview.created_at}
                       status={interview.status as InterviewStatus}
                       statusLabel={statusInfo.label}
@@ -347,7 +355,7 @@ export default async function DashboardPage() {
                     subtitle: "Completed sources per project",
                     right: (
                       <TrendingUp
-                        className="h-[13px] w-[13px] text-white/45"
+                        className="h-[13px] w-[13px] text-muted-foreground/80"
                         strokeWidth={1.6}
                       />
                     ),
@@ -357,8 +365,8 @@ export default async function DashboardPage() {
                   <div
                     className="rounded-[4px] p-2"
                     style={{
-                      background: "#07080C",
-                      border: "1px solid rgba(147,147,147,0.08)",
+                      background: "var(--sv-canvas-bg)",
+                      border: "1px solid var(--sv-border-divider)",
                     }}
                   >
                     <InterviewsByProjectChart data={projectBreakdown} />
@@ -374,7 +382,7 @@ export default async function DashboardPage() {
                     subtitle: `Top ${topTopics.length} themes across all sources`,
                     right: (
                       <Hash
-                        className="h-[13px] w-[13px] text-white/45"
+                        className="h-[13px] w-[13px] text-muted-foreground/80"
                         strokeWidth={1.6}
                       />
                     ),
@@ -384,8 +392,8 @@ export default async function DashboardPage() {
                   <div
                     className="rounded-[4px] p-2"
                     style={{
-                      background: "#07080C",
-                      border: "1px solid rgba(147,147,147,0.08)",
+                      background: "var(--sv-canvas-bg)",
+                      border: "1px solid var(--sv-border-divider)",
                     }}
                   >
                     <TopicDistributionChart data={topTopics} />
@@ -433,7 +441,7 @@ export default async function DashboardPage() {
               />
               <div
                 className="mt-0.5 pt-3"
-                style={{ borderTop: "1px solid rgba(147,147,147,0.10)" }}
+                style={{ borderTop: "1px solid var(--sv-border-divider-muted)" }}
               >
                 <StatusRow
                   label="Total"
@@ -481,7 +489,7 @@ export default async function DashboardPage() {
             <div
               aria-hidden
               className="my-1 h-px"
-              style={{ background: "rgba(147,147,147,0.10)" }}
+              style={{ background: "var(--sv-border-divider-muted)" }}
             />
             {[
               {
@@ -509,7 +517,7 @@ export default async function DashboardPage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex items-center gap-2.5 rounded-[5px] px-2 py-2 transition-colors duration-150 hover:bg-white/[0.035]"
+                className="group flex items-center gap-2.5 rounded-[5px] px-2 py-2 transition-colors duration-150 hover:bg-accent"
               >
                 <span
                   className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[4px] transition-colors duration-150 group-hover:bg-[color-mix(in_srgb,var(--accent-color)_14%,transparent)]"
@@ -526,11 +534,11 @@ export default async function DashboardPage() {
                     style={{ color: accent }}
                   />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-white/80 transition-colors duration-150 group-hover:text-white">
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/80 transition-colors duration-150 group-hover:text-foreground">
                   {label}
                 </span>
                 <ArrowUpRight
-                  className="h-[11px] w-[11px] shrink-0 text-white/25 transition-colors duration-150 group-hover:text-white/65"
+                  className="h-[11px] w-[11px] shrink-0 text-muted-foreground/50 transition-colors duration-150 group-hover:text-muted-foreground"
                   strokeWidth={1.8}
                 />
               </Link>
@@ -594,7 +602,7 @@ function StatusRow({
         </IconWell>
         <span
           className={`text-[12.5px] ${
-            bold ? "font-semibold text-white" : "text-white/70"
+            bold ? "font-semibold text-foreground" : "text-foreground/70"
           }`}
         >
           {label}
@@ -602,7 +610,7 @@ function StatusRow({
       </div>
       <span
         className={`text-[13px] tabular-nums ${
-          bold ? "font-semibold text-white" : "text-white/62"
+          bold ? "font-semibold text-foreground" : "text-foreground/62"
         }`}
       >
         {count}
@@ -626,11 +634,19 @@ function StatusRow({
  *   - Title 12.5px / 600 / white-92, caption 10.5px / white-50 with a
  *     subdued separator dot at white/22, status pill on the right.
  */
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  audio: "Audio",
+  document: "PDF",
+  video: "Video",
+  text: "Text",
+};
+
 function InterviewListRow({
   id,
   title,
   project,
   country,
+  sourceType,
   createdAt,
   status,
   statusLabel,
@@ -639,6 +655,7 @@ function InterviewListRow({
   title: string;
   project: string | null;
   country: string | null;
+  sourceType: string | null;
   createdAt: string;
   status: InterviewStatus;
   statusLabel: string;
@@ -649,34 +666,40 @@ function InterviewListRow({
     year: "numeric",
   });
 
+  const typeLabel = sourceType ? (SOURCE_TYPE_LABELS[sourceType] ?? null) : null;
+
+  // Build subtitle tokens: [project/country, type, date]
+  const tokens: string[] = [];
+  if (project) tokens.push(project);
+  else if (country) tokens.push(country);
+  if (typeLabel) tokens.push(typeLabel);
+  tokens.push(formattedDate);
+
   return (
     <Link
       href={`/interviews/${id}`}
-      className="group flex items-center gap-3 rounded-[6px] border px-3 py-2.5 transition-colors duration-150 hover:border-[rgba(147,147,147,0.26)] hover:bg-white/[0.025]"
+      className="group flex items-center gap-3 rounded-[6px] border px-3 py-2.5 transition-colors duration-150 hover:bg-accent"
       style={{
         minHeight: 52,
-        borderColor: "rgba(147,147,147,0.10)",
+        borderColor: "var(--sv-border-divider-muted)",
       }}
     >
       <StatusWell status={status} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[12.5px] font-semibold leading-tight text-white/92">
+        <p className="truncate text-[12.5px] font-semibold leading-tight text-foreground/92">
           {title}
         </p>
-        <p className="mt-[4px] flex flex-wrap items-center gap-x-1.5 truncate text-[10.5px] leading-snug text-white/50">
-          {project && <span className="truncate">{project}</span>}
-          {project && country && (
-            <span aria-hidden className="text-white/22">
-              ·
+        <p className="mt-[4px] flex items-center gap-x-1.5 text-[10.5px] leading-snug text-muted-foreground">
+          {tokens.map((token, i) => (
+            <span key={i} className="flex items-center gap-x-1.5">
+              {i > 0 && (
+                <span aria-hidden style={{ color: "var(--sv-text-ghost)" }}>·</span>
+              )}
+              <span className={i === tokens.length - 1 ? "tabular-nums text-muted-foreground/70" : "truncate"}>
+                {token}
+              </span>
             </span>
-          )}
-          {country && <span className="truncate">{country}</span>}
-          {(project || country) && (
-            <span aria-hidden className="text-white/22">
-              ·
-            </span>
-          )}
-          <span className="tabular-nums text-white/38">{formattedDate}</span>
+          ))}
         </p>
       </div>
       <div className="shrink-0">
@@ -742,32 +765,32 @@ function PrimaryQuickAction({
       href={href}
       className="sv-hover-card group flex items-center gap-3 rounded-[5px] border px-2.5 py-2.5"
       style={{
-        backgroundColor: "rgba(255,255,255,0.03)",
-        borderColor: "rgba(147,147,147,0.14)",
+        backgroundColor: "var(--sv-accent,rgba(255,255,255,0.03))",
+        borderColor: "var(--sv-border-card)",
       }}
     >
       <span
-        className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-150 group-hover:bg-white/[0.07]"
+        className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-150 group-hover:bg-accent"
         style={{
-          backgroundColor: "rgba(255,255,255,0.04)",
-          borderColor: "rgba(147,147,147,0.18)",
+          backgroundColor: "var(--sv-accent,rgba(255,255,255,0.04))",
+          borderColor: "var(--sv-border-surface-strong)",
         }}
       >
         <Icon className="h-[13px] w-[13px]" strokeWidth={1.7} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-[12.5px] font-semibold text-white/92">
+        <span className="truncate text-[12.5px] font-semibold text-foreground/92">
           {label}
         </span>
         <span
-          className="mt-[3px] truncate text-[10.5px] text-white/45"
+          className="mt-[3px] truncate text-[10.5px] text-muted-foreground"
           style={{ letterSpacing: "-0.005em" }}
         >
           {caption}
         </span>
       </div>
       <ArrowUpRight
-        className="h-[12px] w-[12px] shrink-0 text-white/35 transition-colors duration-150 group-hover:text-white/75"
+        className="h-[12px] w-[12px] shrink-0 text-muted-foreground/55 transition-colors duration-150 group-hover:text-foreground/75"
         strokeWidth={1.8}
       />
     </Link>

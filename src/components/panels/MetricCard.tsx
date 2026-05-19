@@ -30,9 +30,11 @@ import * as React from "react"
  */
 export type MetricCardTone = "default" | "lifted"
 
+// Backgrounds and borders use CSS var arbitrary values (class-based, not inline
+// style) to preserve sv-hover-card specificity contract (see comment above).
 const METRIC_TONE_CLASS: Record<MetricCardTone, string> = {
-  default: "bg-[#0B0E14] border-[rgba(147,147,147,0.15)]",
-  lifted: "bg-[#0E1119] border-[rgba(147,147,147,0.18)]",
+  default: "bg-[var(--sv-surface-bg)] border-[var(--sv-border-card)]",
+  lifted: "bg-[var(--sv-surface-bg)] border-[var(--sv-border-panel)]",
 }
 
 export interface MetricCardProps {
@@ -68,7 +70,7 @@ export function MetricCard({
   tone = "default",
 }: MetricCardProps) {
   const isLarge = size === "large"
-  const valueColor = tintValue && accent ? accent : "#fff"
+  const valueColor = tintValue && accent ? accent : "var(--sv-text-primary)"
   const toneClass = METRIC_TONE_CLASS[tone]
   const hoverClass =
     tone === "lifted" ? "sv-hover-card-lifted" : "sv-hover-card"
@@ -87,7 +89,7 @@ export function MetricCard({
             className="text-[10.5px] font-semibold uppercase"
             style={{
               letterSpacing: "0.09em",
-              color: "rgba(255,255,255,0.42)",
+              color: "var(--sv-text-placeholder)",
             }}
           >
             {label}
@@ -101,7 +103,7 @@ export function MetricCard({
           {sub && (
             <p
               className="text-[11px]"
-              style={{ color: "rgba(255,255,255,0.45)" }}
+              style={{ color: "var(--sv-text-muted)" }}
             >
               {sub}
             </p>
@@ -112,7 +114,7 @@ export function MetricCard({
           <div className="mb-2 flex items-center justify-between">
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.07em]"
-              style={{ color: "rgba(255,255,255,0.55)" }}
+              style={{ color: "var(--sv-text-subtle)" }}
             >
               {label}
             </span>
@@ -128,11 +130,14 @@ export function MetricCard({
               </div>
             )}
           </div>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-white">
+          <p
+            className="text-[22px] font-semibold tabular-nums leading-none"
+            style={{ color: "var(--sv-text-primary)" }}
+          >
             {value}
           </p>
           {sub && (
-            <p className="mt-[6px] text-[10.5px] text-white/45">{sub}</p>
+            <p className="mt-[6px] text-[10.5px] text-muted-foreground">{sub}</p>
           )}
         </>
       )}

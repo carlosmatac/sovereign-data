@@ -50,7 +50,8 @@ export async function GET(
     .select(
       `id, role, content, sequence, client_message_id, user_message_id, created_at,
        chat_message_evidence(id, chunk_id, position, similarity, used_in_text,
-         source_chunks(id, source_id, speaker, start_time))`
+         source_chunks(id, source_id, speaker, start_time, content,
+           sources(id, title, source_type, summary, interviewee_name, interviewee_org, project_id)))`
     )
     .eq("conversation_id", conversationId)
     .order("sequence", { ascending: false })

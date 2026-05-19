@@ -30,6 +30,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { CopilotMode } from "@/lib/chat/prompt-builder";
+import {
+  SourceCitationCard,
+  type SourceCard,
+} from "@/components/chat/source-citation-card";
 
 const COPILOT_MODE_LABELS: Record<CopilotMode, string> = {
   general_context: "General Context",
@@ -38,6 +42,16 @@ const COPILOT_MODE_LABELS: Record<CopilotMode, string> = {
 
 const MAX_MESSAGES_CLIENT = 200;
 const INITIAL_MESSAGE_LIMIT = 40;
+
+type EvidenceSourceRow = {
+  id: string;
+  title: string;
+  source_type: string;
+  summary: string | null;
+  interviewee_name: string | null;
+  interviewee_org: string | null;
+  project_id: string;
+};
 
 type EvidenceChip = {
   id: string;
@@ -50,6 +64,8 @@ type EvidenceChip = {
     source_id: string;
     speaker: string | null;
     start_time: number | null;
+    content: string | null;
+    sources: EvidenceSourceRow | null;
   } | null;
 };
 
@@ -75,7 +91,7 @@ const UserBubble = memo(function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
       <div
-        className="max-w-md rounded-[10px] px-4 py-3 text-[12.5px] font-medium leading-[1.55] text-white/88"
+        className="max-w-md rounded-[10px] px-4 py-3 text-[12.5px] font-medium leading-[1.55] text-foreground/88"
         style={{
           background: "rgba(91,156,246,0.09)",
           border: "1px solid rgba(91,156,246,0.22)",
@@ -88,70 +104,96 @@ const UserBubble = memo(function UserBubble({ text }: { text: string }) {
   );
 });
 
-function formatMinSec(seconds: number | null): string | null {
-  if (seconds === null) return null;
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-const SourceChips = memo(function SourceChips({
+/**
+ * Aggregates flat evidence rows into one SourceCard per source_id,
+ * then renders a row of citation cards.
+ */
+const SourceCitationCards = memo(function SourceCitationCards({
   evidence,
 }: {
   evidence: EvidenceChip[];
 }) {
-  // Deduplicate by source_id, collecting citation numbers
-  const bySource = new Map<
-    string,
-    { positions: number[]; speaker: string | null; start_time: number | null }
-  >();
+  const bySource = new Map<string, SourceCard>();
+
   for (const e of evidence) {
-    if (!e.source_chunks?.source_id) continue;
-    const sid = e.source_chunks.source_id;
-    const existing = bySource.get(sid);
-    if (existing) {
-      existing.positions.push(e.position);
-    } else {
+    const chunk = e.source_chunks;
+    if (!chunk?.source_id) continue;
+    const sid = chunk.source_id;
+    const src = chunk.sources;
+
+    if (!bySource.has(sid)) {
       bySource.set(sid, {
-        positions: [e.position],
-        speaker: e.source_chunks.speaker,
-        start_time: e.source_chunks.start_time,
+        sourceId: sid,
+        title: src?.title ?? sid,
+        sourceType: src?.source_type ?? "text",
+        summary: src?.summary ?? null,
+        intervieweeName: src?.interviewee_name ?? null,
+        intervieweeOrg: src?.interviewee_org ?? null,
+        citedPositions: [],
+        totalChunks: 0,
+        usedInText: false,
+        excerpts: [],
+      });
+    }
+
+    const card = bySource.get(sid)!;
+    card.totalChunks += 1;
+    if (e.used_in_text) {
+      card.usedInText = true;
+      // Deduplicate: position values must be unique per card
+      if (!card.citedPositions.includes(e.position)) {
+        card.citedPositions.push(e.position);
+      }
+    }
+    if (chunk.content) {
+      card.excerpts.push({
+        content: chunk.content,
+        speaker: chunk.speaker,
+        startTime: chunk.start_time,
+        position: e.position,
+        usedInText: e.used_in_text,
       });
     }
   }
 
   if (bySource.size === 0) return null;
 
+  // Sort each card's cited positions ascending
+  for (const card of bySource.values()) {
+    card.citedPositions.sort((a, b) => a - b);
+  }
+
+  // Sort cards: cited sources first, then by lowest cited position (or totalChunks)
+  const cards = [...bySource.values()].sort((a, b) => {
+    if (a.usedInText !== b.usedInText) return a.usedInText ? -1 : 1;
+    const aMin = a.citedPositions[0] ?? Infinity;
+    const bMin = b.citedPositions[0] ?? Infinity;
+    return aMin - bMin;
+  });
+
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      {[...bySource.entries()].map(([sourceId, meta]) => {
-        const citationLabel = meta.positions
-          .sort((a, b) => a - b)
-          .map((p) => `[${p}]`)
-          .join(" ");
-        const timeLabel = formatMinSec(meta.start_time);
-        const label = [
-          citationLabel,
-          meta.speaker,
-          timeLabel ? `@ ${timeLabel}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
-
-        return (
-          <a
-            key={sourceId}
-            href={`/interviews/${sourceId}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
-          >
-            <span className="opacity-60">↗</span>
-            {label}
-          </a>
-        );
-      })}
+      {cards.map((card) => (
+        <SourceCitationCard key={card.sourceId} card={card} />
+      ))}
     </div>
   );
 });
+
+/**
+ * Strip the LLM-generated "Sources" section from assistant text.
+ * The prompt instructs the model to append a "Sources" heading + citations,
+ * but that content is now replaced by citation cards — rendering both is
+ * redundant and visually noisy.
+ *
+ * Matches any markdown heading form on its own line:
+ *   ## Sources  /  **Sources**  /  Sources
+ */
+function stripSourcesSection(text: string): string {
+  const idx = text.search(/\n(?:#{1,6} +|\*{1,2})?Sources\*{0,2} *(\n|$)/m);
+  if (idx === -1) return text;
+  return text.slice(0, idx).trimEnd();
+}
 
 const AssistantBlock = memo(function AssistantBlock({
   text,
@@ -160,12 +202,13 @@ const AssistantBlock = memo(function AssistantBlock({
   text: string;
   evidence?: EvidenceChip[] | null;
 }) {
+  const hasCards = evidence && evidence.length > 0;
+  const displayText = hasCards ? stripSourcesSection(text) : text;
+
   return (
     <article className="w-full max-w-[40rem] text-foreground">
-      <IntelligenceBriefMarkdown>{text}</IntelligenceBriefMarkdown>
-      {evidence && evidence.length > 0 && (
-        <SourceChips evidence={evidence} />
-      )}
+      <IntelligenceBriefMarkdown>{displayText}</IntelligenceBriefMarkdown>
+      {hasCards && <SourceCitationCards evidence={evidence} />}
     </article>
   );
 });

@@ -1,9 +1,9 @@
 ---
 title: "Multi-participant entity tagging in source upload"
-status: on-going
+status: done
 owner: team
 priority: medium
-last_updated: 2026-05-13
+last_updated: 2026-05-17
 related_architecture:
   - docs/architecture/ingestion-pipeline.md
 related_features:

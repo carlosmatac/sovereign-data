@@ -19,6 +19,7 @@ export type InterviewStatus =
  * this constant instead of duplicating local arrays.
  */
 export const ENTITY_TYPE_VALUES = [
+  // Core types (migration 00001 + 00025)
   "PERSON",
   "COMPANY",
   "GOVERNMENT",
@@ -37,6 +38,16 @@ export const ENTITY_TYPE_VALUES = [
   "RISK",
   "OPPORTUNITY",
   "PROJECT",
+  // v2 canonical expansion (migration 00046)
+  "COUNTRY_REGION",       // sub-national geography (provinces, states, economic zones)
+  "CORPORATE_EVENT",      // IPOs, rights issues, mergers, acquisitions
+  "EDUCATIONAL_INSTITUTION", // universities, business schools, research institutes
+  "EXCHANGE",             // financial exchanges (JSE, NYSE, NYMEX)
+  "FACILITY",             // refineries, ports, plants, physical infrastructure
+  "LANGUAGE",             // human languages (Arabic, Hausa, Swahili)
+  "PRODUCT",              // manufactured/commercial goods (distinct from COMMODITY)
+  "WORK_OF_ART",          // publications, reports, books, research papers, films
+  "ENTITY",               // generic fallback when no specific type fits
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPE_VALUES)[number];
@@ -74,53 +85,161 @@ export type UserRole = "owner" | "editor" | "viewer";
 export type PlatformRole = "member" | "platform_admin" | "superuser";
 
 export type RelationType =
-  // ── Preferred taxonomy (v2, migration 00024) ─────────────────────────────
-  | "supplier"
-  | "competitor"
-  | "investor"
-  | "subsidiary"
-  | "acquirer"
-  | "critic"
-  | "advisor"
-  | "regulator"
-  | "affiliated_with"
-  | "operates_in"
-  | "governs"
-  | "customer_of"
-  // ── Legacy (kept for existing rows; new extractions discouraged) ─────────
+  // ── v3 canonical taxonomy (migration 00045) ───────────────────────────────
+  // Employment / role
+  | "works_at"              // PERSON → org (generic; fallback when no C-suite type fits)
+  | "leads"                 // PERSON → org (minister, chairperson, head of institution)
+  | "is_ceo_of"             // PERSON → org
+  | "is_cfo_of"             // PERSON → org
+  | "is_cto_of"             // PERSON → org
+  | "is_coo_of"             // PERSON → org
+  | "is_cmo_of"             // PERSON → org
+  | "is_cso_of"             // PERSON → org (Chief Strategy Officer)
+  | "is_board_member_of"    // PERSON → org
+  | "is_member_of"          // PERSON or org → org (coalition, body, group)
+  | "founded"               // PERSON or org → org
+  // Ownership / control
+  | "is_direct_parent_of"     // parent org → child org
+  | "is_ultimate_parent_of"   // ultimate parent → any subsidiary
+  | "invested_in"             // investor → investee (supersedes deprecated `investor`)
+  | "is_beneficial_owner_of"  // PERSON → org
+  | "is_controlled_person_of" // PERSON → org (acts under direction of controlling party)
+  // Geography
+  | "has_headquarters_in"  // org → COUNTRY / COUNTRY_REGION / FACILITY
+  | "has_presence_in"      // org → COUNTRY / COUNTRY_REGION (supersedes deprecated `operates_in`)
+  | "is_registered_in"     // org → COUNTRY (legal domicile)
+  | "located_in"           // any → COUNTRY / COUNTRY_REGION / FACILITY
+  | "within"               // COUNTRY_REGION / FACILITY → COUNTRY / COUNTRY_REGION
+  | "has_nationality"      // PERSON → COUNTRY
+  | "native_to"            // PERSON or LANGUAGE → COUNTRY / COUNTRY_REGION
+  // Governance
+  | "has_jurisdiction"      // GOVERNMENT / PUBLIC_INSTITUTION → org/COUNTRY (supersedes `regulator`, `governs`)
+  | "operates_in_industry"  // org → SECTOR / INDUSTRY
+  // Events / activities
+  | "spoke_at"                        // PERSON → EVENT / CORPORATE_EVENT
+  | "participates_in_corporate_event" // org or PERSON → CORPORATE_EVENT
+  | "studied_at"                      // PERSON → EDUCATIONAL_INSTITUTION
+  | "featured_in"                     // PERSON or org → WORK_OF_ART / EVENT
+  // Markets / finance
+  | "listed_on"   // COMPANY → EXCHANGE
+  | "traded_on"   // COMMODITY / PRODUCT → EXCHANGE
+  // Products / works / infrastructure
+  | "manufactured_by"  // PRODUCT / COMMODITY → org
+  | "published_by"     // WORK_OF_ART / LAW_OR_POLICY → org / GOVERNMENT
+  | "created_by"       // WORK_OF_ART / PRODUCT → PERSON or org
+  | "designed_by"      // PRODUCT → PERSON or org
+  | "operated_by"      // FACILITY / infrastructure → org (operator / concessionaire)
+  | "spoken_in"        // LANGUAGE → COUNTRY / COUNTRY_REGION
+  | "represents"       // PERSON → org / COUNTRY (spokesperson, ambassador, official representative)
+  // ── v2 taxonomy (migration 00024) — retained, still valid ─────────────────
+  | "supplier"        // seller → buyer
+  | "competitor"      // bidirectional competitive relationship
+  | "acquirer"        // acquirer → acquired entity (M&A)
+  | "critic"          // entity publicly criticises another
+  | "advisor"         // PERSON or org advises another
+  | "affiliated_with" // generic person↔org fallback; always prefer a specific type
+  | "customer_of"     // buyer → seller
+  // ── v2 taxonomy — deprecated for new writes; kept for existing rows ────────
+  | "investor"    // → use `invested_in`
+  | "subsidiary"  // → use `is_direct_parent_of` (parent → child)
+  | "regulator"   // → use `has_jurisdiction`
+  | "operates_in" // → use `has_presence_in` (location) or `operates_in_industry` (sector)
+  | "governs"     // → use `has_jurisdiction`
+  // ── Legacy — do not emit; kept so historical rows render ──────────────────
   | "business_partner"
   | "ally";
 
 /**
- * Canonical list of relation types, kept in sync with the DB enum.
+ * Canonical list of relation types, kept in sync with the DB enum (migrations
+ * 00004, 00024, 00045).
  *
- * Order matters: the **preferred v2 taxonomy** is listed first so any UI
- * that iterates this constant (e.g. the relation-type dropdown on the
- * interview detail page) surfaces the better labels above the legacy ones.
- *
- * Legacy values (`business_partner`, `ally`) remain valid so historical
- * rows render naturally, but extraction guidance prefers the v2 values.
+ * Order: v3 preferred types first (grouped by category), then retained v2
+ * types, then deprecated v2 types, then legacy. UIs that iterate this array
+ * should filter out deprecated/legacy values for new-write dropdowns.
  */
 export const RELATION_TYPE_VALUES = [
+  // Employment / role
+  "works_at",
+  "leads",
+  "is_ceo_of",
+  "is_cfo_of",
+  "is_cto_of",
+  "is_coo_of",
+  "is_cmo_of",
+  "is_cso_of",
+  "is_board_member_of",
+  "is_member_of",
+  "founded",
+  // Ownership / control
+  "is_direct_parent_of",
+  "is_ultimate_parent_of",
+  "invested_in",
+  "is_beneficial_owner_of",
+  "is_controlled_person_of",
+  // Geography
+  "has_headquarters_in",
+  "has_presence_in",
+  "is_registered_in",
+  "located_in",
+  "within",
+  "has_nationality",
+  "native_to",
+  // Governance
+  "has_jurisdiction",
+  "operates_in_industry",
+  // Events / activities
+  "spoke_at",
+  "participates_in_corporate_event",
+  "studied_at",
+  "featured_in",
+  // Markets / finance
+  "listed_on",
+  "traded_on",
+  // Products / works / infrastructure
+  "manufactured_by",
+  "published_by",
+  "created_by",
+  "designed_by",
+  "operated_by",
+  "spoken_in",
+  "represents",
+  // v2 retained
   "supplier",
   "competitor",
-  "investor",
-  "subsidiary",
   "acquirer",
   "critic",
   "advisor",
-  "regulator",
   "affiliated_with",
+  "customer_of",
+  // v2 deprecated (kept for existing rows)
+  "investor",
+  "subsidiary",
+  "regulator",
   "operates_in",
   "governs",
-  "customer_of",
+  // Legacy (do not emit)
   "business_partner",
   "ally",
 ] as const satisfies ReadonlyArray<RelationType>;
 
+/**
+ * Relation types that are valid for NEW writes (extraction, anchor creation,
+ * manual creation). Excludes deprecated v2 types and legacy types.
+ * Use this set for Zod enums passed to OpenAI structured output and for
+ * UI dropdowns on forms that create new relationships.
+ */
+export const ACTIVE_RELATION_TYPE_VALUES = RELATION_TYPE_VALUES.filter(
+  (t) =>
+    !["investor", "subsidiary", "regulator", "operates_in", "governs", "business_partner", "ally"].includes(t)
+) as ReadonlyArray<RelationType>;
+
 /** Editorial state on `entity_relationships` (added in migration 00023). */
 export type RelationshipReviewStatus = "pending" | "approved" | "rejected";
-export type RelationshipOrigin = "llm" | "human_created" | "human_edited";
+export type RelationshipOrigin =
+  | "llm"
+  | "human_created"
+  | "human_edited"
+  | "anchor_derived"; // deterministic from upload anchors (migration 00045)
 
 /**
  * Source-level (source, entity) association layer (added in migration 00028).
@@ -562,6 +681,8 @@ export interface Database {
           interviewee_title: string | null;
           interviewee_entity_id: string | null;
           interviewee_org_entity_id: string | null;
+          interviewee_relationship_types: RelationType[] | null;
+          participant_anchor_relationships: Record<string, unknown> | null;
           source_type: SourceType;
           semantic_source_type: string | null;
           source_metadata: Record<string, unknown> | null;
@@ -599,6 +720,8 @@ export interface Database {
           interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
+          interviewee_relationship_types?: RelationType[] | null;
+          participant_anchor_relationships?: Record<string, unknown> | null;
           source_type?: SourceType;
           semantic_source_type?: string | null;
           source_metadata?: Record<string, unknown> | null;
@@ -636,6 +759,8 @@ export interface Database {
           interviewee_title?: string | null;
           interviewee_entity_id?: string | null;
           interviewee_org_entity_id?: string | null;
+          interviewee_relationship_types?: RelationType[] | null;
+          participant_anchor_relationships?: Record<string, unknown> | null;
           source_type?: SourceType;
           semantic_source_type?: string | null;
           source_metadata?: Record<string, unknown> | null;

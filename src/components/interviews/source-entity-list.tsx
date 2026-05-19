@@ -88,7 +88,7 @@ export function SourceEntityList({ items }: SourceEntityListProps) {
       {items.map((item) => (
         <div
           key={item.entityId}
-          className="group flex items-start gap-2 rounded-[5px] px-1.5 py-1.5 transition-colors duration-150 hover:bg-white/[0.035]"
+          className="group flex items-start gap-2 rounded-[5px] px-1.5 py-1.5 transition-colors duration-150 hover:bg-accent"
         >
           {/* Type icon */}
           <div className="mt-[2px] shrink-0 text-muted-foreground">

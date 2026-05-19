@@ -118,10 +118,10 @@ export function EditableSpeakersCard({
           {codes.map((code) => (
             <li
               key={code}
-              className="flex items-center gap-3 rounded-[8px] border border-[rgba(147,147,147,0.10)] bg-white/[0.02] px-3 py-2"
+              className="flex items-center gap-3 rounded-[8px] border border-border/30 bg-accent/50 px-3 py-2"
             >
               <span
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.04] font-mono text-[11px] font-semibold text-white/60"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] font-semibold text-muted-foreground"
                 title="Stable speaker id from diarization"
               >
                 <span className="sr-only">Diarization track </span>
@@ -141,7 +141,7 @@ export function EditableSpeakersCard({
                     aria-label={`Display name for speaker track ${code}`}
                   />
                 ) : (
-                  <p className="truncate text-sm font-medium text-white/85">
+                  <p className="truncate text-sm font-medium text-foreground/85">
                     {map[code]}
                   </p>
                 )}

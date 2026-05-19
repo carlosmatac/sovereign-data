@@ -1,10 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isOrgLikeEntityType,
+  ACTIVE_RELATION_TYPE_VALUES,
   type Database,
   type EntityType,
+  type RelationType,
   type SourceEntityLinkType,
 } from "@/types/database";
+
+// ── Relationship type validation ─────────────────────────────────────────────
+
+const ACTIVE_RELATION_TYPE_SET: ReadonlySet<string> = new Set(
+  ACTIVE_RELATION_TYPE_VALUES
+);
+
+/**
+ * Parse and validate an array of relationship type strings from untrusted
+ * input (form payload, JSON body). Strips any values not in the active
+ * taxonomy and deduplicates. Returns an empty array for invalid input.
+ */
+export function parseRelationshipTypes(raw: unknown): RelationType[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: RelationType[] = [];
+  for (const v of raw) {
+    if (typeof v === "string" && ACTIVE_RELATION_TYPE_SET.has(v) && !seen.has(v)) {
+      seen.add(v);
+      out.push(v as RelationType);
+    }
+  }
+  return out;
+}
 import { matchOrCreateEntity } from "@/lib/entities/match";
 
 /**
@@ -231,6 +257,10 @@ export type RawParticipant = {
   entity_type?: string | null;
   link_type?: string | null;
   title?: string | null;
+  // Optional anchor-derived relationship fields (person → affiliated org)
+  relationship_types?: unknown;          // validated via parseRelationshipTypes
+  affiliated_org_name?: string | null;
+  affiliated_org_entity_id?: string | null;
 };
 
 /** Resolved participant row ready for `writeParticipantSourceEntities`. */
@@ -238,6 +268,10 @@ export type ResolvedParticipant = {
   entityId: string;
   linkType: SourceEntityLinkType;
   context: string | null;
+  // Anchor-derived relationship data (only present for PERSON rows with an
+  // affiliated org; used by writeAnchorDerivedRelationships)
+  relationshipTypes: RelationType[];
+  affiliatedOrgEntityId: string | null;
 };
 
 /**
@@ -286,10 +320,32 @@ export async function parseAndResolveParticipants(
       continue;
     }
 
+    // Resolve affiliated org (only meaningful for PERSON rows)
+    let affiliatedOrgEntityId: string | null = null;
+    const relationshipTypes = parseRelationshipTypes(raw.relationship_types);
+    if (entityType === "PERSON" && relationshipTypes.length > 0) {
+      const rawOrgId = raw.affiliated_org_entity_id?.trim() || null;
+      const rawOrgName = raw.affiliated_org_name?.trim() || null;
+      if (rawOrgId || rawOrgName) {
+        const orgResult = await ensureUploadAnchorEntity(admin, {
+          entityId: rawOrgId && /^[0-9a-f-]{36}$/i.test(rawOrgId) ? rawOrgId : null,
+          name: rawOrgName,
+          projectId,
+          tenantId,
+          role: "organization",
+        });
+        if (orgResult.ok) {
+          affiliatedOrgEntityId = orgResult.entityId ?? null;
+        }
+      }
+    }
+
     resolved.push({
       entityId: result.entityId,
       linkType,
       context: raw.title?.trim() || null,
+      relationshipTypes: affiliatedOrgEntityId ? relationshipTypes : [],
+      affiliatedOrgEntityId,
     });
   }
 
