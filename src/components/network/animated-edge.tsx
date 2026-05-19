@@ -19,6 +19,8 @@ export interface AnimatedEdgeData extends Record<string, unknown> {
   variant?: "semantic" | "contextual";
   /** Source title(s) for contextual edge tooltips */
   sourceTitles?: string[];
+  /** Perpendicular offset (px) for multi-edge fan separation between the same node pair. */
+  pathOffset?: number;
 }
 
 // ── Colour map ───────────────────────────────────────────────────
@@ -33,6 +35,44 @@ const EDGE_COLORS: Record<EdgeDirection, string> = {
 // ── Component ────────────────────────────────────────────────────
 
 export type AnimatedEdgeType = Edge<AnimatedEdgeData, "animated">;
+
+function perpendicularDelta(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  amount: number
+): [number, number] {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  return [(-dy / len) * amount, (dx / len) * amount];
+}
+
+function getBezierPathWithOffset(
+  params: Parameters<typeof getBezierPath>[0] & { pathOffset?: number }
+): string {
+  const { pathOffset = 0, ...bezierParams } = params;
+  const [path] = getBezierPath(bezierParams);
+  if (pathOffset === 0) return path;
+
+  const match = path.match(
+    /^M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)$/
+  );
+  if (!match) return path;
+
+  const sourceX = Number(match[1]);
+  const sourceY = Number(match[2]);
+  const sourceControlX = Number(match[3]);
+  const sourceControlY = Number(match[4]);
+  const targetControlX = Number(match[5]);
+  const targetControlY = Number(match[6]);
+  const targetX = Number(match[7]);
+  const targetY = Number(match[8]);
+  const [offsetX, offsetY] = perpendicularDelta(sourceX, sourceY, targetX, targetY, pathOffset);
+
+  return `M${sourceX},${sourceY} C${sourceControlX + offsetX},${sourceControlY + offsetY} ${targetControlX + offsetX},${targetControlY + offsetY} ${targetX},${targetY}`;
+}
 
 export const AnimatedEdge = memo(function AnimatedEdge({
   id,
@@ -51,13 +91,16 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const isContextual = variant === "contextual";
   const color = isContextual ? "rgba(245, 158, 11, 0.55)" : EDGE_COLORS[direction];
 
-  const [edgePath] = getBezierPath({
+  const pathOffset = typeof data?.pathOffset === "number" ? data.pathOffset : 0;
+
+  const edgePath = getBezierPathWithOffset({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    pathOffset,
   });
 
   const isActive = !isContextual && direction !== "unrelated";

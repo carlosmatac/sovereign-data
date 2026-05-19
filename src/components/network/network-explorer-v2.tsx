@@ -211,6 +211,26 @@ function buildGraph(
     }
   });
 
+  // Fan out multiple edges that share the same source↔target pair so they are
+  // all visible. React Flow ignores bezier curvature for many handle layouts,
+  // so we offset control points perpendicular to the chord instead.
+  const pairCounts = new Map<string, number>();
+  for (const edge of edgeMap.values()) {
+    const key = [edge.source, edge.target].sort().join("::");
+    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+  }
+  const pairIndices = new Map<string, number>();
+  const FAN_STEP_PX = 24;
+  for (const [edgeId, edge] of edgeMap) {
+    const key = [edge.source, edge.target].sort().join("::");
+    const total = pairCounts.get(key) ?? 1;
+    if (total <= 1) continue;
+    const idx = pairIndices.get(key) ?? 0;
+    pairIndices.set(key, idx + 1);
+    const pathOffset = (idx - (total - 1) / 2) * FAN_STEP_PX;
+    edgeMap.set(edgeId, { ...edge, data: { ...edge.data!, pathOffset } as AnimatedEdgeData });
+  }
+
   return { nodes: Array.from(nodeMap.values()), edges: Array.from(edgeMap.values()) };
 }
 
